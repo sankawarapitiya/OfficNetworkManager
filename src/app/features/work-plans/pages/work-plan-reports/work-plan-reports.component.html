@@ -81,8 +81,58 @@
         <button type="button" class="toggle-pill-btn" [class.active]="viewMode() === 'vertical'" (click)="setViewMode('vertical')" matTooltip="Vertical (Portrait A4: 210 × 297 mm) - Standard official dossier">
           <mat-icon>crop_portrait</mat-icon> <span>Vertical</span>
         </button>
+
+        <!-- Column Selector Trigger Button in Main Toolbar -->
+        <button type="button" class="toggle-pill-btn col-select-pill-btn" [matMenuTriggerFor]="columnPickerMenu" matTooltip="Customize visible columns for this report">
+          <mat-icon>view_column</mat-icon>
+          <span>Columns ({{ getVisibleColCount(reportType()) }}/{{ getColumnsDef(reportType()).length }})</span>
+          <mat-icon class="dropdown-arrow-icon">arrow_drop_down</mat-icon>
+        </button>
       </div>
     </div>
+
+    <!-- Reusable Column Selector Menu Panel -->
+    <mat-menu #columnPickerMenu="matMenu" class="column-picker-menu-panel" backdropClass="column-menu-backdrop">
+      <div class="column-picker-card" (click)="$event.stopPropagation()">
+        <div class="column-picker-header">
+          <div class="cp-title-row">
+            <div class="cp-title-group">
+              <mat-icon class="cp-icon">view_column</mat-icon>
+              <span class="cp-title">Column Selector</span>
+            </div>
+            <span class="cp-badge">{{ getVisibleColCount(reportType()) }}/{{ getColumnsDef(reportType()).length }} visible</span>
+          </div>
+          <div class="cp-report-name">{{ getReportTitle(reportType()) }}</div>
+          <div class="cp-actions-row">
+            <button type="button" class="cp-quick-btn" (click)="selectAllColumns(reportType(), $event)">
+              <mat-icon>done_all</mat-icon> <span>Select All</span>
+            </button>
+            <button type="button" class="cp-quick-btn" (click)="resetDefaultColumns(reportType(), $event)">
+              <mat-icon>restart_alt</mat-icon> <span>Reset</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="column-picker-divider"></div>
+
+        <div class="column-picker-list">
+          <div *ngFor="let col of getColumnsDef(reportType())" 
+               class="column-picker-item" 
+               [class.required-item]="col.required"
+               (click)="toggleColumn(reportType(), col.id, $event)">
+            <mat-checkbox 
+              [checked]="isColVisible(reportType(), col.id)" 
+              [disabled]="!!col.required"
+              (click)="$event.stopPropagation()"
+              (change)="toggleColumn(reportType(), col.id, $event)"
+              color="primary">
+              <span class="col-name">{{ col.label }}</span>
+              <span class="col-lock-tag" *ngIf="col.required" matTooltip="Mandatory key column">(Required)</span>
+            </mat-checkbox>
+          </div>
+        </div>
+      </div>
+    </mat-menu>
 
     <!-- Second Row: Report Type Selector Tabs with Direct Print Actions -->
     <div class="report-type-selector">
@@ -235,6 +285,9 @@
           <span class="report-count-info">{{ pendingPlans().length }} outstanding tasks</span>
         </div>
         <div class="toolbar-right">
+          <button mat-stroked-button class="section-action-btn" [matMenuTriggerFor]="columnPickerMenu" matTooltip="Select visible columns">
+            <mat-icon>view_column</mat-icon> <span>Columns ({{ getVisibleColCount('pending') }}/{{ getColumnsDef('pending').length }})</span>
+          </button>
           <button mat-stroked-button class="section-action-btn" (click)="exportToCsv()" matTooltip="Export Pending Directives to CSV">
             <mat-icon>table_view</mat-icon> <span>Export CSV</span>
           </button>
@@ -310,25 +363,25 @@
         <table class="report-data-table">
           <thead>
             <tr>
-              <th style="width: 4%;" class="text-center">#</th>
-              <th style="width: 10%;">Ref ID</th>
-              <th style="width: 24%;">Task Title & Objective</th>
-              <th style="width: 14%;">Assigned Officer</th>
-              <th style="width: 13%;">Department</th>
-              <th style="width: 7%;" class="text-center">Priority</th>
-              <th style="width: 9%;" class="text-center">Target Date</th>
-              <th style="width: 9%;" class="text-center">Remaining</th>
-              <th style="width: 5%;" class="text-center">Prog</th>
-              <th style="width: 5%;" class="text-center">Status</th>
+              <th *ngIf="isColVisible('pending', 'num')" style="width: 4%;" class="text-center">#</th>
+              <th *ngIf="isColVisible('pending', 'refId')" style="width: 10%;">Ref ID</th>
+              <th *ngIf="isColVisible('pending', 'title')" style="width: 24%;">Task Title & Objective</th>
+              <th *ngIf="isColVisible('pending', 'officer')" style="width: 14%;">Assigned Officer</th>
+              <th *ngIf="isColVisible('pending', 'department')" style="width: 13%;">Department</th>
+              <th *ngIf="isColVisible('pending', 'priority')" style="width: 7%;" class="text-center">Priority</th>
+              <th *ngIf="isColVisible('pending', 'targetDate')" style="width: 9%;" class="text-center">Target Date</th>
+              <th *ngIf="isColVisible('pending', 'remaining')" style="width: 9%;" class="text-center">Remaining</th>
+              <th *ngIf="isColVisible('pending', 'progress')" style="width: 5%;" class="text-center">Prog</th>
+              <th *ngIf="isColVisible('pending', 'status')" style="width: 5%;" class="text-center">Status</th>
             </tr>
           </thead>
           <tbody>
             <tr *ngFor="let p of pendingPlans(); let idx = index" [class.delayed-row]="p.status === 'Delayed'">
-              <td class="text-center font-mono">{{ idx + 1 }}</td>
-              <td class="font-mono text-xs">
+              <td *ngIf="isColVisible('pending', 'num')" class="text-center font-mono">{{ idx + 1 }}</td>
+              <td *ngIf="isColVisible('pending', 'refId')" class="font-mono text-xs">
                 <strong>{{ p.id ? p.id.substring(0, 10) : 'WP-' + (idx + 101) }}</strong>
               </td>
-              <td>
+              <td *ngIf="isColVisible('pending', 'title')">
                 <div class="task-title-cell">
                   <strong>{{ p.title }}</strong>
                   <div class="milestone-subline" *ngIf="p.milestones && p.milestones.length > 0">
@@ -337,23 +390,23 @@
                   </div>
                 </div>
               </td>
-              <td>
+              <td *ngIf="isColVisible('pending', 'officer')">
                 <div class="officer-name">{{ p.ownerName || p.leadName || 'Unassigned' }}</div>
                 <div class="officer-email" *ngIf="p.ownerEmail || p.leadEmail">{{ p.ownerEmail || p.leadEmail }}</div>
               </td>
-              <td>
+              <td *ngIf="isColVisible('pending', 'department')">
                 <span class="dept-text">{{ p.department || p.division || 'Operations' }}</span>
               </td>
-              <td class="text-center">
+              <td *ngIf="isColVisible('pending', 'priority')" class="text-center">
                 <span class="priority-pill" [class]="p.priority.toLowerCase()">{{ p.priority }}</span>
               </td>
-              <td class="text-center font-mono text-xs">{{ p.targetDate }}</td>
-              <td class="text-center">
+              <td *ngIf="isColVisible('pending', 'targetDate')" class="text-center font-mono text-xs">{{ p.targetDate }}</td>
+              <td *ngIf="isColVisible('pending', 'remaining')" class="text-center">
                 <span class="due-pill" [class.overdue]="getDaysRemaining(p.targetDate).isOverdue">
                   {{ getDaysRemaining(p.targetDate).text }}
                 </span>
               </td>
-              <td class="text-center">
+              <td *ngIf="isColVisible('pending', 'progress')" class="text-center">
                 <div class="progress-cell">
                   <span class="prog-pct">{{ p.progress }}%</span>
                   <div class="mini-bar">
@@ -361,7 +414,7 @@
                   </div>
                 </div>
               </td>
-              <td class="text-center">
+              <td *ngIf="isColVisible('pending', 'status')" class="text-center">
                 <span class="status-badge" [class]="p.status.toLowerCase().replace(' ', '-')">
                   {{ p.status }}
                 </span>
@@ -369,7 +422,7 @@
             </tr>
 
             <tr *ngIf="pendingPlans().length === 0">
-              <td colspan="10" class="no-data-cell">
+              <td [attr.colspan]="getVisibleColCount('pending')" class="no-data-cell">
                 <mat-icon class="empty-icon">task_alt</mat-icon>
                 <p>No pending tasks found for {{ getFormattedMonth() }} matching the selected filters!</p>
               </td>
@@ -424,6 +477,9 @@
           <span class="report-count-info">{{ completedPlans().length }} completed directives</span>
         </div>
         <div class="toolbar-right">
+          <button mat-stroked-button class="section-action-btn" [matMenuTriggerFor]="columnPickerMenu" matTooltip="Select visible columns">
+            <mat-icon>view_column</mat-icon> <span>Columns ({{ getVisibleColCount('completed') }}/{{ getColumnsDef('completed').length }})</span>
+          </button>
           <button mat-stroked-button class="section-action-btn" (click)="exportToCsv()" matTooltip="Export Completed Directives to CSV">
             <mat-icon>table_view</mat-icon> <span>Export CSV</span>
           </button>
@@ -499,41 +555,41 @@
         <table class="report-data-table">
           <thead>
             <tr>
-              <th style="width: 4%;" class="text-center">#</th>
-              <th style="width: 10%;">Ref ID</th>
-              <th style="width: 22%;">Task Title</th>
-              <th style="width: 14%;">Assigned Officer</th>
-              <th style="width: 13%;">Department</th>
-              <th style="width: 8%;" class="text-center">Target Date</th>
-              <th style="width: 8%;" class="text-center">Completion</th>
-              <th style="width: 11%;">Verification Sign-Offs</th>
-              <th style="width: 10%;">Review Remarks</th>
+              <th *ngIf="isColVisible('completed', 'num')" style="width: 4%;" class="text-center">#</th>
+              <th *ngIf="isColVisible('completed', 'refId')" style="width: 10%;">Ref ID</th>
+              <th *ngIf="isColVisible('completed', 'title')" style="width: 22%;">Task Title</th>
+              <th *ngIf="isColVisible('completed', 'officer')" style="width: 14%;">Assigned Officer</th>
+              <th *ngIf="isColVisible('completed', 'department')" style="width: 13%;">Department</th>
+              <th *ngIf="isColVisible('completed', 'targetDate')" style="width: 8%;" class="text-center">Target Date</th>
+              <th *ngIf="isColVisible('completed', 'completionDate')" style="width: 8%;" class="text-center">Completion</th>
+              <th *ngIf="isColVisible('completed', 'verifications')" style="width: 11%;">Verification Sign-Offs</th>
+              <th *ngIf="isColVisible('completed', 'remarks')" style="width: 10%;">Review Remarks</th>
             </tr>
           </thead>
           <tbody>
             <tr *ngFor="let p of completedPlans(); let idx = index">
-              <td class="text-center font-mono">{{ idx + 1 }}</td>
-              <td class="font-mono text-xs">
+              <td *ngIf="isColVisible('completed', 'num')" class="text-center font-mono">{{ idx + 1 }}</td>
+              <td *ngIf="isColVisible('completed', 'refId')" class="font-mono text-xs">
                 <strong>{{ p.id ? p.id.substring(0, 10) : 'WP-' + (idx + 201) }}</strong>
               </td>
-              <td>
+              <td *ngIf="isColVisible('completed', 'title')">
                 <div class="task-title-cell">
                   <strong>{{ p.title }}</strong>
                   <div class="priority-subline">Priority: {{ p.priority }}</div>
                 </div>
               </td>
-              <td>
+              <td *ngIf="isColVisible('completed', 'officer')">
                 <div class="officer-name">{{ p.ownerName || p.leadName || 'Assigned Officer' }}</div>
                 <div class="officer-email" *ngIf="p.ownerEmail || p.leadEmail">{{ p.ownerEmail || p.leadEmail }}</div>
               </td>
-              <td>
+              <td *ngIf="isColVisible('completed', 'department')">
                 <span class="dept-text">{{ p.department || p.division || 'Operations' }}</span>
               </td>
-              <td class="text-center font-mono text-xs">{{ p.targetDate }}</td>
-              <td class="text-center font-mono text-xs">
+              <td *ngIf="isColVisible('completed', 'targetDate')" class="text-center font-mono text-xs">{{ p.targetDate }}</td>
+              <td *ngIf="isColVisible('completed', 'completionDate')" class="text-center font-mono text-xs">
                 <span class="date-success">{{ p.updatedAt | date:'yyyy-MM-dd' }}</span>
               </td>
-              <td>
+              <td *ngIf="isColVisible('completed', 'verifications')">
                 <div class="verification-mini-list">
                   <div class="verif-chip-row" *ngFor="let v of getVerifiers(p)">
                     <span class="v-tag" [class.verified]="v.verified">
@@ -543,7 +599,7 @@
                   </div>
                 </div>
               </td>
-              <td class="text-xs">
+              <td *ngIf="isColVisible('completed', 'remarks')" class="text-xs">
                 <div class="review-remark-box">
                   {{ getLastReviewRemarks(p) }}
                 </div>
@@ -551,7 +607,7 @@
             </tr>
 
             <tr *ngIf="completedPlans().length === 0">
-              <td colspan="9" class="no-data-cell">
+              <td [attr.colspan]="getVisibleColCount('completed')" class="no-data-cell">
                 <mat-icon class="empty-icon">info</mat-icon>
                 <p>No completed directives found for {{ getFormattedMonth() }} with the selected filters.</p>
               </td>
@@ -606,6 +662,9 @@
           <span class="report-count-info">{{ masterPlans().length }} total directives</span>
         </div>
         <div class="toolbar-right">
+          <button mat-stroked-button class="section-action-btn" [matMenuTriggerFor]="columnPickerMenu" matTooltip="Select visible columns">
+            <mat-icon>view_column</mat-icon> <span>Columns ({{ getVisibleColCount('master') }}/{{ getColumnsDef('master').length }})</span>
+          </button>
           <button mat-stroked-button class="section-action-btn" (click)="exportToCsv()" matTooltip="Export Master Register to CSV">
             <mat-icon>table_view</mat-icon> <span>Export CSV</span>
           </button>
@@ -685,49 +744,49 @@
         <table class="report-data-table">
           <thead>
             <tr>
-              <th style="width: 4%;" class="text-center">#</th>
-              <th style="width: 10%;">Ref ID</th>
-              <th style="width: 23%;">Task Title</th>
-              <th style="width: 14%;">Officer / Lead</th>
-              <th style="width: 13%;">Department</th>
-              <th style="width: 8%;" class="text-center">Status</th>
-              <th style="width: 7%;" class="text-center">Priority</th>
-              <th style="width: 6%;" class="text-center">Prog</th>
-              <th style="width: 8%;" class="text-center">Target</th>
-              <th style="width: 7%;" class="text-right">Budget</th>
+              <th *ngIf="isColVisible('master', 'num')" style="width: 4%;" class="text-center">#</th>
+              <th *ngIf="isColVisible('master', 'refId')" style="width: 10%;">Ref ID</th>
+              <th *ngIf="isColVisible('master', 'title')" style="width: 23%;">Task Title</th>
+              <th *ngIf="isColVisible('master', 'officer')" style="width: 14%;">Officer / Lead</th>
+              <th *ngIf="isColVisible('master', 'department')" style="width: 13%;">Department</th>
+              <th *ngIf="isColVisible('master', 'status')" style="width: 8%;" class="text-center">Status</th>
+              <th *ngIf="isColVisible('master', 'priority')" style="width: 7%;" class="text-center">Priority</th>
+              <th *ngIf="isColVisible('master', 'progress')" style="width: 6%;" class="text-center">Prog</th>
+              <th *ngIf="isColVisible('master', 'targetDate')" style="width: 8%;" class="text-center">Target</th>
+              <th *ngIf="isColVisible('master', 'budget')" style="width: 7%;" class="text-right">Budget</th>
             </tr>
           </thead>
           <tbody>
             <tr *ngFor="let p of masterPlans(); let idx = index">
-              <td class="text-center font-mono">{{ idx + 1 }}</td>
-              <td class="font-mono text-xs">{{ p.id ? p.id.substring(0, 10) : 'WP-' + (idx + 1) }}</td>
-              <td>
+              <td *ngIf="isColVisible('master', 'num')" class="text-center font-mono">{{ idx + 1 }}</td>
+              <td *ngIf="isColVisible('master', 'refId')" class="font-mono text-xs">{{ p.id ? p.id.substring(0, 10) : 'WP-' + (idx + 1) }}</td>
+              <td *ngIf="isColVisible('master', 'title')">
                 <div class="task-title-cell">
                   <strong>{{ p.title }}</strong>
                   <div class="division-subline">{{ p.division }}</div>
                 </div>
               </td>
-              <td>
+              <td *ngIf="isColVisible('master', 'officer')">
                 <div class="officer-name">{{ p.ownerName || p.leadName || 'Unassigned' }}</div>
               </td>
-              <td>{{ p.department || p.division }}</td>
-              <td class="text-center">
+              <td *ngIf="isColVisible('master', 'department')">{{ p.department || p.division }}</td>
+              <td *ngIf="isColVisible('master', 'status')" class="text-center">
                 <span class="status-badge" [class]="p.status.toLowerCase().replace(' ', '-')">
                   {{ p.status }}
                 </span>
               </td>
-              <td class="text-center">
+              <td *ngIf="isColVisible('master', 'priority')" class="text-center">
                 <span class="priority-pill" [class]="p.priority.toLowerCase()">{{ p.priority }}</span>
               </td>
-              <td class="text-center">
+              <td *ngIf="isColVisible('master', 'progress')" class="text-center">
                 <span class="prog-pct">{{ p.progress }}%</span>
               </td>
-              <td class="text-center font-mono text-xs">{{ p.targetDate }}</td>
-              <td class="text-right font-mono">{{ (p.budget | number:'1.0-0') || '0' }}</td>
+              <td *ngIf="isColVisible('master', 'targetDate')" class="text-center font-mono text-xs">{{ p.targetDate }}</td>
+              <td *ngIf="isColVisible('master', 'budget')" class="text-right font-mono">{{ (p.budget | number:'1.0-0') || '0' }}</td>
             </tr>
 
             <tr *ngIf="masterPlans().length === 0">
-              <td colspan="10" class="no-data-cell">
+              <td [attr.colspan]="getVisibleColCount('master')" class="no-data-cell">
                 <mat-icon class="empty-icon">search_off</mat-icon>
                 <p>No work plans found for the selected criteria.</p>
               </td>
@@ -776,6 +835,9 @@
           <span class="report-count-info">{{ officerDossiers().length }} officer dossier(s)</span>
         </div>
         <div class="toolbar-right">
+          <button mat-stroked-button class="section-action-btn" [matMenuTriggerFor]="columnPickerMenu" matTooltip="Select visible columns">
+            <mat-icon>view_column</mat-icon> <span>Columns ({{ getVisibleColCount('individual') }}/{{ getColumnsDef('individual').length }})</span>
+          </button>
           <button mat-stroked-button class="section-action-btn" (click)="exportToCsv()" matTooltip="Export Officer Dossiers to CSV">
             <mat-icon>table_view</mat-icon> <span>Export CSV</span>
           </button>
@@ -879,35 +941,35 @@
           <table class="report-data-table">
             <thead>
               <tr>
-                <th style="width: 4%;" class="text-center">#</th>
-                <th style="width: 10%;" class="text-center">Ref ID</th>
-                <th style="width: 26%;">Directive Title & Scope</th>
-                <th style="width: 7%;" class="text-center">Priority</th>
-                <th style="width: 9%;" class="text-center">Start Date</th>
-                <th style="width: 9%;" class="text-center">Target Date</th>
-                <th style="width: 6%;" class="text-center">Prog</th>
-                <th style="width: 11%;" class="text-center">Status</th>
-                <th style="width: 18%;">Verification State</th>
+                <th *ngIf="isColVisible('individual', 'num')" style="width: 4%;" class="text-center">#</th>
+                <th *ngIf="isColVisible('individual', 'refId')" style="width: 10%;" class="text-center">Ref ID</th>
+                <th *ngIf="isColVisible('individual', 'title')" style="width: 26%;">Directive Title & Scope</th>
+                <th *ngIf="isColVisible('individual', 'priority')" style="width: 7%;" class="text-center">Priority</th>
+                <th *ngIf="isColVisible('individual', 'startDate')" style="width: 9%;" class="text-center">Start Date</th>
+                <th *ngIf="isColVisible('individual', 'targetDate')" style="width: 9%;" class="text-center">Target Date</th>
+                <th *ngIf="isColVisible('individual', 'progress')" style="width: 6%;" class="text-center">Prog</th>
+                <th *ngIf="isColVisible('individual', 'status')" style="width: 11%;" class="text-center">Status</th>
+                <th *ngIf="isColVisible('individual', 'verification')" style="width: 18%;">Verification State</th>
               </tr>
             </thead>
             <tbody>
               <tr *ngFor="let p of dossier.plans; let tIdx = index" [class.delayed-row]="p.status === 'Delayed'">
-                <td class="text-center font-mono">{{ tIdx + 1 }}</td>
-                <td class="text-center font-mono text-xs">
+                <td *ngIf="isColVisible('individual', 'num')" class="text-center font-mono">{{ tIdx + 1 }}</td>
+                <td *ngIf="isColVisible('individual', 'refId')" class="text-center font-mono text-xs">
                   <strong>{{ p.id ? p.id.substring(0, 10) : 'WP-' + (tIdx + 1) }}</strong>
                 </td>
-                <td>
+                <td *ngIf="isColVisible('individual', 'title')">
                   <div class="task-title-cell">
                     <strong>{{ p.title }}</strong>
                     <div class="desc-line" *ngIf="p.description">{{ p.description }}</div>
                   </div>
                 </td>
-                <td class="text-center">
+                <td *ngIf="isColVisible('individual', 'priority')" class="text-center">
                   <span class="priority-pill" [class]="p.priority.toLowerCase()">{{ p.priority }}</span>
                 </td>
-                <td class="text-center font-mono text-xs">{{ p.startDate }}</td>
-                <td class="text-center font-mono text-xs">{{ p.targetDate }}</td>
-                <td class="text-center">
+                <td *ngIf="isColVisible('individual', 'startDate')" class="text-center font-mono text-xs">{{ p.startDate }}</td>
+                <td *ngIf="isColVisible('individual', 'targetDate')" class="text-center font-mono text-xs">{{ p.targetDate }}</td>
+                <td *ngIf="isColVisible('individual', 'progress')" class="text-center">
                   <div class="progress-cell">
                     <span class="prog-pct">{{ p.progress }}%</span>
                     <div class="mini-bar">
@@ -915,12 +977,12 @@
                     </div>
                   </div>
                 </td>
-                <td class="text-center">
+                <td *ngIf="isColVisible('individual', 'status')" class="text-center">
                   <span class="status-badge" [class]="p.status.toLowerCase().replace(' ', '-')">
                     {{ p.status }}
                   </span>
                 </td>
-                <td>
+                <td *ngIf="isColVisible('individual', 'verification')">
                   <div class="verification-mini-list">
                     <div class="verif-chip-row" *ngFor="let v of getVerifiers(p)">
                       <span class="v-tag" [class.verified]="v.verified">
@@ -934,7 +996,7 @@
               </tr>
 
               <tr *ngIf="dossier.plans.length === 0">
-                <td colspan="9" class="no-data-cell">No tasks recorded for this officer in {{ getFormattedMonth() }}.</td>
+                <td [attr.colspan]="getVisibleColCount('individual')" class="no-data-cell">No tasks recorded for this officer in {{ getFormattedMonth() }}.</td>
               </tr>
             </tbody>
           </table>
@@ -999,6 +1061,9 @@
           <span class="report-count-info">{{ departmentSummaries().length }} departments</span>
         </div>
         <div class="toolbar-right">
+          <button mat-stroked-button class="section-action-btn" [matMenuTriggerFor]="columnPickerMenu" matTooltip="Select visible columns">
+            <mat-icon>view_column</mat-icon> <span>Columns ({{ getVisibleColCount('department') }}/{{ getColumnsDef('department').length }})</span>
+          </button>
           <button mat-stroked-button class="section-action-btn" (click)="exportToCsv()" matTooltip="Export Department Matrix to CSV">
             <mat-icon>table_view</mat-icon> <span>Export CSV</span>
           </button>
@@ -1054,31 +1119,31 @@
         <table class="report-data-table">
           <thead>
             <tr>
-              <th style="width: 4%;">#</th>
-              <th style="width: 25%;">Department Name</th>
-              <th style="width: 15%;">Division</th>
-              <th style="width: 7%;" class="text-center">Total Tasks</th>
-              <th style="width: 7%;" class="text-center">Completed</th>
-              <th style="width: 7%;" class="text-center">In Progress</th>
-              <th style="width: 7%;" class="text-center">Delayed</th>
-              <th style="width: 10%;" class="text-center">Completion %</th>
-              <th style="width: 8%;" class="text-center">Avg Progress</th>
-              <th style="width: 10%;" class="text-right">Budget (LKR)</th>
+              <th *ngIf="isColVisible('department', 'num')" style="width: 4%;">#</th>
+              <th *ngIf="isColVisible('department', 'deptName')" style="width: 25%;">Department Name</th>
+              <th *ngIf="isColVisible('department', 'division')" style="width: 15%;">Division</th>
+              <th *ngIf="isColVisible('department', 'totalTasks')" style="width: 7%;" class="text-center">Total Tasks</th>
+              <th *ngIf="isColVisible('department', 'completed')" style="width: 7%;" class="text-center">Completed</th>
+              <th *ngIf="isColVisible('department', 'inProgress')" style="width: 7%;" class="text-center">In Progress</th>
+              <th *ngIf="isColVisible('department', 'delayed')" style="width: 7%;" class="text-center">Delayed</th>
+              <th *ngIf="isColVisible('department', 'completionRate')" style="width: 10%;" class="text-center">Completion %</th>
+              <th *ngIf="isColVisible('department', 'avgProgress')" style="width: 8%;" class="text-center">Avg Progress</th>
+              <th *ngIf="isColVisible('department', 'budget')" style="width: 10%;" class="text-right">Budget (LKR)</th>
             </tr>
           </thead>
           <tbody>
             <tr *ngFor="let s of departmentSummaries(); let idx = index">
-              <td class="text-center font-mono">{{ idx + 1 }}</td>
-              <td><strong>{{ s.department }}</strong></td>
-              <td>{{ s.division }}</td>
-              <td class="text-center font-bold">{{ s.totalPlans }}</td>
-              <td class="text-center"><span class="badge success">{{ s.completedPlans }}</span></td>
-              <td class="text-center"><span class="badge info">{{ s.inProgressPlans }}</span></td>
-              <td class="text-center">
+              <td *ngIf="isColVisible('department', 'num')" class="text-center font-mono">{{ idx + 1 }}</td>
+              <td *ngIf="isColVisible('department', 'deptName')"><strong>{{ s.department }}</strong></td>
+              <td *ngIf="isColVisible('department', 'division')">{{ s.division }}</td>
+              <td *ngIf="isColVisible('department', 'totalTasks')" class="text-center font-bold">{{ s.totalPlans }}</td>
+              <td *ngIf="isColVisible('department', 'completed')" class="text-center"><span class="badge success">{{ s.completedPlans }}</span></td>
+              <td *ngIf="isColVisible('department', 'inProgress')" class="text-center"><span class="badge info">{{ s.inProgressPlans }}</span></td>
+              <td *ngIf="isColVisible('department', 'delayed')" class="text-center">
                 <span class="badge danger" *ngIf="s.delayedPlans > 0">{{ s.delayedPlans }}</span>
                 <span *ngIf="s.delayedPlans === 0">-</span>
               </td>
-              <td class="text-center">
+              <td *ngIf="isColVisible('department', 'completionRate')" class="text-center">
                 <div class="progress-cell">
                   <span class="prog-pct">{{ s.completionRate }}%</span>
                   <div class="mini-bar">
@@ -1086,12 +1151,12 @@
                   </div>
                 </div>
               </td>
-              <td class="text-center font-bold">{{ s.avgProgress }}%</td>
-              <td class="text-right font-mono">{{ (s.totalBudget | number:'1.0-0') || '0' }}</td>
+              <td *ngIf="isColVisible('department', 'avgProgress')" class="text-center font-bold">{{ s.avgProgress }}%</td>
+              <td *ngIf="isColVisible('department', 'budget')" class="text-right font-mono">{{ (s.totalBudget | number:'1.0-0') || '0' }}</td>
             </tr>
 
             <tr *ngIf="departmentSummaries().length === 0">
-              <td colspan="10" class="no-data-cell">No departmental data available for the selected filters.</td>
+              <td [attr.colspan]="getVisibleColCount('department')" class="no-data-cell">No departmental data available for the selected filters.</td>
             </tr>
           </tbody>
         </table>
@@ -1143,6 +1208,9 @@
           <span class="report-count-info">{{ verificationAuditTrail().length }} audit stages</span>
         </div>
         <div class="toolbar-right">
+          <button mat-stroked-button class="section-action-btn" [matMenuTriggerFor]="columnPickerMenu" matTooltip="Select visible columns">
+            <mat-icon>view_column</mat-icon> <span>Columns ({{ getVisibleColCount('verification') }}/{{ getColumnsDef('verification').length }})</span>
+          </button>
           <button mat-stroked-button class="section-action-btn" (click)="exportToCsv()" matTooltip="Export Verification Audit to CSV">
             <mat-icon>table_view</mat-icon> <span>Export CSV</span>
           </button>
@@ -1198,29 +1266,29 @@
         <table class="report-data-table">
           <thead>
             <tr>
-              <th style="width: 3%;" class="text-center">#</th>
-              <th style="width: 17%;">Directive Title</th>
-              <th style="width: 11%;">Department</th>
-              <th style="width: 16%;">Deliverable Milestones</th>
-              <th style="width: 6%;">Stage</th>
-              <th style="width: 12%;">Assigned Officer</th>
-              <th style="width: 7%;" class="text-center">Sign Status</th>
-              <th style="width: 9%;" class="text-center">Signed At</th>
-              <th style="width: 9%;">Signer Email</th>
-              <th style="width: 10%;">Remarks / Audit Notes</th>
+              <th *ngIf="isColVisible('verification', 'num')" style="width: 3%;" class="text-center">#</th>
+              <th *ngIf="isColVisible('verification', 'title')" style="width: 17%;">Directive Title</th>
+              <th *ngIf="isColVisible('verification', 'department')" style="width: 11%;">Department</th>
+              <th *ngIf="isColVisible('verification', 'milestones')" style="width: 16%;">Deliverable Milestones</th>
+              <th *ngIf="isColVisible('verification', 'stage')" style="width: 6%;">Stage</th>
+              <th *ngIf="isColVisible('verification', 'officer')" style="width: 12%;">Assigned Officer</th>
+              <th *ngIf="isColVisible('verification', 'signStatus')" style="width: 7%;" class="text-center">Sign Status</th>
+              <th *ngIf="isColVisible('verification', 'signedAt')" style="width: 9%;" class="text-center">Signed At</th>
+              <th *ngIf="isColVisible('verification', 'signerEmail')" style="width: 9%;">Signer Email</th>
+              <th *ngIf="isColVisible('verification', 'remarks')" style="width: 10%;">Remarks / Audit Notes</th>
             </tr>
           </thead>
           <tbody>
             <tr *ngFor="let item of verificationAuditTrail(); let idx = index">
-              <td class="text-center font-mono">{{ idx + 1 }}</td>
-              <td>
+              <td *ngIf="isColVisible('verification', 'num')" class="text-center font-mono">{{ idx + 1 }}</td>
+              <td *ngIf="isColVisible('verification', 'title')">
                 <div class="task-title-cell">
                   <strong>{{ item.planTitle }}</strong>
                   <div class="division-subline" *ngIf="item.division">{{ item.division }}</div>
                 </div>
               </td>
-              <td>{{ item.department }}</td>
-              <td>
+              <td *ngIf="isColVisible('verification', 'department')">{{ item.department }}</td>
+              <td *ngIf="isColVisible('verification', 'milestones')">
                 <div class="milestones-status-cell">
                   <ng-container *ngIf="item.milestonesTotal > 0; else noMilestonesTpl">
                     <div class="ms-badge-row">
@@ -1249,22 +1317,22 @@
                   </ng-template>
                 </div>
               </td>
-              <td><span class="stage-tag">Stage {{ item.stageOrder }}</span></td>
-              <td>{{ item.assignedOfficerName }}</td>
-              <td class="text-center">
+              <td *ngIf="isColVisible('verification', 'stage')"><span class="stage-tag">Stage {{ item.stageOrder }}</span></td>
+              <td *ngIf="isColVisible('verification', 'officer')">{{ item.assignedOfficerName }}</td>
+              <td *ngIf="isColVisible('verification', 'signStatus')" class="text-center">
                 <span class="badge" [class.success]="item.verified" [class.warning]="!item.verified">
                   {{ item.verified ? 'Approved' : 'Pending' }}
                 </span>
               </td>
-              <td class="font-mono text-xs text-center">
+              <td *ngIf="isColVisible('verification', 'signedAt')" class="font-mono text-xs text-center">
                 {{ item.verifiedAt ? (item.verifiedAt | date:'yyyy-MM-dd HH:mm') : '-' }}
               </td>
-              <td class="font-mono text-xs">{{ item.verifiedByEmail || '-' }}</td>
-              <td class="text-xs">{{ item.reviewComment || 'Standard approval' }}</td>
+              <td *ngIf="isColVisible('verification', 'signerEmail')" class="font-mono text-xs">{{ item.verifiedByEmail || '-' }}</td>
+              <td *ngIf="isColVisible('verification', 'remarks')" class="text-xs">{{ item.reviewComment || 'Standard approval' }}</td>
             </tr>
 
             <tr *ngIf="verificationAuditTrail().length === 0">
-              <td colspan="10" class="no-data-cell">No verification stages found for the selected criteria.</td>
+              <td [attr.colspan]="getVisibleColCount('verification')" class="no-data-cell">No verification stages found for the selected criteria.</td>
             </tr>
           </tbody>
         </table>

@@ -12,6 +12,8 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
+import { MatMenuModule } from '@angular/material/menu';
+import { MatCheckboxModule } from '@angular/material/checkbox';
 import {
   WorkPlan,
   WorkPlanVerifier,
@@ -30,6 +32,86 @@ import { AuthService } from '../../../../auth/auth.service';
 import { RbacService } from '../../../../auth/rbac.service';
 
 export type ReportType = 'pending' | 'completed' | 'master' | 'individual' | 'department' | 'verification';
+
+export interface ReportColumnDef {
+  id: string;
+  label: string;
+  defaultVisible: boolean;
+  required?: boolean;
+}
+
+export const REPORT_COLUMNS: Record<ReportType, ReportColumnDef[]> = {
+  pending: [
+    { id: 'num', label: '# (Row Number)', defaultVisible: true },
+    { id: 'refId', label: 'Ref ID', defaultVisible: true },
+    { id: 'title', label: 'Task Title & Objective', defaultVisible: true, required: true },
+    { id: 'officer', label: 'Assigned Officer', defaultVisible: true },
+    { id: 'department', label: 'Department', defaultVisible: true },
+    { id: 'priority', label: 'Priority', defaultVisible: true },
+    { id: 'targetDate', label: 'Target Date', defaultVisible: true },
+    { id: 'remaining', label: 'Remaining / Due', defaultVisible: true },
+    { id: 'progress', label: 'Progress %', defaultVisible: true },
+    { id: 'status', label: 'Status', defaultVisible: true }
+  ],
+  completed: [
+    { id: 'num', label: '# (Row Number)', defaultVisible: true },
+    { id: 'refId', label: 'Ref ID', defaultVisible: true },
+    { id: 'title', label: 'Task Title', defaultVisible: true, required: true },
+    { id: 'officer', label: 'Assigned Officer', defaultVisible: true },
+    { id: 'department', label: 'Department', defaultVisible: true },
+    { id: 'targetDate', label: 'Target Date', defaultVisible: true },
+    { id: 'completionDate', label: 'Completion Date', defaultVisible: true },
+    { id: 'verifications', label: 'Verification Sign-Offs', defaultVisible: true },
+    { id: 'remarks', label: 'Review Remarks', defaultVisible: true }
+  ],
+  master: [
+    { id: 'num', label: '# (Row Number)', defaultVisible: true },
+    { id: 'refId', label: 'Ref ID', defaultVisible: true },
+    { id: 'title', label: 'Task Title', defaultVisible: true, required: true },
+    { id: 'officer', label: 'Officer / Lead', defaultVisible: true },
+    { id: 'department', label: 'Department', defaultVisible: true },
+    { id: 'status', label: 'Status', defaultVisible: true },
+    { id: 'priority', label: 'Priority', defaultVisible: true },
+    { id: 'progress', label: 'Progress %', defaultVisible: true },
+    { id: 'targetDate', label: 'Target Date', defaultVisible: true },
+    { id: 'budget', label: 'Budget (LKR)', defaultVisible: true }
+  ],
+  individual: [
+    { id: 'num', label: '# (Row Number)', defaultVisible: true },
+    { id: 'refId', label: 'Ref ID', defaultVisible: true },
+    { id: 'title', label: 'Directive Title & Scope', defaultVisible: true, required: true },
+    { id: 'priority', label: 'Priority', defaultVisible: true },
+    { id: 'startDate', label: 'Start Date', defaultVisible: true },
+    { id: 'targetDate', label: 'Target Date', defaultVisible: true },
+    { id: 'progress', label: 'Progress %', defaultVisible: true },
+    { id: 'status', label: 'Status', defaultVisible: true },
+    { id: 'verification', label: 'Verification State', defaultVisible: true }
+  ],
+  department: [
+    { id: 'num', label: '# (Row Number)', defaultVisible: true },
+    { id: 'deptName', label: 'Department Name', defaultVisible: true, required: true },
+    { id: 'division', label: 'Division', defaultVisible: true },
+    { id: 'totalTasks', label: 'Total Tasks', defaultVisible: true },
+    { id: 'completed', label: 'Completed', defaultVisible: true },
+    { id: 'inProgress', label: 'In Progress', defaultVisible: true },
+    { id: 'delayed', label: 'Delayed', defaultVisible: true },
+    { id: 'completionRate', label: 'Completion %', defaultVisible: true },
+    { id: 'avgProgress', label: 'Avg Progress', defaultVisible: true },
+    { id: 'budget', label: 'Budget (LKR)', defaultVisible: true }
+  ],
+  verification: [
+    { id: 'num', label: '# (Row Number)', defaultVisible: true },
+    { id: 'title', label: 'Directive Title', defaultVisible: true, required: true },
+    { id: 'department', label: 'Department', defaultVisible: true },
+    { id: 'milestones', label: 'Deliverable Milestones', defaultVisible: true },
+    { id: 'stage', label: 'Stage', defaultVisible: true },
+    { id: 'officer', label: 'Assigned Officer', defaultVisible: true },
+    { id: 'signStatus', label: 'Sign Status', defaultVisible: true },
+    { id: 'signedAt', label: 'Signed At', defaultVisible: true },
+    { id: 'signerEmail', label: 'Signer Email', defaultVisible: true },
+    { id: 'remarks', label: 'Remarks / Audit Notes', defaultVisible: true }
+  ]
+};
 
 export interface OfficerDossier {
   officerName: string;
@@ -99,7 +181,9 @@ export interface VerificationAuditItem {
     MatFormFieldModule,
     MatInputModule,
     MatSelectModule,
-    MatSnackBarModule
+    MatSnackBarModule,
+    MatMenuModule,
+    MatCheckboxModule
   ],
   templateUrl: './work-plan-reports.component.html',
   styleUrl: './work-plan-reports.component.scss'
@@ -127,6 +211,130 @@ export class WorkPlanReportsComponent implements OnInit, OnDestroy {
     (typeof localStorage !== 'undefined' && localStorage.getItem('work_plan_report_view_mode') === 'horizontal') ? 'horizontal' : 'vertical'
   );
   viewLayout = computed<'a4-preview' | 'responsive'>(() => 'a4-preview');
+
+  // Visible columns map per report type: { pending: { num: true, refId: true, ... }, ... }
+  visibleColumns = signal<Record<ReportType, Record<string, boolean>>>(this.loadVisibleColumns());
+
+  private loadVisibleColumns(): Record<ReportType, Record<string, boolean>> {
+    const defaults: Record<ReportType, Record<string, boolean>> = {
+      pending: {},
+      completed: {},
+      master: {},
+      individual: {},
+      department: {},
+      verification: {}
+    };
+    (Object.keys(REPORT_COLUMNS) as ReportType[]).forEach(type => {
+      defaults[type] = {};
+      REPORT_COLUMNS[type].forEach(col => {
+        defaults[type][col.id] = col.defaultVisible;
+      });
+    });
+
+    if (typeof localStorage !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('work_plan_report_visible_columns');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          (Object.keys(defaults) as ReportType[]).forEach(type => {
+            if (parsed[type]) {
+              defaults[type] = { ...defaults[type], ...parsed[type] };
+            }
+          });
+        }
+      } catch (e) {
+        console.warn('Failed to parse saved visible columns', e);
+      }
+    }
+    return defaults;
+  }
+
+  private persistVisibleColumns() {
+    if (typeof localStorage !== 'undefined') {
+      try {
+        localStorage.setItem('work_plan_report_visible_columns', JSON.stringify(this.visibleColumns()));
+      } catch (e) {
+        console.warn('Failed to save visible columns', e);
+      }
+    }
+  }
+
+  isColVisible(type: ReportType, colId: string): boolean {
+    const reportMap = this.visibleColumns()[type];
+    if (!reportMap) return true;
+    return reportMap[colId] !== false;
+  }
+
+  toggleColumn(type: ReportType, colId: string, event?: any) {
+    if (event && typeof event.stopPropagation === 'function') {
+      event.stopPropagation();
+    }
+    const current = this.visibleColumns();
+    const reportMap = { ...(current[type] || {}) };
+    const colDef = REPORT_COLUMNS[type]?.find(c => c.id === colId);
+    if (colDef?.required) {
+      return; // Cannot toggle off required column
+    }
+    reportMap[colId] = !this.isColVisible(type, colId);
+    this.visibleColumns.set({
+      ...current,
+      [type]: reportMap
+    });
+    this.persistVisibleColumns();
+  }
+
+  selectAllColumns(type: ReportType, event?: any) {
+    if (event && typeof event.stopPropagation === 'function') {
+      event.stopPropagation();
+    }
+    const current = this.visibleColumns();
+    const reportMap = { ...(current[type] || {}) };
+    (REPORT_COLUMNS[type] || []).forEach(col => {
+      reportMap[col.id] = true;
+    });
+    this.visibleColumns.set({
+      ...current,
+      [type]: reportMap
+    });
+    this.persistVisibleColumns();
+  }
+
+  resetDefaultColumns(type: ReportType, event?: any) {
+    if (event && typeof event.stopPropagation === 'function') {
+      event.stopPropagation();
+    }
+    const current = this.visibleColumns();
+    const reportMap: Record<string, boolean> = {};
+    (REPORT_COLUMNS[type] || []).forEach(col => {
+      reportMap[col.id] = col.defaultVisible;
+    });
+    this.visibleColumns.set({
+      ...current,
+      [type]: reportMap
+    });
+    this.persistVisibleColumns();
+  }
+
+  getVisibleColCount(type: ReportType): number {
+    const cols = REPORT_COLUMNS[type] || [];
+    return cols.filter(c => this.isColVisible(type, c.id)).length;
+  }
+
+  getColumnsDef(type: ReportType): ReportColumnDef[] {
+    return REPORT_COLUMNS[type] || [];
+  }
+
+  getReportTitle(type: ReportType): string {
+    switch (type) {
+      case 'pending': return 'Whole Month Pending Directives';
+      case 'completed': return 'Completed Directives with Status';
+      case 'master': return 'Monthly Master Register';
+      case 'individual': return 'Individual Officer Dossier';
+      case 'department': return 'Department Summary Matrix';
+      case 'verification': return 'Verification Audit Log';
+      default: return 'Report';
+    }
+  }
 
   // Filters
   selectedDivision = signal<string>('all');
