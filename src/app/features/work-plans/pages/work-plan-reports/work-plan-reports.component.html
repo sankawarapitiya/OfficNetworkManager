@@ -81,13 +81,6 @@
         <button type="button" class="toggle-pill-btn" [class.active]="viewMode() === 'vertical'" (click)="setViewMode('vertical')" matTooltip="Vertical (Portrait A4: 210 × 297 mm) - Standard official dossier">
           <mat-icon>crop_portrait</mat-icon> <span>Vertical</span>
         </button>
-
-        <!-- Column Selector Trigger Button in Main Toolbar -->
-        <button type="button" class="toggle-pill-btn col-select-pill-btn" [matMenuTriggerFor]="columnPickerMenu" matTooltip="Customize visible columns for this report">
-          <mat-icon>view_column</mat-icon>
-          <span>Columns ({{ getVisibleColCount(reportType()) }}/{{ getColumnsDef(reportType()).length }})</span>
-          <mat-icon class="dropdown-arrow-icon">arrow_drop_down</mat-icon>
-        </button>
       </div>
     </div>
 
