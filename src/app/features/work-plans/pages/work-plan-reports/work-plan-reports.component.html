@@ -594,7 +594,10 @@
               </td>
               <td *ngIf="isColVisible('completed', 'remarks')" class="text-xs">
                 <div class="review-remark-box">
-                  {{ getLastReviewRemarks(p) }}
+                  <div class="remark-entry" *ngFor="let rem of getCompletedRemarks(p)">
+                    <span class="remark-stage-pill" [class.stage1]="rem.isStage1">{{ rem.label }}:</span>
+                    <span class="remark-text">{{ rem.comment }}</span>
+                  </div>
                 </div>
               </td>
             </tr>
@@ -1321,7 +1324,18 @@
                 {{ item.verifiedAt ? (item.verifiedAt | date:'yyyy-MM-dd HH:mm') : '-' }}
               </td>
               <td *ngIf="isColVisible('verification', 'signerEmail')" class="font-mono text-xs">{{ item.verifiedByEmail || '-' }}</td>
-              <td *ngIf="isColVisible('verification', 'remarks')" class="text-xs">{{ item.reviewComment || 'Standard approval' }}</td>
+              <td *ngIf="isColVisible('verification', 'remarks')" class="text-xs">
+                <div class="audit-remarks-box">
+                  <div class="audit-remark-row stage1" *ngIf="item.stageOrder > 1 && item.stage1Comment">
+                    <span class="audit-stage-pill stage1">Stage 1{{ item.stage1Officer ? ' (' + item.stage1Officer + ')' : '' }}:</span>
+                    <span class="audit-text">{{ item.stage1Comment }}</span>
+                  </div>
+                  <div class="audit-remark-row current" [class.has-prior]="item.stageOrder > 1 && item.stage1Comment">
+                    <span class="audit-stage-pill" *ngIf="item.stageOrder > 1">Stage {{ item.stageOrder }}:</span>
+                    <span class="audit-text">{{ item.reviewComment || 'Standard approval' }}</span>
+                  </div>
+                </div>
+              </td>
             </tr>
 
             <tr *ngIf="verificationAuditTrail().length === 0">

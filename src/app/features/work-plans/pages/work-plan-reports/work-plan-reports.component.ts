@@ -157,6 +157,8 @@ export interface VerificationAuditItem {
   verifiedAt?: number | string;
   verifiedByEmail?: string;
   reviewComment?: string;
+  stage1Comment?: string;
+  stage1Officer?: string;
   planStatus: string;
   targetDate: string;
   milestonesTotal: number;
@@ -715,6 +717,10 @@ export class WorkPlanReportsComponent implements OnInit, OnDestroy {
       const mCompleted = ms.filter(m => m.completed).length;
       const mRate = mTotal > 0 ? Math.round((mCompleted / mTotal) * 100) : 0;
 
+      const stage1V = verifiers.find(v => v.order === 1);
+      const stage1Comment = stage1V?.reviewComment?.trim() || (stage1V?.verified ? 'Verified / Approved' : undefined);
+      const stage1Officer = stage1V?.name;
+
       for (const v of verifiers) {
         items.push({
           planId: p.id,
@@ -729,6 +735,8 @@ export class WorkPlanReportsComponent implements OnInit, OnDestroy {
           verifiedAt: v.verifiedAt,
           verifiedByEmail: v.verifiedByEmail,
           reviewComment: v.reviewComment || (p.revisionNotes ? `Rollback: ${p.revisionNotes}` : undefined),
+          stage1Comment: stage1Comment,
+          stage1Officer: stage1Officer,
           planStatus: p.status,
           targetDate: p.targetDate,
           milestonesTotal: mTotal,
@@ -930,20 +938,76 @@ export class WorkPlanReportsComponent implements OnInit, OnDestroy {
     return getPlanVerifiers(plan);
   }
 
-  getLastReviewRemarks(plan: WorkPlan): string {
+  getCompletedRemarks(plan: WorkPlan): { label: string; comment: string; isStage1: boolean }[] {
+    const results: { label: string; comment: string; isStage1: boolean }[] = [];
     const verifiers = getPlanVerifiers(plan);
-    // Find the last verifier who provided reviewComment
-    for (let i = verifiers.length - 1; i >= 0; i--) {
-      const v = verifiers[i];
-      if (v.reviewComment && v.reviewComment.trim()) {
-        return `[Stage ${v.order}${v.name ? ' - ' + v.name : ''}]: ${v.reviewComment.trim()}`;
+    const stage1 = verifiers.find(v => v.order === 1);
+
+    // 1. Stage 1 remark
+    if (stage1) {
+      if (stage1.reviewComment && stage1.reviewComment.trim()) {
+        results.push({
+          label: `Stage 1${stage1.name ? ' (' + stage1.name + ')' : ''}`,
+          comment: stage1.reviewComment.trim(),
+          isStage1: true
+        });
+      } else if (stage1.verified) {
+        const hasLaterComments = verifiers.some(v => v.order > 1 && v.reviewComment && v.reviewComment.trim());
+        if (hasLaterComments) {
+          results.push({
+            label: `Stage 1${stage1.name ? ' (' + stage1.name + ')' : ''}`,
+            comment: 'Verified & Approved',
+            isStage1: true
+          });
+        }
       }
     }
-    // Check revisionNotes / rollback comment
-    if (plan.revisionNotes && plan.revisionNotes.trim()) {
-      return `[Revision]: ${plan.revisionNotes.trim()}`;
+
+    // 2. Subsequent verifier comments (Stage 2, Stage 3...)
+    const laterVerifiersWithComments = verifiers.filter(v => v.order > 1 && v.reviewComment && v.reviewComment.trim());
+    if (laterVerifiersWithComments.length > 0) {
+      laterVerifiersWithComments.forEach(v => {
+        results.push({
+          label: `Stage ${v.order}${v.name ? ' (' + v.name + ')' : ''}`,
+          comment: v.reviewComment!.trim(),
+          isStage1: false
+        });
+      });
+    } else if (verifiers.length > 1 && results.length > 0) {
+      const lastV = verifiers[verifiers.length - 1];
+      if (lastV.verified && lastV.order > 1) {
+        results.push({
+          label: `Stage ${lastV.order}${lastV.name ? ' (' + lastV.name + ')' : ''}`,
+          comment: 'Final approval verified',
+          isStage1: false
+        });
+      }
     }
-    return 'Approved as per directive.';
+
+    // 3. Rollback / Revision notes
+    if (plan.revisionNotes && plan.revisionNotes.trim()) {
+      results.push({
+        label: 'Revision',
+        comment: plan.revisionNotes.trim(),
+        isStage1: false
+      });
+    }
+
+    // 4. Default fallback if no remarks were entered
+    if (results.length === 0) {
+      results.push({
+        label: 'Sign-off',
+        comment: 'Approved as per directive.',
+        isStage1: false
+      });
+    }
+
+    return results;
+  }
+
+  getLastReviewRemarks(plan: WorkPlan): string {
+    const remarks = this.getCompletedRemarks(plan);
+    return remarks.map(r => `[${r.label}]: ${r.comment}`).join(' | ');
   }
 
   triggerPrint(targetReportType?: ReportType) {
@@ -1187,7 +1251,9 @@ export class WorkPlanReportsComponent implements OnInit, OnDestroy {
         item.verified ? 'Approved' : 'Pending Sign-off',
         item.verifiedAt ? new Date(item.verifiedAt).toLocaleString() : 'N/A',
         item.verifiedByEmail || 'N/A',
-        item.reviewComment || 'N/A',
+        item.stageOrder > 1 && item.stage1Comment
+          ? `[Stage 1]: ${item.stage1Comment} | [Stage ${item.stageOrder}]: ${item.reviewComment || 'Standard approval'}`
+          : (item.reviewComment || 'Standard approval'),
         item.targetDate
       ]);
     }

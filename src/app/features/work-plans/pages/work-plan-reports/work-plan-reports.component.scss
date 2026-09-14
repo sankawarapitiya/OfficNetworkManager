@@ -1359,13 +1359,90 @@
     }
 
     .review-remark-box {
-      font-style: italic;
-      color: #334155;
       width: 100%;
       overflow-wrap: break-word;
       word-break: break-word;
-      line-height: 1.2;
+      line-height: 1.25;
       font-size: 0.62rem;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+
+      .remark-entry {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: baseline;
+        gap: 3px;
+
+        .remark-stage-pill {
+          display: inline-block;
+          font-style: normal;
+          font-weight: 700;
+          font-size: 0.58rem;
+          color: #475569;
+          background: #f1f5f9;
+          padding: 0 4px;
+          border-radius: 2px;
+          white-space: nowrap;
+
+          &.stage1 {
+            color: #1e40af;
+            background: #dbeafe;
+            border: 1px solid #bfdbfe;
+          }
+        }
+
+        .remark-text {
+          font-style: italic;
+          color: #334155;
+        }
+      }
+    }
+
+    .audit-remarks-box {
+      width: 100%;
+      overflow-wrap: break-word;
+      word-break: break-word;
+      line-height: 1.25;
+      font-size: 0.62rem;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+
+      .audit-remark-row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: baseline;
+        gap: 3px;
+
+        .audit-stage-pill {
+          display: inline-block;
+          font-style: normal;
+          font-weight: 700;
+          font-size: 0.58rem;
+          color: #475569;
+          background: #f1f5f9;
+          padding: 0 4px;
+          border-radius: 2px;
+          white-space: nowrap;
+
+          &.stage1 {
+            color: #1e40af;
+            background: #dbeafe;
+            border: 1px solid #bfdbfe;
+          }
+        }
+
+        .audit-text {
+          font-style: italic;
+          color: #334155;
+        }
+
+        &.current.has-prior {
+          padding-top: 1px;
+          border-top: 1px dashed #e2e8f0;
+        }
+      }
     }
 
     .stage-tag {
