@@ -1,0 +1,99 @@
+:host {
+  display: block;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+}
+
+.layout-container {
+  height: 100vh;
+  width: 100vw;
+  background-color: var(--canvas-bg);
+}
+
+.app-sidenav {
+  width: 260px;
+  max-width: 85vw;
+  background-color: var(--surface-white) !important;
+  border-right: 1px solid var(--border-subtle) !important;
+  box-shadow: 1px 0 6px 0 rgba(15, 23, 42, 0.06) !important;
+  overflow-x: hidden;
+}
+
+.layout-main-wrapper {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+  background-color: var(--canvas-bg);
+}
+
+.content-scrollable-area {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 32px 36px;
+  display: flex;
+  flex-direction: column;
+
+  @media (max-width: 960px) {
+    padding: 24px 20px;
+  }
+
+  @media (max-width: 600px) {
+    padding: 16px 12px;
+  }
+}
+
+.content-inner {
+  max-width: 1560px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+@media print {
+  :host {
+    height: auto !important;
+    width: 100% !important;
+    overflow: visible !important;
+    display: block !important;
+  }
+
+  .layout-container {
+    height: auto !important;
+    min-height: auto !important;
+    width: 100% !important;
+    background: transparent !important;
+    overflow: visible !important;
+  }
+
+  .app-sidenav,
+  app-header {
+    display: none !important;
+  }
+
+  .layout-main-wrapper {
+    height: auto !important;
+    min-height: auto !important;
+    overflow: visible !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    width: 100% !important;
+    background: transparent !important;
+  }
+
+  .content-scrollable-area {
+    padding: 0 !important;
+    overflow: visible !important;
+    height: auto !important;
+    width: 100% !important;
+    display: block !important;
+  }
+
+  .content-inner {
+    max-width: 100% !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+}

@@ -1,0 +1,1322 @@
+<div class="work-plans-reports-page">
+  
+  <!-- Screen Only: Hero Banner & Navigation Tabs -->
+  <div class="hero-banner no-print">
+    <div class="hero-content">
+      <div class="hero-tag-row">
+        <span class="status-pill indigo">
+          <mat-icon class="pill-icon">summarize</mat-icon> Executive Reporting Suite
+        </span>
+        <span class="sync-indicator">A4 Printable & Multi-Type Export</span>
+      </div>
+      <h1 class="hero-title">Work Plan Reports & Dossiers</h1>
+      <p class="hero-subtitle">
+        Generate monthly pending and completed directive lists, individual officer performance dossiers, departmental matrices, and multi-stage verification audit logs.
+      </p>
+    </div>
+    
+    <div class="hero-actions" *ngIf="hasAnyReportAccess()">
+      <button mat-stroked-button class="action-btn" (click)="exportToCsv()" matTooltip="Download formatted spreadsheet">
+        <mat-icon>table_view</mat-icon> <span>Export CSV</span>
+      </button>
+      <button mat-flat-button color="primary" class="primary-action-btn" (click)="triggerPrint()" matTooltip="Print or Save as PDF (A4)">
+        <mat-icon>print</mat-icon> <span>Print / Save PDF</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Sub-Category Tab Navigation Bar -->
+  <div class="sub-category-tabs no-print">
+    <a routerLink="/work-plans/dashboard" routerLinkActive="active" class="sub-tab-btn">
+      <mat-icon>insights</mat-icon>
+      <span>Dashboard</span>
+    </a>
+    <a *ngIf="canAccessVerification()" routerLink="/work-plans/verification" routerLinkActive="active" class="sub-tab-btn">
+      <mat-icon>fact_check</mat-icon>
+      <span>Verification</span>
+    </a>
+    <a routerLink="/work-plans/tasks" routerLinkActive="active" class="sub-tab-btn">
+      <mat-icon>view_kanban</mat-icon>
+      <span>Task List</span>
+    </a>
+    <a routerLink="/work-plans/reports" routerLinkActive="active" class="sub-tab-btn active">
+      <mat-icon>summarize</mat-icon>
+      <span>Reports</span>
+    </a>
+    <a *ngIf="canManageSettings()" routerLink="/work-plans/settings" routerLinkActive="active" class="sub-tab-btn">
+      <mat-icon>tune</mat-icon>
+      <span>Settings</span>
+    </a>
+  </div>
+
+  <ng-container *ngIf="hasAnyReportAccess(); else unauthorizedBlock">
+
+  <!-- Control & Filter Toolbar (Screen Only) -->
+  <div class="report-controls-card no-print">
+    
+    <!-- Top Row: Month Selector & Quick Actions -->
+    <div class="month-selector-row">
+      <div class="month-nav-group">
+        <button mat-icon-button (click)="shiftMonth(-1)" matTooltip="Previous Month">
+          <mat-icon>chevron_left</mat-icon>
+        </button>
+        <div class="current-month-display">
+          <mat-icon class="cal-icon">calendar_month</mat-icon>
+          <span class="month-text">{{ getFormattedMonth() }}</span>
+          <span class="raw-code">({{ selectedMonth() }})</span>
+        </div>
+        <button mat-icon-button (click)="shiftMonth(1)" matTooltip="Next Month">
+          <mat-icon>chevron_right</mat-icon>
+        </button>
+        <button mat-stroked-button class="today-btn" (click)="resetToCurrentMonth()">
+          Current Month
+        </button>
+      </div>
+
+      <div class="layout-toggle-group">
+        <span class="control-label">View Mode:</span>
+        <button type="button" class="toggle-pill-btn" [class.active]="viewMode() === 'horizontal'" (click)="setViewMode('horizontal')" matTooltip="Horizontal (Landscape A4: 297 × 210 mm) - Optimal for multi-column tables">
+          <mat-icon>crop_landscape</mat-icon> <span>Horizontal</span>
+        </button>
+        <button type="button" class="toggle-pill-btn" [class.active]="viewMode() === 'vertical'" (click)="setViewMode('vertical')" matTooltip="Vertical (Portrait A4: 210 × 297 mm) - Standard official dossier">
+          <mat-icon>crop_portrait</mat-icon> <span>Vertical</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Second Row: Report Type Selector Tabs with Direct Print Actions -->
+    <div class="report-type-selector">
+      <button *ngIf="canAccessReport('pending')" type="button" class="type-tab-btn" [class.active]="reportType() === 'pending'" (click)="selectReportType('pending')">
+        <mat-icon>pending_actions</mat-icon>
+        <div class="tab-label-group">
+          <span class="tab-title">Whole Month Pending</span>
+          <span class="tab-count">{{ pendingPlans().length }} tasks</span>
+        </div>
+        <button type="button" class="tab-print-icon-btn" (click)="$event.stopPropagation(); triggerPrint('pending')" matTooltip="Quick Print Pending Directives (A4)">
+          <mat-icon>print</mat-icon>
+        </button>
+      </button>
+
+      <button *ngIf="canAccessReport('completed')" type="button" class="type-tab-btn" [class.active]="reportType() === 'completed'" (click)="selectReportType('completed')">
+        <mat-icon>check_circle</mat-icon>
+        <div class="tab-label-group">
+          <span class="tab-title">Completed with Status</span>
+          <span class="tab-count">{{ completedPlans().length }} tasks</span>
+        </div>
+        <button type="button" class="tab-print-icon-btn" (click)="$event.stopPropagation(); triggerPrint('completed')" matTooltip="Quick Print Completed Report (A4)">
+          <mat-icon>print</mat-icon>
+        </button>
+      </button>
+
+      <button *ngIf="canAccessReport('master')" type="button" class="type-tab-btn" [class.active]="reportType() === 'master'" (click)="selectReportType('master')">
+        <mat-icon>assignment</mat-icon>
+        <div class="tab-label-group">
+          <span class="tab-title">Monthly Master Register</span>
+          <span class="tab-count">{{ masterPlans().length }} total</span>
+        </div>
+        <button type="button" class="tab-print-icon-btn" (click)="$event.stopPropagation(); triggerPrint('master')" matTooltip="Quick Print Master Register (A4)">
+          <mat-icon>print</mat-icon>
+        </button>
+      </button>
+
+      <button *ngIf="canAccessReport('individual')" type="button" class="type-tab-btn" [class.active]="reportType() === 'individual'" (click)="selectReportType('individual')">
+        <mat-icon>person_pin</mat-icon>
+        <div class="tab-label-group">
+          <span class="tab-title">{{ (canAccessReport('master') || canAccessReport('pending')) ? 'Individual Officer Dossier' : 'My Personal Dossier' }}</span>
+          <span class="tab-count">{{ officerDossiers().length }} {{ (canAccessReport('master') || canAccessReport('pending')) ? 'officers' : 'dossier' }}</span>
+        </div>
+        <button type="button" class="tab-print-icon-btn" (click)="$event.stopPropagation(); triggerPrint('individual')" matTooltip="Quick Print Officer Dossiers (A4)">
+          <mat-icon>print</mat-icon>
+        </button>
+      </button>
+
+      <button *ngIf="canAccessReport('department')" type="button" class="type-tab-btn" [class.active]="reportType() === 'department'" (click)="selectReportType('department')">
+        <mat-icon>corporate_fare</mat-icon>
+        <div class="tab-label-group">
+          <span class="tab-title">Department Summary</span>
+          <span class="tab-count">{{ departmentSummaries().length }} units</span>
+        </div>
+        <button type="button" class="tab-print-icon-btn" (click)="$event.stopPropagation(); triggerPrint('department')" matTooltip="Quick Print Department Summary (A4)">
+          <mat-icon>print</mat-icon>
+        </button>
+      </button>
+
+      <button *ngIf="canAccessReport('verification')" type="button" class="type-tab-btn" [class.active]="reportType() === 'verification'" (click)="selectReportType('verification')">
+        <mat-icon>verified</mat-icon>
+        <div class="tab-label-group">
+          <span class="tab-title">Verification Audit</span>
+          <span class="tab-count">{{ verificationAuditTrail().length }} stages</span>
+        </div>
+        <button type="button" class="tab-print-icon-btn" (click)="$event.stopPropagation(); triggerPrint('verification')" matTooltip="Quick Print Verification Audit (A4)">
+          <mat-icon>print</mat-icon>
+        </button>
+      </button>
+    </div>
+
+    <!-- Third Row: Advanced Filtering -->
+    <div class="filter-strip">
+      <ng-container *ngIf="canAccessReport('master') || canAccessReport('department') || canAccessReport('pending') || canAccessReport('completed'); else personalScope">
+        <mat-form-field appearance="outline" class="filter-field">
+          <mat-label>Division</mat-label>
+          <mat-select [value]="selectedDivision()" (selectionChange)="selectedDivision.set($event.value)">
+            <mat-option value="all">All Divisions</mat-option>
+            <mat-option *ngFor="let div of divisions()" [value]="div.name">{{ div.name }}</mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="filter-field">
+          <mat-label>Department</mat-label>
+          <mat-select [value]="selectedDepartment()" (selectionChange)="selectedDepartment.set($event.value)">
+            <mat-option value="all">All Departments</mat-option>
+            <mat-option *ngFor="let dept of departments()" [value]="dept.name">{{ dept.name }}</mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="filter-field">
+          <mat-label>Individual Officer</mat-label>
+          <mat-select [value]="selectedOfficer()" (selectionChange)="selectedOfficer.set($event.value)">
+            <mat-option value="all">All Officers (Combined)</mat-option>
+            <mat-option *ngFor="let off of availableOfficers()" [value]="off.email || off.name">
+              {{ off.name }} <span *ngIf="off.email">({{ off.email }})</span>
+            </mat-option>
+          </mat-select>
+        </mat-form-field>
+      </ng-container>
+
+      <ng-template #personalScope>
+        <div class="personal-scope-badge">
+          <mat-icon>badge</mat-icon>
+          <span>Personal Scope: <strong>{{ currentUserName() }}</strong></span>
+        </div>
+      </ng-template>
+
+      <mat-form-field appearance="outline" class="filter-field">
+        <mat-label>Priority</mat-label>
+        <mat-select [value]="selectedPriority()" (selectionChange)="selectedPriority.set($event.value)">
+          <mat-option value="all">All Priorities</mat-option>
+          <mat-option value="Urgent">Urgent</mat-option>
+          <mat-option value="High">High</mat-option>
+          <mat-option value="Medium">Medium</mat-option>
+          <mat-option value="Low">Low</mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="filter-field search-field">
+        <mat-label>Search directives or keywords</mat-label>
+        <input matInput [value]="searchQuery()" (input)="searchQuery.set($any($event.target).value)" placeholder="Search title, description...">
+        <mat-icon matSuffix>search</mat-icon>
+      </mat-form-field>
+    </div>
+  </div>
+
+  <!-- Loading State -->
+  <div class="loading-container" *ngIf="isLoading()">
+    <div class="spinner-box">
+      <mat-icon class="spinning-icon">hourglass_empty</mat-icon>
+      <p>Generating and aggregating monthly report data...</p>
+    </div>
+  </div>
+
+  <!-- Main Report Document Presentation (A4 Container) -->
+  <div class="report-wrapper a4-preview-mode" [class.mode-vertical]="viewMode() === 'vertical'" [class.mode-horizontal]="viewMode() === 'horizontal'" *ngIf="!isLoading()">
+    
+    <!-- ========================================================================= -->
+    <!-- REPORT TYPE 1: WHOLE MONTH PENDING TASK LIST                              -->
+    <!-- ========================================================================= -->
+    <div *ngIf="reportType() === 'pending' && canAccessReport('pending')">
+      
+      <!-- Report Section Toolbar (Screen Only) -->
+      <div class="report-section-toolbar no-print">
+        <div class="toolbar-left">
+          <span class="section-badge amber">
+            <mat-icon>pending_actions</mat-icon>
+            <span>Whole Month Pending Directives</span>
+          </span>
+          <span class="report-count-info">{{ pendingPlans().length }} outstanding tasks</span>
+        </div>
+        <div class="toolbar-right">
+          <button mat-stroked-button class="section-action-btn" (click)="exportToCsv()" matTooltip="Export Pending Directives to CSV">
+            <mat-icon>table_view</mat-icon> <span>Export CSV</span>
+          </button>
+          <button mat-flat-button color="primary" class="section-print-btn" (click)="triggerPrint('pending')" matTooltip="Print or Save Pending Directives as A4 PDF">
+            <mat-icon>print</mat-icon> <span>Print Pending Report (A4)</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="a4-page official-document">
+      
+      <!-- Official Header Banner -->
+      <div class="doc-header">
+        <div class="header-emblem-col">
+          <div class="gov-emblem-badge">
+            <mat-icon>account_balance</mat-icon>
+          </div>
+        </div>
+        <div class="header-title-col">
+          <div class="gov-line-1">DEPARTMENT OF NATIONAL MANAGEMENT (DONM)</div>
+          <div class="gov-line-2">OFFICE OF OPERATIONS & REGIONAL WORK DIRECTIVES</div>
+          <h2 class="doc-main-title">WHOLE MONTH PENDING DIRECTIVES & TASK LIST</h2>
+          <div class="doc-subtitle">
+            Comprehensive audit of outstanding, in-progress, and delayed tasks for {{ getFormattedMonth() }}
+          </div>
+        </div>
+        <div class="header-meta-col">
+          <table class="meta-table">
+            <tr>
+              <td class="lbl">Ref No:</td>
+              <td class="val">DONM/WP/PND/{{ selectedMonth() }}</td>
+            </tr>
+            <tr>
+              <td class="lbl">Period:</td>
+              <td class="val"><strong>{{ getFormattedMonth() }}</strong></td>
+            </tr>
+            <tr>
+              <td class="lbl">Generated:</td>
+              <td class="val">{{ generatedAt() | date:'yyyy-MM-dd HH:mm' }}</td>
+            </tr>
+            <tr>
+              <td class="lbl">Status:</td>
+              <td class="val"><span class="badge warning">PENDING REVIEW</span></td>
+            </tr>
+          </table>
+        </div>
+      </div>
+
+      <div class="divider-gold"></div>
+
+      <!-- KPI Summary Cards -->
+      <div class="summary-kpi-row">
+        <div class="kpi-mini-card amber">
+          <span class="kpi-num">{{ pendingPlans().length }}</span>
+          <span class="kpi-label">Total Incomplete</span>
+        </div>
+        <div class="kpi-mini-card red">
+          <span class="kpi-num">{{ reportKPIs().delayed }}</span>
+          <span class="kpi-label">Critically Delayed</span>
+        </div>
+        <div class="kpi-mini-card blue">
+          <span class="kpi-num">{{ reportKPIs().inProgress }}</span>
+          <span class="kpi-label">Under Execution</span>
+        </div>
+        <div class="kpi-mini-card green">
+          <span class="kpi-num">LKR {{ (reportKPIs().totalBudget | number:'1.0-0') || '0' }}</span>
+          <span class="kpi-label">Portfolio Budget</span>
+        </div>
+      </div>
+
+      <!-- Pending Tasks Table -->
+      <div class="table-container">
+        <table class="report-data-table">
+          <thead>
+            <tr>
+              <th style="width: 4%;" class="text-center">#</th>
+              <th style="width: 10%;">Ref ID</th>
+              <th style="width: 24%;">Task Title & Objective</th>
+              <th style="width: 14%;">Assigned Officer</th>
+              <th style="width: 13%;">Department</th>
+              <th style="width: 7%;" class="text-center">Priority</th>
+              <th style="width: 9%;" class="text-center">Target Date</th>
+              <th style="width: 9%;" class="text-center">Remaining</th>
+              <th style="width: 5%;" class="text-center">Prog</th>
+              <th style="width: 5%;" class="text-center">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let p of pendingPlans(); let idx = index" [class.delayed-row]="p.status === 'Delayed'">
+              <td class="text-center font-mono">{{ idx + 1 }}</td>
+              <td class="font-mono text-xs">
+                <strong>{{ p.id ? p.id.substring(0, 10) : 'WP-' + (idx + 101) }}</strong>
+              </td>
+              <td>
+                <div class="task-title-cell">
+                  <strong>{{ p.title }}</strong>
+                  <div class="milestone-subline" *ngIf="p.milestones && p.milestones.length > 0">
+                    <mat-icon class="ms-mini-icon">flag</mat-icon>
+                    <span>Milestones: {{ (p.milestones | slice:0:2).length }} logged</span>
+                  </div>
+                </div>
+              </td>
+              <td>
+                <div class="officer-name">{{ p.ownerName || p.leadName || 'Unassigned' }}</div>
+                <div class="officer-email" *ngIf="p.ownerEmail || p.leadEmail">{{ p.ownerEmail || p.leadEmail }}</div>
+              </td>
+              <td>
+                <span class="dept-text">{{ p.department || p.division || 'Operations' }}</span>
+              </td>
+              <td class="text-center">
+                <span class="priority-pill" [class]="p.priority.toLowerCase()">{{ p.priority }}</span>
+              </td>
+              <td class="text-center font-mono text-xs">{{ p.targetDate }}</td>
+              <td class="text-center">
+                <span class="due-pill" [class.overdue]="getDaysRemaining(p.targetDate).isOverdue">
+                  {{ getDaysRemaining(p.targetDate).text }}
+                </span>
+              </td>
+              <td class="text-center">
+                <div class="progress-cell">
+                  <span class="prog-pct">{{ p.progress }}%</span>
+                  <div class="mini-bar">
+                    <div class="fill" [style.width.%]="p.progress"></div>
+                  </div>
+                </div>
+              </td>
+              <td class="text-center">
+                <span class="status-badge" [class]="p.status.toLowerCase().replace(' ', '-')">
+                  {{ p.status }}
+                </span>
+              </td>
+            </tr>
+
+            <tr *ngIf="pendingPlans().length === 0">
+              <td colspan="10" class="no-data-cell">
+                <mat-icon class="empty-icon">task_alt</mat-icon>
+                <p>No pending tasks found for {{ getFormattedMonth() }} matching the selected filters!</p>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Formal Sign-Off Footer -->
+      <div class="report-signoff-section">
+        <div class="signoff-box">
+          <div class="sig-line"></div>
+          <span class="sig-role">Prepared By (Desk Officer)</span>
+          <span class="sig-name">{{ currentUserName() }}</span>
+          <span class="sig-date">Date: {{ generatedAt() | date:'yyyy-MM-dd' }}</span>
+        </div>
+        <div class="signoff-box">
+          <div class="sig-line"></div>
+          <span class="sig-role">Verified By (Department Head)</span>
+          <span class="sig-name">Signature & Official Stamp</span>
+          <span class="sig-date">Date: .......................................</span>
+        </div>
+        <div class="signoff-box">
+          <div class="sig-line"></div>
+          <span class="sig-role">Approved By (Divisional Admin)</span>
+          <span class="sig-name">Signature & Official Seal</span>
+          <span class="sig-date">Date: .......................................</span>
+        </div>
+      </div>
+
+      <div class="doc-security-footer">
+        <span>CONFIDENTIAL - FOR INTERNAL ADMINISTRATIVE USE ONLY</span>
+        <span>Page 1 of 1</span>
+        <span>DONM Document Control v4.8</span>
+      </div>
+    </div>
+  </div>
+
+
+    <!-- ========================================================================= -->
+    <!-- REPORT TYPE 2: WHOLE MONTH COMPLETED TASK LIST WITH STATUS & VERIFICATION -->
+    <!-- ========================================================================= -->
+    <div *ngIf="reportType() === 'completed' && canAccessReport('completed')">
+      
+      <!-- Report Section Toolbar (Screen Only) -->
+      <div class="report-section-toolbar no-print">
+        <div class="toolbar-left">
+          <span class="section-badge green">
+            <mat-icon>check_circle</mat-icon>
+            <span>Completed Directives & Verification Audit</span>
+          </span>
+          <span class="report-count-info">{{ completedPlans().length }} completed directives</span>
+        </div>
+        <div class="toolbar-right">
+          <button mat-stroked-button class="section-action-btn" (click)="exportToCsv()" matTooltip="Export Completed Directives to CSV">
+            <mat-icon>table_view</mat-icon> <span>Export CSV</span>
+          </button>
+          <button mat-flat-button color="primary" class="section-print-btn" (click)="triggerPrint('completed')" matTooltip="Print or Save Completed Directives as A4 PDF">
+            <mat-icon>print</mat-icon> <span>Print Completed Report (A4)</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="a4-page official-document">
+      
+      <!-- Official Header Banner -->
+      <div class="doc-header">
+        <div class="header-emblem-col">
+          <div class="gov-emblem-badge green-badge">
+            <mat-icon>verified</mat-icon>
+          </div>
+        </div>
+        <div class="header-title-col">
+          <div class="gov-line-1">DEPARTMENT OF NATIONAL MANAGEMENT (DONM)</div>
+          <div class="gov-line-2">OFFICE OF OPERATIONS & REGIONAL WORK DIRECTIVES</div>
+          <h2 class="doc-main-title">COMPLETED DIRECTIVES & VERIFICATION AUDIT</h2>
+          <div class="doc-subtitle">
+            Official record of completed and signed-off work plans for {{ getFormattedMonth() }}
+          </div>
+        </div>
+        <div class="header-meta-col">
+          <table class="meta-table">
+            <tr>
+              <td class="lbl">Ref No:</td>
+              <td class="val">DONM/WP/CMP/{{ selectedMonth() }}</td>
+            </tr>
+            <tr>
+              <td class="lbl">Period:</td>
+              <td class="val"><strong>{{ getFormattedMonth() }}</strong></td>
+            </tr>
+            <tr>
+              <td class="lbl">Generated:</td>
+              <td class="val">{{ generatedAt() | date:'yyyy-MM-dd HH:mm' }}</td>
+            </tr>
+            <tr>
+              <td class="lbl">Status:</td>
+              <td class="val"><span class="badge success">100% EXECUTED</span></td>
+            </tr>
+          </table>
+        </div>
+      </div>
+
+      <div class="divider-green"></div>
+
+      <!-- KPI Summary Cards -->
+      <div class="summary-kpi-row">
+        <div class="kpi-mini-card green">
+          <span class="kpi-num">{{ completedPlans().length }}</span>
+          <span class="kpi-label">Completed Directives</span>
+        </div>
+        <div class="kpi-mini-card blue">
+          <span class="kpi-num">100%</span>
+          <span class="kpi-label">Execution Progress</span>
+        </div>
+        <div class="kpi-mini-card purple">
+          <span class="kpi-num">{{ reportKPIs().completedMilestones }}</span>
+          <span class="kpi-label">Milestones Delivered</span>
+        </div>
+        <div class="kpi-mini-card amber">
+          <span class="kpi-num">LKR {{ (reportKPIs().totalBudget | number:'1.0-0') || '0' }}</span>
+          <span class="kpi-label">Value Delivered</span>
+        </div>
+      </div>
+
+      <!-- Completed Tasks Table -->
+      <div class="table-container">
+        <table class="report-data-table">
+          <thead>
+            <tr>
+              <th style="width: 4%;" class="text-center">#</th>
+              <th style="width: 10%;">Ref ID</th>
+              <th style="width: 22%;">Task Title</th>
+              <th style="width: 14%;">Assigned Officer</th>
+              <th style="width: 13%;">Department</th>
+              <th style="width: 8%;" class="text-center">Target Date</th>
+              <th style="width: 8%;" class="text-center">Completion</th>
+              <th style="width: 11%;">Verification Sign-Offs</th>
+              <th style="width: 10%;">Review Remarks</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let p of completedPlans(); let idx = index">
+              <td class="text-center font-mono">{{ idx + 1 }}</td>
+              <td class="font-mono text-xs">
+                <strong>{{ p.id ? p.id.substring(0, 10) : 'WP-' + (idx + 201) }}</strong>
+              </td>
+              <td>
+                <div class="task-title-cell">
+                  <strong>{{ p.title }}</strong>
+                  <div class="priority-subline">Priority: {{ p.priority }}</div>
+                </div>
+              </td>
+              <td>
+                <div class="officer-name">{{ p.ownerName || p.leadName || 'Assigned Officer' }}</div>
+                <div class="officer-email" *ngIf="p.ownerEmail || p.leadEmail">{{ p.ownerEmail || p.leadEmail }}</div>
+              </td>
+              <td>
+                <span class="dept-text">{{ p.department || p.division || 'Operations' }}</span>
+              </td>
+              <td class="text-center font-mono text-xs">{{ p.targetDate }}</td>
+              <td class="text-center font-mono text-xs">
+                <span class="date-success">{{ p.updatedAt | date:'yyyy-MM-dd' }}</span>
+              </td>
+              <td>
+                <div class="verification-mini-list">
+                  <div class="verif-chip-row" *ngFor="let v of getVerifiers(p)">
+                    <span class="v-tag" [class.verified]="v.verified">
+                      {{ v.verified ? '✓ Stg ' + v.order + ': Verified' : '○ Stg ' + v.order + ': Pending' }}
+                    </span>
+                    <span class="v-by" *ngIf="v.verified && v.name">({{ v.name }})</span>
+                  </div>
+                </div>
+              </td>
+              <td class="text-xs">
+                <div class="review-remark-box">
+                  {{ getLastReviewRemarks(p) }}
+                </div>
+              </td>
+            </tr>
+
+            <tr *ngIf="completedPlans().length === 0">
+              <td colspan="9" class="no-data-cell">
+                <mat-icon class="empty-icon">info</mat-icon>
+                <p>No completed directives found for {{ getFormattedMonth() }} with the selected filters.</p>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Formal Sign-Off Footer -->
+      <div class="report-signoff-section">
+        <div class="signoff-box">
+          <div class="sig-line"></div>
+          <span class="sig-role">Audited By (Quality Assurance)</span>
+          <span class="sig-name">{{ currentUserName() }}</span>
+          <span class="sig-date">Date: {{ generatedAt() | date:'yyyy-MM-dd' }}</span>
+        </div>
+        <div class="signoff-box">
+          <div class="sig-line"></div>
+          <span class="sig-role">Certified By (Department Head)</span>
+          <span class="sig-name">Signature & Official Stamp</span>
+          <span class="sig-date">Date: .......................................</span>
+        </div>
+        <div class="signoff-box">
+          <div class="sig-line"></div>
+          <span class="sig-role">Final Sign-off (Divisional Secretary)</span>
+          <span class="sig-name">Signature & Official Seal</span>
+          <span class="sig-date">Date: .......................................</span>
+        </div>
+      </div>
+
+      <div class="doc-security-footer">
+        <span>CONFIDENTIAL - OFFICIAL REGISTRATION RECORD</span>
+        <span>Page 1 of 1</span>
+        <span>DONM Document Control v4.8</span>
+      </div>
+    </div>
+  </div>
+
+
+    <!-- ========================================================================= -->
+    <!-- REPORT TYPE 3: COMPREHENSIVE MONTHLY MASTER REGISTER                      -->
+    <!-- ========================================================================= -->
+    <div *ngIf="reportType() === 'master' && canAccessReport('master')">
+      
+      <!-- Report Section Toolbar (Screen Only) -->
+      <div class="report-section-toolbar no-print">
+        <div class="toolbar-left">
+          <span class="section-badge blue">
+            <mat-icon>assignment</mat-icon>
+            <span>Monthly Work Plans Master Register</span>
+          </span>
+          <span class="report-count-info">{{ masterPlans().length }} total directives</span>
+        </div>
+        <div class="toolbar-right">
+          <button mat-stroked-button class="section-action-btn" (click)="exportToCsv()" matTooltip="Export Master Register to CSV">
+            <mat-icon>table_view</mat-icon> <span>Export CSV</span>
+          </button>
+          <button mat-flat-button color="primary" class="section-print-btn" (click)="triggerPrint('master')" matTooltip="Print or Save Master Register as A4 PDF">
+            <mat-icon>print</mat-icon> <span>Print Master Register (A4)</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="a4-page official-document">
+      
+      <!-- Official Header Banner -->
+      <div class="doc-header">
+        <div class="header-emblem-col">
+          <div class="gov-emblem-badge blue-badge">
+            <mat-icon>menu_book</mat-icon>
+          </div>
+        </div>
+        <div class="header-title-col">
+          <div class="gov-line-1">DEPARTMENT OF NATIONAL MANAGEMENT (DONM)</div>
+          <div class="gov-line-2">CENTRAL PLANNING & POLICY IMPLEMENTATION DIRECTORATE</div>
+          <h2 class="doc-main-title">MONTHLY WORK PLANS MASTER REGISTER</h2>
+          <div class="doc-subtitle">
+            Master roll of all operational directives, milestones, and resource allocations for {{ getFormattedMonth() }}
+          </div>
+        </div>
+        <div class="header-meta-col">
+          <table class="meta-table">
+            <tr>
+              <td class="lbl">Ref No:</td>
+              <td class="val">DONM/WP/MTR/{{ selectedMonth() }}</td>
+            </tr>
+            <tr>
+              <td class="lbl">Period:</td>
+              <td class="val"><strong>{{ getFormattedMonth() }}</strong></td>
+            </tr>
+            <tr>
+              <td class="lbl">Total Directives:</td>
+              <td class="val"><strong>{{ masterPlans().length }}</strong></td>
+            </tr>
+            <tr>
+              <td class="lbl">Compliance:</td>
+              <td class="val"><span class="badge info">{{ reportKPIs().completionRate }}% RATE</span></td>
+            </tr>
+          </table>
+        </div>
+      </div>
+
+      <div class="divider-blue"></div>
+
+      <!-- Master KPI Summary -->
+      <div class="summary-kpi-row">
+        <div class="kpi-mini-card blue">
+          <span class="kpi-num">{{ masterPlans().length }}</span>
+          <span class="kpi-label">Total Portfolio</span>
+        </div>
+        <div class="kpi-mini-card green">
+          <span class="kpi-num">{{ reportKPIs().completed }}</span>
+          <span class="kpi-label">Completed</span>
+        </div>
+        <div class="kpi-mini-card amber">
+          <span class="kpi-num">{{ reportKPIs().inProgress }}</span>
+          <span class="kpi-label">In Progress</span>
+        </div>
+        <div class="kpi-mini-card red">
+          <span class="kpi-num">{{ reportKPIs().delayed }}</span>
+          <span class="kpi-label">Delayed</span>
+        </div>
+        <div class="kpi-mini-card purple">
+          <span class="kpi-num">LKR {{ (reportKPIs().totalBudget | number:'1.0-0') || '0' }}</span>
+          <span class="kpi-label">Total Budget</span>
+        </div>
+      </div>
+
+      <!-- Master Data Table -->
+      <div class="table-container">
+        <table class="report-data-table">
+          <thead>
+            <tr>
+              <th style="width: 4%;" class="text-center">#</th>
+              <th style="width: 10%;">Ref ID</th>
+              <th style="width: 23%;">Task Title</th>
+              <th style="width: 14%;">Officer / Lead</th>
+              <th style="width: 13%;">Department</th>
+              <th style="width: 8%;" class="text-center">Status</th>
+              <th style="width: 7%;" class="text-center">Priority</th>
+              <th style="width: 6%;" class="text-center">Prog</th>
+              <th style="width: 8%;" class="text-center">Target</th>
+              <th style="width: 7%;" class="text-right">Budget</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let p of masterPlans(); let idx = index">
+              <td class="text-center font-mono">{{ idx + 1 }}</td>
+              <td class="font-mono text-xs">{{ p.id ? p.id.substring(0, 10) : 'WP-' + (idx + 1) }}</td>
+              <td>
+                <div class="task-title-cell">
+                  <strong>{{ p.title }}</strong>
+                  <div class="division-subline">{{ p.division }}</div>
+                </div>
+              </td>
+              <td>
+                <div class="officer-name">{{ p.ownerName || p.leadName || 'Unassigned' }}</div>
+              </td>
+              <td>{{ p.department || p.division }}</td>
+              <td class="text-center">
+                <span class="status-badge" [class]="p.status.toLowerCase().replace(' ', '-')">
+                  {{ p.status }}
+                </span>
+              </td>
+              <td class="text-center">
+                <span class="priority-pill" [class]="p.priority.toLowerCase()">{{ p.priority }}</span>
+              </td>
+              <td class="text-center">
+                <span class="prog-pct">{{ p.progress }}%</span>
+              </td>
+              <td class="text-center font-mono text-xs">{{ p.targetDate }}</td>
+              <td class="text-right font-mono">{{ (p.budget | number:'1.0-0') || '0' }}</td>
+            </tr>
+
+            <tr *ngIf="masterPlans().length === 0">
+              <td colspan="10" class="no-data-cell">
+                <mat-icon class="empty-icon">search_off</mat-icon>
+                <p>No work plans found for the selected criteria.</p>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Sign-Off Block -->
+      <div class="report-signoff-section">
+        <div class="signoff-box">
+          <div class="sig-line"></div>
+          <span class="sig-role">Compiled By (Records Registrar)</span>
+          <span class="sig-name">{{ currentUserName() }}</span>
+          <span class="sig-date">Date: {{ generatedAt() | date:'yyyy-MM-dd' }}</span>
+        </div>
+        <div class="signoff-box">
+          <div class="sig-line"></div>
+          <span class="sig-role">Endorsed By (Planning Director)</span>
+          <span class="sig-name">Signature & Official Stamp</span>
+          <span class="sig-date">Date: .......................................</span>
+        </div>
+      </div>
+
+      <div class="doc-security-footer">
+        <span>DONM MASTER REGISTER - INTERNAL USE ONLY</span>
+        <span>Page 1 of 1</span>
+        <span>DONM Document Control v4.8</span>
+      </div>
+    </div>
+  </div>
+
+
+    <!-- ========================================================================= -->
+    <!-- REPORT TYPE 4: INDIVIDUAL OFFICER DOSSIER (A4 PRINTABLE PER OFFICER)      -->
+    <!-- ========================================================================= -->
+    <div *ngIf="reportType() === 'individual' && canAccessReport('individual')">
+      
+      <!-- Report Section Toolbar (Screen Only) -->
+      <div class="report-section-toolbar no-print">
+        <div class="toolbar-left">
+          <span class="section-badge amber">
+            <mat-icon>person_pin</mat-icon>
+            <span>{{ (canAccessReport('master') || canAccessReport('pending')) ? 'Individual Officer Dossiers' : 'Personal Work Plan Dossier' }}</span>
+          </span>
+          <span class="report-count-info">{{ officerDossiers().length }} officer dossier(s)</span>
+        </div>
+        <div class="toolbar-right">
+          <button mat-stroked-button class="section-action-btn" (click)="exportToCsv()" matTooltip="Export Officer Dossiers to CSV">
+            <mat-icon>table_view</mat-icon> <span>Export CSV</span>
+          </button>
+          <button mat-flat-button color="primary" class="section-print-btn" (click)="triggerPrint('individual')" matTooltip="Print All Officer Dossiers as A4 PDF">
+            <mat-icon>print</mat-icon> <span>Print All Dossiers (A4)</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Repeats for each individual officer dossier; in print mode, page-break separates each! -->
+      <div *ngFor="let dossier of officerDossiers(); let dIdx = index; let isLast = last" class="a4-page official-document individual-dossier-page" [class.page-break-after]="!isLast">
+        
+        <!-- Official Header -->
+        <div class="doc-header">
+          <div class="header-emblem-col">
+            <div class="gov-emblem-badge amber-badge">
+              <mat-icon>badge</mat-icon>
+            </div>
+          </div>
+          <div class="header-title-col">
+            <div class="gov-line-1">DEPARTMENT OF NATIONAL MANAGEMENT (DONM)</div>
+            <div class="gov-line-2">INDIVIDUAL PERFORMANCE & MONTHLY DIRECTIVES DOSSIER</div>
+            <h2 class="doc-main-title">OFFICER MONTHLY WORK PLAN DOSSIER</h2>
+            <div class="doc-subtitle">
+              Official assigned tasks, deliverables, and performance evaluation for {{ getFormattedMonth() }}
+            </div>
+          </div>
+          <div class="header-meta-col">
+            <table class="meta-table">
+              <tr>
+                <td class="lbl">Dossier ID:</td>
+                <td class="val">DOS/{{ selectedMonth() }}/{{ dIdx + 101 }}</td>
+              </tr>
+              <tr>
+                <td class="lbl">Period:</td>
+                <td class="val"><strong>{{ getFormattedMonth() }}</strong></td>
+              </tr>
+              <tr>
+                <td class="lbl">Assigned:</td>
+                <td class="val"><strong>{{ dossier.totalPlans }} Directives</strong></td>
+              </tr>
+              <tr>
+                <td class="lbl">Delivered:</td>
+                <td class="val"><span class="badge success">{{ dossier.completionRate }}% COMPLETED</span></td>
+              </tr>
+            </table>
+          </div>
+        </div>
+
+        <div class="divider-gold"></div>
+
+        <!-- Screen Action Bar: Quick Print Only this Officer's Dossier -->
+        <div class="dossier-screen-actions no-print">
+          <span class="officer-record-badge">
+            <mat-icon>verified_user</mat-icon>
+            <span>Dossier: <strong>{{ dossier.officerName }}</strong></span>
+          </span>
+          <button mat-stroked-button class="print-single-btn" (click)="printIndividualDossier(dossier.officerEmail || dossier.officerName)" matTooltip="Print only this officer's individual A4 dossier">
+            <mat-icon>print</mat-icon> <span>Print This Officer's A4 Dossier</span>
+          </button>
+        </div>
+
+        <!-- Officer Profile & Monthly Performance Card -->
+        <div class="officer-profile-card">
+          <div class="officer-identity-group">
+            <div class="officer-avatar-box">
+              <mat-icon>person</mat-icon>
+            </div>
+            <div class="officer-details">
+              <h3 class="officer-full-name">{{ dossier.officerName }}</h3>
+              <div class="officer-meta-line">
+                <span class="meta-item"><mat-icon>email</mat-icon> {{ dossier.officerEmail || 'official@donm.gov.lk' }}</span>
+                <span class="meta-item"><mat-icon>corporate_fare</mat-icon> {{ dossier.department }}</span>
+                <span class="meta-item"><mat-icon>place</mat-icon> {{ dossier.division }}</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="officer-stats-grid">
+            <div class="stat-pill">
+              <span class="pill-val">{{ dossier.completedPlans }}</span>
+              <span class="pill-lbl">Completed</span>
+            </div>
+            <div class="stat-pill">
+              <span class="pill-val">{{ dossier.inProgressPlans }}</span>
+              <span class="pill-lbl">In Progress</span>
+            </div>
+            <div class="stat-pill">
+              <span class="pill-val">{{ dossier.delayedPlans }}</span>
+              <span class="pill-lbl">Delayed</span>
+            </div>
+            <div class="stat-pill">
+              <span class="pill-val">{{ dossier.avgProgress }}%</span>
+              <span class="pill-lbl">Avg Progress</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Individual's Tasks Breakdown Table -->
+        <div class="table-container">
+          <table class="report-data-table">
+            <thead>
+              <tr>
+                <th style="width: 4%;" class="text-center">#</th>
+                <th style="width: 10%;" class="text-center">Ref ID</th>
+                <th style="width: 26%;">Directive Title & Scope</th>
+                <th style="width: 7%;" class="text-center">Priority</th>
+                <th style="width: 9%;" class="text-center">Start Date</th>
+                <th style="width: 9%;" class="text-center">Target Date</th>
+                <th style="width: 6%;" class="text-center">Prog</th>
+                <th style="width: 11%;" class="text-center">Status</th>
+                <th style="width: 18%;">Verification State</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let p of dossier.plans; let tIdx = index" [class.delayed-row]="p.status === 'Delayed'">
+                <td class="text-center font-mono">{{ tIdx + 1 }}</td>
+                <td class="text-center font-mono text-xs">
+                  <strong>{{ p.id ? p.id.substring(0, 10) : 'WP-' + (tIdx + 1) }}</strong>
+                </td>
+                <td>
+                  <div class="task-title-cell">
+                    <strong>{{ p.title }}</strong>
+                    <div class="desc-line" *ngIf="p.description">{{ p.description }}</div>
+                  </div>
+                </td>
+                <td class="text-center">
+                  <span class="priority-pill" [class]="p.priority.toLowerCase()">{{ p.priority }}</span>
+                </td>
+                <td class="text-center font-mono text-xs">{{ p.startDate }}</td>
+                <td class="text-center font-mono text-xs">{{ p.targetDate }}</td>
+                <td class="text-center">
+                  <div class="progress-cell">
+                    <span class="prog-pct">{{ p.progress }}%</span>
+                    <div class="mini-bar">
+                      <div class="fill" [style.width.%]="p.progress"></div>
+                    </div>
+                  </div>
+                </td>
+                <td class="text-center">
+                  <span class="status-badge" [class]="p.status.toLowerCase().replace(' ', '-')">
+                    {{ p.status }}
+                  </span>
+                </td>
+                <td>
+                  <div class="verification-mini-list">
+                    <div class="verif-chip-row" *ngFor="let v of getVerifiers(p)">
+                      <span class="v-tag" [class.verified]="v.verified">
+                        {{ v.verified ? '✓ Stg ' + v.order + ': Verified' : '○ Stg ' + v.order + ': Pending' }}
+                      </span>
+                      <span class="v-by" *ngIf="v.verified && v.name">({{ v.name }})</span>
+                    </div>
+                    <span *ngIf="getVerifiers(p).length === 0" class="text-xs" style="color: #94a3b8; font-style: italic;">No verifiers assigned</span>
+                  </div>
+                </td>
+              </tr>
+
+              <tr *ngIf="dossier.plans.length === 0">
+                <td colspan="9" class="no-data-cell">No tasks recorded for this officer in {{ getFormattedMonth() }}.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Individual Officer Certification & Supervisor Endorsement Block -->
+        <div class="report-signoff-section individual-signoff">
+          <div class="signoff-box">
+            <div class="sig-line"></div>
+            <span class="sig-role">Officer Acknowledgment</span>
+            <span class="sig-name">{{ dossier.officerName }}</span>
+            <span class="sig-date">Date: .......................................</span>
+            <div class="sig-notes">"I hereby affirm that the duties and deliverables above reflect my official monthly assignments."</div>
+          </div>
+          
+          <div class="signoff-box">
+            <div class="sig-line"></div>
+            <span class="sig-role">Supervising Officer / Department Head</span>
+            <span class="sig-name">Signature & Official Stamp</span>
+            <span class="sig-date">Date: .......................................</span>
+            <div class="sig-notes">"Performance verified and certified for monthly departmental evaluation."</div>
+          </div>
+
+          <div class="signoff-box">
+            <div class="sig-line"></div>
+            <span class="sig-role">Approved By (Divisional Admin)</span>
+            <span class="sig-name">Signature & Official Seal</span>
+            <span class="sig-date">Date: .......................................</span>
+            <div class="sig-notes">"Endorsed and recorded in central civil service performance registry."</div>
+          </div>
+        </div>
+
+        <div class="doc-security-footer">
+          <span>DONM INDIVIDUAL DOSSIER - A4 FORMAT</span>
+          <span>Dossier {{ dIdx + 1 }} of {{ officerDossiers().length }}</span>
+          <span>Confidential Personal Record</span>
+        </div>
+      </div>
+
+      <div *ngIf="officerDossiers().length === 0" class="a4-page official-document">
+        <div class="no-data-cell large-empty">
+          <mat-icon class="empty-icon">person_off</mat-icon>
+          <h3>No Officer Dossiers Found</h3>
+          <p>No work plans match the selected officer or month filters.</p>
+        </div>
+      </div>
+    </div>
+
+
+    <!-- ========================================================================= -->
+    <!-- REPORT TYPE 5: DEPARTMENTAL & DIVISIONAL SUMMARY MATRIX                   -->
+    <!-- ========================================================================= -->
+    <div *ngIf="reportType() === 'department' && canAccessReport('department')">
+      
+      <!-- Report Section Toolbar (Screen Only) -->
+      <div class="report-section-toolbar no-print">
+        <div class="toolbar-left">
+          <span class="section-badge indigo">
+            <mat-icon>corporate_fare</mat-icon>
+            <span>Departmental & Divisional Performance Matrix</span>
+          </span>
+          <span class="report-count-info">{{ departmentSummaries().length }} departments</span>
+        </div>
+        <div class="toolbar-right">
+          <button mat-stroked-button class="section-action-btn" (click)="exportToCsv()" matTooltip="Export Department Matrix to CSV">
+            <mat-icon>table_view</mat-icon> <span>Export CSV</span>
+          </button>
+          <button mat-flat-button color="primary" class="section-print-btn" (click)="triggerPrint('department')" matTooltip="Print or Save Department Matrix as A4 PDF">
+            <mat-icon>print</mat-icon> <span>Print Department Matrix (A4)</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="a4-page official-document">
+      
+      <!-- Official Header Banner -->
+      <div class="doc-header">
+        <div class="header-emblem-col">
+          <div class="gov-emblem-badge indigo-badge">
+            <mat-icon>corporate_fare</mat-icon>
+          </div>
+        </div>
+        <div class="header-title-col">
+          <div class="gov-line-1">DEPARTMENT OF NATIONAL MANAGEMENT (DONM)</div>
+          <div class="gov-line-2">EXECUTIVE STRATEGY & DIVISIONAL MONITORING CELL</div>
+          <h2 class="doc-main-title">DEPARTMENTAL & DIVISIONAL PERFORMANCE MATRIX</h2>
+          <div class="doc-subtitle">
+            Aggregated delivery rates, task distribution, and budget breakdown for {{ getFormattedMonth() }}
+          </div>
+        </div>
+        <div class="header-meta-col">
+          <table class="meta-table">
+            <tr>
+              <td class="lbl">Ref No:</td>
+              <td class="val">DONM/WP/DPT/{{ selectedMonth() }}</td>
+            </tr>
+            <tr>
+              <td class="lbl">Period:</td>
+              <td class="val"><strong>{{ getFormattedMonth() }}</strong></td>
+            </tr>
+            <tr>
+              <td class="lbl">Active Units:</td>
+              <td class="val"><strong>{{ departmentSummaries().length }} Departments</strong></td>
+            </tr>
+            <tr>
+              <td class="lbl">Status:</td>
+              <td class="val"><span class="badge info">MONTHLY CONSOLIDATION</span></td>
+            </tr>
+          </table>
+        </div>
+      </div>
+
+      <div class="divider-gold"></div>
+
+      <!-- Department Performance Matrix Table -->
+      <div class="table-container">
+        <table class="report-data-table">
+          <thead>
+            <tr>
+              <th style="width: 4%;">#</th>
+              <th style="width: 25%;">Department Name</th>
+              <th style="width: 15%;">Division</th>
+              <th style="width: 7%;" class="text-center">Total Tasks</th>
+              <th style="width: 7%;" class="text-center">Completed</th>
+              <th style="width: 7%;" class="text-center">In Progress</th>
+              <th style="width: 7%;" class="text-center">Delayed</th>
+              <th style="width: 10%;" class="text-center">Completion %</th>
+              <th style="width: 8%;" class="text-center">Avg Progress</th>
+              <th style="width: 10%;" class="text-right">Budget (LKR)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let s of departmentSummaries(); let idx = index">
+              <td class="text-center font-mono">{{ idx + 1 }}</td>
+              <td><strong>{{ s.department }}</strong></td>
+              <td>{{ s.division }}</td>
+              <td class="text-center font-bold">{{ s.totalPlans }}</td>
+              <td class="text-center"><span class="badge success">{{ s.completedPlans }}</span></td>
+              <td class="text-center"><span class="badge info">{{ s.inProgressPlans }}</span></td>
+              <td class="text-center">
+                <span class="badge danger" *ngIf="s.delayedPlans > 0">{{ s.delayedPlans }}</span>
+                <span *ngIf="s.delayedPlans === 0">-</span>
+              </td>
+              <td class="text-center">
+                <div class="progress-cell">
+                  <span class="prog-pct">{{ s.completionRate }}%</span>
+                  <div class="mini-bar">
+                    <div class="fill" [style.width.%]="s.completionRate"></div>
+                  </div>
+                </div>
+              </td>
+              <td class="text-center font-bold">{{ s.avgProgress }}%</td>
+              <td class="text-right font-mono">{{ (s.totalBudget | number:'1.0-0') || '0' }}</td>
+            </tr>
+
+            <tr *ngIf="departmentSummaries().length === 0">
+              <td colspan="10" class="no-data-cell">No departmental data available for the selected filters.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Sign-Off Section -->
+      <div class="report-signoff-section">
+        <div class="signoff-box">
+          <div class="sig-line"></div>
+          <span class="sig-role">Prepared By (Monitoring Officer)</span>
+          <span class="sig-name">{{ currentUserName() }}</span>
+          <span class="sig-date">Date: {{ generatedAt() | date:'yyyy-MM-dd' }}</span>
+        </div>
+        <div class="signoff-box">
+          <div class="sig-line"></div>
+          <span class="sig-role">Reviewed By (Chief Administrative Officer)</span>
+          <span class="sig-name">Signature & Official Stamp</span>
+          <span class="sig-date">Date: .......................................</span>
+        </div>
+        <div class="signoff-box">
+          <div class="sig-line"></div>
+          <span class="sig-role">Approved By (Director General)</span>
+          <span class="sig-name">Signature & Official Seal</span>
+          <span class="sig-date">Date: .......................................</span>
+        </div>
+      </div>
+
+      <div class="doc-security-footer">
+        <span>EXECUTIVE PERFORMANCE MATRIX - DONM HEADQUARTERS</span>
+        <span>Page 1 of 1</span>
+        <span>DONM Document Control v4.8</span>
+      </div>
+    </div>
+  </div>
+
+
+    <!-- ========================================================================= -->
+    <!-- REPORT TYPE 6: MULTI-STAGE VERIFICATION & AUDIT LOG REPORT               -->
+    <!-- ========================================================================= -->
+    <div *ngIf="reportType() === 'verification' && canAccessReport('verification')">
+      
+      <!-- Report Section Toolbar (Screen Only) -->
+      <div class="report-section-toolbar no-print">
+        <div class="toolbar-left">
+          <span class="section-badge red">
+            <mat-icon>verified</mat-icon>
+            <span>Verification Audit Trail & Sign-off Log</span>
+          </span>
+          <span class="report-count-info">{{ verificationAuditTrail().length }} audit stages</span>
+        </div>
+        <div class="toolbar-right">
+          <button mat-stroked-button class="section-action-btn" (click)="exportToCsv()" matTooltip="Export Verification Audit to CSV">
+            <mat-icon>table_view</mat-icon> <span>Export CSV</span>
+          </button>
+          <button mat-flat-button color="primary" class="section-print-btn" (click)="triggerPrint('verification')" matTooltip="Print or Save Verification Audit as A4 PDF">
+            <mat-icon>print</mat-icon> <span>Print Verification Audit (A4)</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="a4-page official-document">
+      
+      <!-- Official Header Banner -->
+      <div class="doc-header">
+        <div class="header-emblem-col">
+          <div class="gov-emblem-badge red-badge">
+            <mat-icon>gavel</mat-icon>
+          </div>
+        </div>
+        <div class="header-title-col">
+          <div class="gov-line-1">DEPARTMENT OF NATIONAL MANAGEMENT (DONM)</div>
+          <div class="gov-line-2">COMPLIANCE, AUDIT & MULTI-OFFICER VERIFICATION CELL</div>
+          <h2 class="doc-main-title">VERIFICATION AUDIT TRAIL & SIGN-OFF LOG</h2>
+          <div class="doc-subtitle">
+            Comprehensive forensic log of verification stages, signers, timestamps, and review remarks for {{ getFormattedMonth() }}
+          </div>
+        </div>
+        <div class="header-meta-col">
+          <table class="meta-table">
+            <tr>
+              <td class="lbl">Ref No:</td>
+              <td class="val">DONM/WP/ADT/{{ selectedMonth() }}</td>
+            </tr>
+            <tr>
+              <td class="lbl">Period:</td>
+              <td class="val"><strong>{{ getFormattedMonth() }}</strong></td>
+            </tr>
+            <tr>
+              <td class="lbl">Total Stages:</td>
+              <td class="val"><strong>{{ verificationAuditTrail().length }}</strong></td>
+            </tr>
+            <tr>
+              <td class="lbl">Milestones:</td>
+              <td class="val"><span class="badge success">{{ reportKPIs().completedMilestones }}/{{ reportKPIs().totalMilestones }} DELIVERED</span></td>
+            </tr>
+          </table>
+        </div>
+      </div>
+
+      <div class="divider-gold"></div>
+
+      <!-- Verification Audit Trail Table -->
+      <div class="table-container">
+        <table class="report-data-table">
+          <thead>
+            <tr>
+              <th style="width: 3%;" class="text-center">#</th>
+              <th style="width: 17%;">Directive Title</th>
+              <th style="width: 11%;">Department</th>
+              <th style="width: 16%;">Deliverable Milestones</th>
+              <th style="width: 6%;">Stage</th>
+              <th style="width: 12%;">Assigned Officer</th>
+              <th style="width: 7%;" class="text-center">Sign Status</th>
+              <th style="width: 9%;" class="text-center">Signed At</th>
+              <th style="width: 9%;">Signer Email</th>
+              <th style="width: 10%;">Remarks / Audit Notes</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let item of verificationAuditTrail(); let idx = index">
+              <td class="text-center font-mono">{{ idx + 1 }}</td>
+              <td>
+                <div class="task-title-cell">
+                  <strong>{{ item.planTitle }}</strong>
+                  <div class="division-subline" *ngIf="item.division">{{ item.division }}</div>
+                </div>
+              </td>
+              <td>{{ item.department }}</td>
+              <td>
+                <div class="milestones-status-cell">
+                  <ng-container *ngIf="item.milestonesTotal > 0; else noMilestonesTpl">
+                    <div class="ms-badge-row">
+                      <span class="badge" 
+                            [class.success]="item.milestonesCompleted === item.milestonesTotal" 
+                            [class.warning]="item.milestonesCompleted > 0 && item.milestonesCompleted < item.milestonesTotal" 
+                            [class.danger]="item.milestonesCompleted === 0">
+                        {{ item.milestonesCompleted }}/{{ item.milestonesTotal }} Delivered ({{ item.milestonesCompletionRate }}%)
+                      </span>
+                    </div>
+                    <div class="ms-mini-bar">
+                      <div class="fill" [style.width.%]="item.milestonesCompletionRate"
+                           [class.fill-success]="item.milestonesCompleted === item.milestonesTotal"
+                           [class.fill-warning]="item.milestonesCompleted > 0 && item.milestonesCompleted < item.milestonesTotal"
+                           [class.fill-danger]="item.milestonesCompleted === 0"></div>
+                    </div>
+                    <div class="milestones-chip-list">
+                      <div *ngFor="let m of item.milestones" class="milestone-chip" [class.done]="m.completed">
+                        <span class="m-status-icon">{{ m.completed ? '✓' : '○' }}</span>
+                        <span class="m-title">{{ m.title }}</span>
+                      </div>
+                    </div>
+                  </ng-container>
+                  <ng-template #noMilestonesTpl>
+                    <span class="text-xs text-muted" style="color: #94a3b8; font-style: italic;">No milestones defined</span>
+                  </ng-template>
+                </div>
+              </td>
+              <td><span class="stage-tag">Stage {{ item.stageOrder }}</span></td>
+              <td>{{ item.assignedOfficerName }}</td>
+              <td class="text-center">
+                <span class="badge" [class.success]="item.verified" [class.warning]="!item.verified">
+                  {{ item.verified ? 'Approved' : 'Pending' }}
+                </span>
+              </td>
+              <td class="font-mono text-xs text-center">
+                {{ item.verifiedAt ? (item.verifiedAt | date:'yyyy-MM-dd HH:mm') : '-' }}
+              </td>
+              <td class="font-mono text-xs">{{ item.verifiedByEmail || '-' }}</td>
+              <td class="text-xs">{{ item.reviewComment || 'Standard approval' }}</td>
+            </tr>
+
+            <tr *ngIf="verificationAuditTrail().length === 0">
+              <td colspan="10" class="no-data-cell">No verification stages found for the selected criteria.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Sign-Off Section -->
+      <div class="report-signoff-section">
+        <div class="signoff-box">
+          <div class="sig-line"></div>
+          <span class="sig-role">Audited By (Internal Audit)</span>
+          <span class="sig-name">{{ currentUserName() }}</span>
+          <span class="sig-date">Date: {{ generatedAt() | date:'yyyy-MM-dd' }}</span>
+        </div>
+        <div class="signoff-box">
+          <div class="sig-line"></div>
+          <span class="sig-role">Verified By (Legal & Compliance Head)</span>
+          <span class="sig-name">Signature & Official Stamp</span>
+          <span class="sig-date">Date: .......................................</span>
+        </div>
+      </div>
+
+      <div class="doc-security-footer">
+        <span>FORENSIC VERIFICATION AUDIT - PERMANENT REGISTRY</span>
+        <span>Page 1 of 1</span>
+        <span>DONM Document Control v4.8</span>
+      </div>
+    </div>
+  </div>
+
+    <!-- Fallback if active reportType is restricted for the user's role -->
+    <div *ngIf="!canAccessReport(reportType())" class="unauthorized-report-card no-print" style="margin: 20px auto; max-width: 600px;">
+      <div class="lock-circle">
+        <mat-icon>lock</mat-icon>
+      </div>
+      <h2>Report Access Restricted</h2>
+      <p>Your user role does not currently have permission to view this report option under Work Plan Settings.</p>
+    </div>
+
+  </div>
+  </ng-container>
+
+  <ng-template #unauthorizedBlock>
+    <div class="unauthorized-report-card no-print">
+      <div class="lock-circle">
+        <mat-icon>lock</mat-icon>
+      </div>
+      <h2>Report Access Restricted</h2>
+      <p>You do not have permission to view or generate Work Plan reports. Your user role is currently not permitted under Work Plan Settings.</p>
+      <div class="info-note">
+        <mat-icon>info</mat-icon>
+        <span>Please contact a system administrator to request report generation privileges for your role.</span>
+      </div>
+    </div>
+  </ng-template>
+</div>

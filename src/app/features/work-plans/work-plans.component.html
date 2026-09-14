@@ -1,0 +1,684 @@
+<div class="work-plans-page">
+  
+  <!-- Hero Greeting & Controls Header -->
+  <div class="hero-banner">
+    <div class="hero-content">
+      <div class="hero-tag-row">
+        <span class="status-pill indigo">
+          <mat-icon class="pill-icon">business_center</mat-icon> Operations Directive Engine
+        </span>
+        <span class="sync-indicator">Multi-Division Monthly Rollout</span>
+      </div>
+      <h1 class="hero-title">Department Work Plans</h1>
+      <p class="hero-subtitle">
+        Monthly directive alignment, cross-branch milestones, and automatic rollover tracking for previous incomplete jobs.
+      </p>
+    </div>
+    <div class="hero-actions">
+      <!-- View Switcher -->
+      <div class="view-mode-toggle">
+        <button type="button" class="mode-btn" [class.active]="viewMode() === 'kanban'" (click)="viewMode.set('kanban')" matTooltip="Kanban Pipeline Board">
+          <mat-icon>view_kanban</mat-icon> <span>Kanban</span>
+        </button>
+        <button type="button" class="mode-btn" [class.active]="viewMode() === 'table'" (click)="viewMode.set('table')" matTooltip="Data Table View">
+          <mat-icon>table_chart</mat-icon> <span>Table</span>
+        </button>
+      </div>
+
+      <button *ngIf="canCreatePlan()" mat-flat-button color="primary" class="primary-action-btn" (click)="openCreateDialog()">
+        <mat-icon>add_circle_outline</mat-icon>
+        <span>+ New Work Plan</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Sub-Category Tab Navigation Bar -->
+  <div class="sub-category-tabs">
+    <a routerLink="/work-plans/dashboard" routerLinkActive="active" class="sub-tab-btn">
+      <mat-icon>insights</mat-icon>
+      <span>Dashboard</span>
+    </a>
+    <a *ngIf="canAccessVerification()" routerLink="/work-plans/verification" routerLinkActive="active" class="sub-tab-btn">
+      <mat-icon>fact_check</mat-icon>
+      <span>Verification</span>
+    </a>
+    <a routerLink="/work-plans/tasks" routerLinkActive="active" class="sub-tab-btn">
+      <mat-icon>view_kanban</mat-icon>
+      <span>Task List</span>
+    </a>
+    <a *ngIf="canAccessReports()" routerLink="/work-plans/reports" routerLinkActive="active" class="sub-tab-btn">
+      <mat-icon>summarize</mat-icon>
+      <span>Reports</span>
+    </a>
+    <a *ngIf="canManageSettings()" routerLink="/work-plans/settings" routerLinkActive="active" class="sub-tab-btn">
+      <mat-icon>tune</mat-icon>
+      <span>Settings</span>
+    </a>
+  </div>
+
+  <!-- View Scope Selector Strip -->
+  <div class="scope-selector-strip">
+    <div class="scope-toggles" *ngIf="canViewAllPlans()">
+      <button type="button" class="scope-btn" [class.active]="viewScope() === 'all'" (click)="viewScope.set('all')">
+        <mat-icon>groups</mat-icon>
+        <span>All Team Directives</span>
+      </button>
+      <button type="button" class="scope-btn" [class.active]="viewScope() === 'own'" (click)="viewScope.set('own')">
+        <mat-icon>person</mat-icon>
+        <span>My Directives Only</span>
+      </button>
+    </div>
+
+    <div class="restricted-scope-banner" *ngIf="!canViewAllPlans()">
+      <mat-icon class="lock-icon">lock</mat-icon>
+      <span>
+        <strong>Personal Directives View:</strong> Displaying your assigned Work Plan tasks. Cross-team directive access is restricted to roles configured in <a routerLink="/work-plans/settings" class="settings-link">Work Plan Settings</a>.
+      </span>
+    </div>
+  </div>
+
+  <!-- Monthly Alignment Navigator Card -->
+  <mat-card class="month-navigator-card">
+    <div class="month-navigator-inner">
+      <div class="month-controls-left">
+        <button mat-icon-button (click)="changeMonth(-1)" matTooltip="Previous Month" class="nav-arrow-btn">
+          <mat-icon>chevron_left</mat-icon>
+        </button>
+
+        <div class="month-heading-group">
+          <div class="month-title-row">
+            <h2 class="month-display-title">{{ formatMonth(selectedMonth()) }}</h2>
+            <span *ngIf="selectedMonth() === runningMonth" class="running-month-tag">
+              <span class="live-dot"></span> RUNNING MONTH
+            </span>
+            <span *ngIf="selectedMonth() !== runningMonth && selectedMonth() !== 'all'" class="archive-month-tag">
+              MONTHLY CYCLE
+            </span>
+            <span *ngIf="selectedMonth() === 'all'" class="archive-month-tag">
+              ALL RECORDED MONTHS
+            </span>
+          </div>
+          <span class="month-subtext">
+            <strong>{{ monthTotalCount() }}</strong> directives aligned in this view
+            <ng-container *ngIf="selectedMonth() === runningMonth && monthRolloverCount() > 0">
+              &bull; <strong class="text-amber">{{ monthRolloverCount() }} carried over from previous months</strong>
+            </ng-container>
+          </span>
+        </div>
+
+        <button mat-icon-button (click)="changeMonth(1)" matTooltip="Next Month" class="nav-arrow-btn">
+          <mat-icon>chevron_right</mat-icon>
+        </button>
+      </div>
+
+      <div class="month-controls-right">
+        <!-- Quick Month Jump Select -->
+        <mat-form-field appearance="outline" class="month-quick-select">
+          <mat-label>Jump to Month</mat-label>
+          <mat-select [ngModel]="selectedMonth()" (ngModelChange)="selectedMonth.set($event)">
+            <mat-option value="all">All Historical Months</mat-option>
+            <mat-option *ngFor="let m of availableMonths()" [value]="m">
+              {{ formatMonth(m) }} {{ m === runningMonth ? '(Running Month)' : '' }}
+            </mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <button *ngIf="selectedMonth() !== runningMonth" mat-stroked-button (click)="goToRunningMonth()" class="today-btn">
+          <mat-icon>today</mat-icon> Jump to Running Month
+        </button>
+      </div>
+    </div>
+
+    <!-- Rollover Alert Banner (Running Month with Incomplete Jobs from Previous Cycles) -->
+    <div *ngIf="selectedMonth() === runningMonth && monthRolloverCount() > 0" class="rollover-alert-banner">
+      <div class="alert-content">
+        <mat-icon class="alert-icon">history_toggle_off</mat-icon>
+        <div class="alert-text">
+          <span class="alert-headline">{{ monthRolloverCount() }} Unfinished Job(s) Carried Over:</span>
+          <span class="alert-sub">Incomplete directives from previous months are actively rolled over into {{ formatMonth(runningMonth) }} to ensure full completion.</span>
+        </div>
+      </div>
+      <div class="alert-actions">
+        <button type="button" class="rollover-filter-toggle" [class.active]="onlyRollover()" (click)="onlyRollover.set(!onlyRollover())">
+          <mat-icon>{{ onlyRollover() ? 'check_box' : 'filter_list' }}</mat-icon>
+          <span>{{ onlyRollover() ? 'Showing Only Rollover' : 'Filter Rollover Jobs (' + monthRolloverCount() + ')' }}</span>
+        </button>
+      </div>
+    </div>
+  </mat-card>
+
+  <!-- 4 High-Level Metric KPI Cards Aligned to Selected Month -->
+  <div class="kpi-grid">
+    <!-- Card 1: Total Plans for Selected Month -->
+    <mat-card class="metric-card">
+      <div class="card-inner">
+        <div class="metric-top">
+          <span class="metric-label">Monthly Directives</span>
+          <div class="metric-icon-box slate">
+            <mat-icon>calendar_view_month</mat-icon>
+          </div>
+        </div>
+        <div class="metric-value-row">
+          <span class="metric-number">{{ monthTotalCount() }}</span>
+          <span class="metric-trend slate">{{ formatMonth(selectedMonth()) }}</span>
+        </div>
+        <div class="metric-footer">
+          <span>{{ selectedMonth() === runningMonth ? 'Scheduled & carried over' : 'Target cycle direct plans' }}</span>
+        </div>
+      </div>
+    </mat-card>
+
+    <!-- Card 2: In Execution -->
+    <mat-card class="metric-card">
+      <div class="card-inner">
+        <div class="metric-top">
+          <span class="metric-label">Active in Execution</span>
+          <div class="metric-icon-box indigo">
+            <mat-icon>sync</mat-icon>
+          </div>
+        </div>
+        <div class="metric-value-row">
+          <span class="metric-number">{{ monthActiveCount() }}</span>
+          <span class="metric-trend indigo">Avg {{ monthAvgProgress() }}% Done</span>
+        </div>
+        <div class="metric-footer">
+          <mat-progress-bar mode="determinate" [value]="monthAvgProgress()" class="metric-progress"></mat-progress-bar>
+        </div>
+      </div>
+    </mat-card>
+
+    <!-- Card 3: Directives Completed -->
+    <mat-card class="metric-card">
+      <div class="card-inner">
+        <div class="metric-top">
+          <span class="metric-label">Delivered & Verified</span>
+          <div class="metric-icon-box emerald">
+            <mat-icon>verified</mat-icon>
+          </div>
+        </div>
+        <div class="metric-value-row">
+          <span class="metric-number">{{ monthCompletedCount() }}</span>
+          <span class="metric-trend emerald">Closed Directives</span>
+        </div>
+        <div class="metric-footer">
+          <span>Full milestone signoff</span>
+        </div>
+      </div>
+    </mat-card>
+
+    <!-- Card 4: Rollover Incomplete Directives -->
+    <mat-card class="metric-card">
+      <div class="card-inner">
+        <div class="metric-top">
+          <span class="metric-label">Carried Over Incomplete</span>
+          <div class="metric-icon-box amber">
+            <mat-icon>update</mat-icon>
+          </div>
+        </div>
+        <div class="metric-value-row">
+          <span class="metric-number">{{ monthRolloverCount() }}</span>
+          <span class="metric-trend amber">Past Incomplete</span>
+        </div>
+        <div class="metric-footer">
+          <span *ngIf="monthRolloverCount() > 0">Transferred to running month</span>
+          <span *ngIf="monthRolloverCount() === 0">Zero backlog rollover</span>
+        </div>
+      </div>
+    </mat-card>
+  </div>
+
+  <!-- Filters & Search Toolbar Card -->
+  <mat-card class="filter-card">
+    <div class="filter-toolbar">
+      
+      <!-- Instant Search -->
+      <div class="search-input-wrap">
+        <mat-icon class="search-icon">search</mat-icon>
+        <input type="text" [ngModel]="searchQuery()" (ngModelChange)="searchQuery.set($event)" 
+               placeholder="Search directives, lead officer, or operational pillar..." class="search-input">
+        <button *ngIf="searchQuery()" mat-icon-button class="clear-btn" (click)="searchQuery.set('')">
+          <mat-icon>close</mat-icon>
+        </button>
+      </div>
+
+      <!-- Division Select -->
+      <mat-form-field appearance="outline" class="filter-field">
+        <mat-label>Division</mat-label>
+        <mat-select [ngModel]="filterDivision()" (ngModelChange)="filterDivision.set($event)">
+          <mat-option value="all">All Divisions</mat-option>
+          <mat-option *ngFor="let div of divisions()" [value]="div.name">{{ div.name }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <!-- Department Select -->
+      <mat-form-field appearance="outline" class="filter-field">
+        <mat-label>Department</mat-label>
+        <mat-select [ngModel]="filterDepartment()" (ngModelChange)="filterDepartment.set($event)">
+          <mat-option value="all">All Departments</mat-option>
+          <mat-option *ngFor="let dept of departments()" [value]="dept.name">{{ dept.name }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <!-- Category / Pillar Select -->
+      <mat-form-field appearance="outline" class="filter-field">
+        <mat-label>Pillar Category</mat-label>
+        <mat-select [ngModel]="filterCategory()" (ngModelChange)="filterCategory.set($event)">
+          <mat-option value="all">All Pillars</mat-option>
+          <mat-option value="Infrastructure">Infrastructure</mat-option>
+          <mat-option value="Land Deeds">Land Deeds</mat-option>
+          <mat-option value="Client Services">Client Services</mat-option>
+          <mat-option value="Operations">Operations</mat-option>
+          <mat-option value="Compliance">Compliance</mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <!-- Status Filter Tabs -->
+      <div class="filter-pills-bar">
+        <button type="button" class="pill-btn" [class.active]="filterStatus() === 'all'" (click)="filterStatus.set('all')">
+          All ({{ monthlyPlans().length }})
+        </button>
+        <button type="button" class="pill-btn" [class.active]="filterStatus() === 'In Progress'" (click)="filterStatus.set('In Progress')">
+          In Progress
+        </button>
+        <button type="button" class="pill-btn" [class.active]="filterStatus() === 'Under Review'" (click)="filterStatus.set('Under Review')">
+          Under Review
+        </button>
+        <button type="button" class="pill-btn" [class.active]="filterStatus() === 'Completed'" (click)="filterStatus.set('Completed')">
+          Completed
+        </button>
+        <button type="button" class="pill-btn" [class.active]="filterStatus() === 'Draft'" (click)="filterStatus.set('Draft')">
+          Draft
+        </button>
+      </div>
+
+    </div>
+  </mat-card>
+
+  <!-- VIEW 1: KANBAN PIPELINE BOARD -->
+  <div class="kanban-view" *ngIf="viewMode() === 'kanban'">
+    <div class="kanban-columns-track">
+
+      <!-- Column 1: Draft & Planning -->
+      <div class="kanban-column draft-col">
+        <div class="column-header">
+          <div class="header-left">
+            <span class="column-dot draft"></span>
+            <h3>Draft & Planning</h3>
+          </div>
+          <span class="col-count-pill">{{ kanbanDraft().length }}</span>
+        </div>
+
+        <div class="column-cards-list">
+          <div class="kanban-plan-card" *ngFor="let plan of kanbanDraft()" (click)="openDetailDialog(plan)">
+            <div class="card-top-row">
+              <div class="card-badges">
+                <span class="priority-tag" [ngClass]="plan.priority.toLowerCase()">{{ plan.priority }}</span>
+                <span *ngIf="isCarriedOver(plan)" class="rollover-pill">
+                  <mat-icon>history</mat-icon> Rollover ({{ getPlanMonthLabel(plan) }})
+                </span>
+              </div>
+              <button mat-icon-button [matMenuTriggerFor]="planMenu" (click)="$event.stopPropagation()" class="card-more-btn">
+                <mat-icon>more_vert</mat-icon>
+              </button>
+              <mat-menu #planMenu="matMenu">
+                <button mat-menu-item (click)="openDetailDialog(plan)"><mat-icon>visibility</mat-icon> View Brief</button>
+                <button mat-menu-item *ngIf="canEditAndAssign()" (click)="openEditDialog(plan)"><mat-icon>edit</mat-icon> Edit</button>
+                <button mat-menu-item (click)="updateStatusQuick(plan, 'In Progress')"><mat-icon>play_arrow</mat-icon> Start Execution</button>
+                <button mat-menu-item *ngIf="canDeletePlan()" (click)="deletePlan(plan)"><mat-icon color="warn">delete</mat-icon> Delete</button>
+              </mat-menu>
+            </div>
+
+            <h4 class="card-title">{{ plan.title }}</h4>
+            <p class="card-desc">{{ plan.description }}</p>
+
+            <div class="tags-row">
+              <span class="tag category">{{ plan.category }}</span>
+              <span class="tag division">{{ plan.division }}</span>
+            </div>
+
+            <div class="card-footer-row">
+              <div class="lead-info" [matTooltip]="'Task Owner: ' + (plan.ownerName || plan.createdByName || plan.leadName) + (plan.ownerName && plan.ownerName !== plan.leadName ? ' | Verifier: ' + plan.leadName : '')">
+                <div class="lead-avatar">{{ getInitials(plan.ownerName || plan.leadName) }}</div>
+                <span class="lead-name">{{ plan.ownerName || plan.leadName }}</span>
+              </div>
+              <div class="due-info">
+                <mat-icon class="clock-icon">event</mat-icon>
+                <span>{{ plan.targetDate }}</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="empty-column-state" *ngIf="kanbanDraft().length === 0">
+            No directives in planning phase.
+          </div>
+        </div>
+      </div>
+
+      <!-- Column 2: In Progress -->
+      <div class="kanban-column in-progress-col">
+        <div class="column-header">
+          <div class="header-left">
+            <span class="column-dot in-progress"></span>
+            <h3>In Progress & Execution</h3>
+          </div>
+          <span class="col-count-pill">{{ kanbanInProgress().length }}</span>
+        </div>
+
+        <div class="column-cards-list">
+          <div class="kanban-plan-card" *ngFor="let plan of kanbanInProgress()" (click)="openDetailDialog(plan)">
+            <div class="card-top-row">
+              <div class="card-badges">
+                <span class="priority-tag" [ngClass]="plan.priority.toLowerCase()">{{ plan.priority }}</span>
+                <span *ngIf="isCarriedOver(plan)" class="rollover-pill">
+                  <mat-icon>history</mat-icon> Rollover ({{ getPlanMonthLabel(plan) }})
+                </span>
+              </div>
+              <button mat-icon-button [matMenuTriggerFor]="planMenu" (click)="$event.stopPropagation()" class="card-more-btn">
+                <mat-icon>more_vert</mat-icon>
+              </button>
+              <mat-menu #planMenu="matMenu">
+                <button mat-menu-item (click)="openDetailDialog(plan)"><mat-icon>visibility</mat-icon> View Brief</button>
+                <button mat-menu-item *ngIf="canEditAndAssign()" (click)="openEditDialog(plan)"><mat-icon>edit</mat-icon> Edit</button>
+                <button mat-menu-item (click)="updateStatusQuick(plan, 'Under Review')"><mat-icon>fact_check</mat-icon> Submit for Review</button>
+                <button mat-menu-item *ngIf="canDeletePlan()" (click)="deletePlan(plan)"><mat-icon color="warn">delete</mat-icon> Delete</button>
+              </mat-menu>
+            </div>
+
+            <h4 class="card-title">{{ plan.title }}</h4>
+            
+            <div class="progress-wrap">
+              <div class="progress-labels">
+                <span>Progress</span>
+                <strong>{{ plan.progress }}%</strong>
+              </div>
+              <mat-progress-bar mode="determinate" [value]="plan.progress" class="card-progress"></mat-progress-bar>
+            </div>
+
+            <div class="tags-row">
+              <span class="tag category">{{ plan.category }}</span>
+              <span class="tag division">{{ plan.division }}</span>
+            </div>
+
+            <div class="card-footer-row">
+              <div class="lead-info" [matTooltip]="'Task Owner: ' + (plan.ownerName || plan.createdByName || plan.leadName) + (plan.ownerName && plan.ownerName !== plan.leadName ? ' | Verifier: ' + plan.leadName : '')">
+                <div class="lead-avatar">{{ getInitials(plan.ownerName || plan.leadName) }}</div>
+                <span class="lead-name">{{ plan.ownerName || plan.leadName }}</span>
+              </div>
+              <div class="milestone-badge" *ngIf="plan.milestones.length > 0">
+                <mat-icon class="check-mini">check</mat-icon>
+                <span>{{ plan.milestones.length }} tasks</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="empty-column-state" *ngIf="kanbanInProgress().length === 0">
+            No directives actively executing.
+          </div>
+        </div>
+      </div>
+
+      <!-- Column 3: Under Review -->
+      <div class="kanban-column review-col">
+        <div class="column-header">
+          <div class="header-left">
+            <span class="column-dot review"></span>
+            <h3>Under Review & Audit</h3>
+          </div>
+          <span class="col-count-pill">{{ kanbanUnderReview().length }}</span>
+        </div>
+
+        <div class="column-cards-list">
+          <div class="kanban-plan-card" *ngFor="let plan of kanbanUnderReview()" (click)="openDetailDialog(plan)">
+            <div class="card-top-row">
+              <div class="card-badges">
+                <span class="priority-tag" [ngClass]="plan.priority.toLowerCase()">{{ plan.priority }}</span>
+                <span *ngIf="isCarriedOver(plan)" class="rollover-pill">
+                  <mat-icon>history</mat-icon> Rollover ({{ getPlanMonthLabel(plan) }})
+                </span>
+              </div>
+              <button mat-icon-button [matMenuTriggerFor]="planMenu" (click)="$event.stopPropagation()" class="card-more-btn">
+                <mat-icon>more_vert</mat-icon>
+              </button>
+              <mat-menu #planMenu="matMenu">
+                <button mat-menu-item (click)="openDetailDialog(plan)"><mat-icon>visibility</mat-icon> View Brief</button>
+                <button mat-menu-item *ngIf="canEditAndAssign()" (click)="openEditDialog(plan)"><mat-icon>edit</mat-icon> Edit</button>
+                <button mat-menu-item *ngIf="canAccessVerification()" (click)="updateStatusQuick(plan, 'Completed')"><mat-icon>verified</mat-icon> Approve & Complete</button>
+                <button mat-menu-item *ngIf="canAccessVerification() && getCompletedVerifiersCount(plan) > 0" (click)="resetPlanApprovals(plan)"><mat-icon>restart_alt</mat-icon> Reset Approvals</button>
+                <button mat-menu-item *ngIf="canDeletePlan()" (click)="deletePlan(plan)"><mat-icon color="warn">delete</mat-icon> Delete</button>
+              </mat-menu>
+            </div>
+
+            <h4 class="card-title">{{ plan.title }}</h4>
+            
+            <div class="progress-wrap">
+              <div class="progress-labels">
+                <span>Verification</span>
+                <strong>{{ plan.progress }}%</strong>
+              </div>
+              <mat-progress-bar mode="determinate" [value]="plan.progress" class="card-progress"></mat-progress-bar>
+            </div>
+
+            <div class="tags-row">
+              <span class="tag category">{{ plan.category }}</span>
+              <span class="tag division">{{ plan.division }}</span>
+            </div>
+
+            <div class="verifiers-badge-row" *ngIf="getPlanVerifiers(plan).length > 0">
+              <span class="v-pill" [class.all-done]="areAllVerifiersApproved(plan)" 
+                    [matTooltip]="'Verification Pipeline: ' + getCompletedVerifiersCount(plan) + ' of ' + getPlanVerifiers(plan).length + ' stages signed off'">
+                <mat-icon class="v-pill-icon">{{ areAllVerifiersApproved(plan) ? 'verified' : 'how_to_reg' }}</mat-icon>
+                <span>{{ getCompletedVerifiersCount(plan) }}/{{ getPlanVerifiers(plan).length }} Verifiers Signed</span>
+              </span>
+            </div>
+
+            <div class="card-footer-row">
+              <div class="lead-info" [matTooltip]="'Task Owner: ' + (plan.ownerName || plan.createdByName || plan.leadName) + (plan.ownerName && plan.ownerName !== plan.leadName ? ' | Verifier: ' + plan.leadName : '')">
+                <div class="lead-avatar">{{ getInitials(plan.ownerName || plan.leadName) }}</div>
+                <span class="lead-name">{{ plan.ownerName || plan.leadName }}</span>
+              </div>
+              <div class="due-info">
+                <mat-icon class="clock-icon">event</mat-icon>
+                <span>{{ plan.targetDate }}</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="empty-column-state" *ngIf="kanbanUnderReview().length === 0">
+            No directives awaiting review.
+          </div>
+        </div>
+      </div>
+
+      <!-- Column 4: Completed -->
+      <div class="kanban-column completed-col">
+        <div class="column-header">
+          <div class="header-left">
+            <span class="column-dot completed"></span>
+            <h3>Delivered & Archived</h3>
+          </div>
+          <span class="col-count-pill">{{ kanbanCompleted().length }}</span>
+        </div>
+
+        <div class="column-cards-list">
+          <div class="kanban-plan-card completed-card" *ngFor="let plan of kanbanCompleted()" (click)="openDetailDialog(plan)">
+            <div class="card-top-row">
+              <span class="status-pill emerald">Completed</span>
+              <button mat-icon-button [matMenuTriggerFor]="planMenu" (click)="$event.stopPropagation()" class="card-more-btn">
+                <mat-icon>more_vert</mat-icon>
+              </button>
+              <mat-menu #planMenu="matMenu">
+                <button mat-menu-item (click)="openDetailDialog(plan)"><mat-icon>visibility</mat-icon> View Brief</button>
+                <button mat-menu-item *ngIf="canDeletePlan()" (click)="deletePlan(plan)"><mat-icon color="warn">delete</mat-icon> Delete</button>
+              </mat-menu>
+            </div>
+
+            <h4 class="card-title">{{ plan.title }}</h4>
+
+            <div class="tags-row">
+              <span class="tag category">{{ plan.category }}</span>
+              <span class="tag division">{{ plan.division }}</span>
+            </div>
+
+            <div class="card-footer-row">
+              <div class="lead-info" [matTooltip]="'Task Owner: ' + (plan.ownerName || plan.createdByName || plan.leadName) + (plan.ownerName && plan.ownerName !== plan.leadName ? ' | Verifier: ' + plan.leadName : '')">
+                <div class="lead-avatar">{{ getInitials(plan.ownerName || plan.leadName) }}</div>
+                <span class="lead-name">{{ plan.ownerName || plan.leadName }}</span>
+              </div>
+              <div class="budget-tag" *ngIf="plan.budget">
+                LKR {{ plan.budget | number }}
+              </div>
+            </div>
+          </div>
+
+          <div class="empty-column-state" *ngIf="kanbanCompleted().length === 0">
+            No completed directives in this cycle.
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- VIEW 2: DATA TABLE VIEW -->
+  <mat-card class="table-card" *ngIf="viewMode() === 'table'">
+    <div class="table-container">
+      <table mat-table [dataSource]="paginatedPlans()" class="modern-plans-table">
+
+        <!-- Title & Category Column -->
+        <ng-container matColumnDef="title">
+          <th mat-header-cell *matHeaderCellDef> Directive / Plan </th>
+          <td mat-cell *matCellDef="let plan" (click)="openDetailDialog(plan)" class="clickable-cell">
+            <div class="title-wrapper">
+              <div class="title-top-line">
+                <span class="plan-title-text">{{ plan.title }}</span>
+                <span *ngIf="isCarriedOver(plan)" class="rollover-pill-mini" matTooltip="Rollover from past incomplete cycle">
+                  <mat-icon>history</mat-icon> Rollover
+                </span>
+              </div>
+              <span class="plan-category-text">{{ plan.category }}</span>
+            </div>
+          </td>
+        </ng-container>
+
+        <!-- Month & Origin Column -->
+        <ng-container matColumnDef="month">
+          <th mat-header-cell *matHeaderCellDef> Cycle Month </th>
+          <td mat-cell *matCellDef="let plan">
+            <div class="month-cell">
+              <span class="month-pill" [class.rollover-month]="isCarriedOver(plan)">
+                {{ getPlanMonthLabel(plan) }}
+              </span>
+            </div>
+          </td>
+        </ng-container>
+
+        <!-- Division Column -->
+        <ng-container matColumnDef="division">
+          <th mat-header-cell *matHeaderCellDef> Division </th>
+          <td mat-cell *matCellDef="let plan">
+            <span class="division-badge">{{ plan.division }}</span>
+          </td>
+        </ng-container>
+
+        <!-- Lead Column -->
+        <ng-container matColumnDef="lead">
+          <th mat-header-cell *matHeaderCellDef> Performer & Verifier </th>
+          <td mat-cell *matCellDef="let plan">
+            <div class="lead-cell" [matTooltip]="'Task Owner: ' + (plan.ownerName || plan.createdByName || plan.leadName) + (plan.ownerName && plan.ownerName !== plan.leadName ? ' | Verifier: ' + plan.leadName : '')">
+              <div class="lead-avatar">{{ getInitials(plan.ownerName || plan.leadName) }}</div>
+              <div class="lead-text-col">
+                <span class="lead-name">{{ plan.ownerName || plan.leadName }}</span>
+                <span class="verifier-sub" *ngIf="plan.ownerName && plan.ownerName !== plan.leadName">
+                  Verifier: {{ plan.leadName }}
+                </span>
+              </div>
+            </div>
+          </td>
+        </ng-container>
+
+        <!-- Priority Column -->
+        <ng-container matColumnDef="priority">
+          <th mat-header-cell *matHeaderCellDef> Priority </th>
+          <td mat-cell *matCellDef="let plan">
+            <span class="priority-tag" [ngClass]="plan.priority.toLowerCase()">{{ plan.priority }}</span>
+          </td>
+        </ng-container>
+
+        <!-- Progress Column -->
+        <ng-container matColumnDef="progress">
+          <th mat-header-cell *matHeaderCellDef> Progress </th>
+          <td mat-cell *matCellDef="let plan">
+            <div class="table-progress-wrap">
+              <mat-progress-bar mode="determinate" [value]="plan.progress" class="tbl-progress"></mat-progress-bar>
+              <span class="tbl-pct">{{ plan.progress }}%</span>
+            </div>
+          </td>
+        </ng-container>
+
+        <!-- Target Date Column -->
+        <ng-container matColumnDef="targetDate">
+          <th mat-header-cell *matHeaderCellDef> Target Date </th>
+          <td mat-cell *matCellDef="let plan">
+            <div class="table-date">
+              <mat-icon class="cal-icon">calendar_today</mat-icon>
+              <span>{{ plan.targetDate }}</span>
+            </div>
+          </td>
+        </ng-container>
+
+        <!-- Status Column -->
+        <ng-container matColumnDef="status">
+          <th mat-header-cell *matHeaderCellDef> Status </th>
+          <td mat-cell *matCellDef="let plan">
+            <div class="table-status-cell">
+              <span class="status-pill" [ngClass]="{
+                'emerald': plan.status === 'Completed',
+                'indigo': plan.status === 'In Progress',
+                'amber': plan.status === 'Under Review',
+                'coral': plan.status === 'Delayed',
+                'slate': plan.status === 'Draft'
+              }">{{ plan.status }}</span>
+              <span class="table-verifiers-badge" *ngIf="plan.status === 'Under Review' && getPlanVerifiers(plan).length > 0"
+                    [class.all-done]="areAllVerifiersApproved(plan)"
+                    [matTooltip]="getCompletedVerifiersCount(plan) + ' of ' + getPlanVerifiers(plan).length + ' verification stages signed off'">
+                {{ getCompletedVerifiersCount(plan) }}/{{ getPlanVerifiers(plan).length }} signed
+              </span>
+            </div>
+          </td>
+        </ng-container>
+
+        <!-- Actions Column -->
+        <ng-container matColumnDef="actions">
+          <th mat-header-cell *matHeaderCellDef class="actions-header"></th>
+          <td mat-cell *matCellDef="let plan" class="actions-cell">
+            <button mat-icon-button (click)="openDetailDialog(plan)" matTooltip="View Details">
+              <mat-icon>visibility</mat-icon>
+            </button>
+            <button mat-icon-button *ngIf="canEditAndAssign()" (click)="openEditDialog(plan)" matTooltip="Edit Plan">
+              <mat-icon>edit</mat-icon>
+            </button>
+            <button mat-icon-button *ngIf="canDeletePlan()" (click)="deletePlan(plan)" matTooltip="Delete" color="warn">
+              <mat-icon>delete</mat-icon>
+            </button>
+          </td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+        <tr mat-row *matRowDef="let row; columns: displayedColumns;" class="table-row"></tr>
+
+        <tr class="mat-row" *matNoDataRow>
+          <td class="mat-cell empty-cell" [attr.colspan]="displayedColumns.length">
+            <mat-icon class="empty-icon">search_off</mat-icon>
+            <p>No work plans match the selected criteria for this monthly cycle.</p>
+          </td>
+        </tr>
+      </table>
+    </div>
+
+    <!-- Paginator -->
+    <mat-paginator [length]="filteredPlans().length" [pageSize]="pageSize()" [pageSizeOptions]="[5, 10, 20, 50]"
+                   aria-label="Select page" (page)="onPageChange($event)">
+    </mat-paginator>
+  </mat-card>
+
+</div>

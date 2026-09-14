@@ -1,0 +1,543 @@
+<div class="work-plan-dashboard-page">
+
+  <!-- Top Hero Header -->
+  <div class="hero-banner">
+    <div class="hero-content">
+      <div class="hero-tag-row">
+        <span class="status-pill indigo">
+          <mat-icon class="pill-icon">insights</mat-icon> Executive Operations Suite
+        </span>
+        <span class="sync-indicator">Team Resource & Capacity Intelligence</span>
+      </div>
+      <h1 class="hero-title">Work Plan Dashboard</h1>
+      <p class="hero-subtitle">
+        Overall user workload governance, cross-division milestone progress, and individual officer performance tracking.
+      </p>
+    </div>
+    <div class="hero-actions">
+      <button *ngIf="canCreatePlan()" mat-flat-button color="primary" class="primary-btn" (click)="openCreateDialog()">
+        <mat-icon>add_circle_outline</mat-icon>
+        <span>+ New Work Plan</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Sub-Category Tab Navigation Bar -->
+  <div class="sub-category-tabs">
+    <a routerLink="/work-plans/dashboard" routerLinkActive="active" class="sub-tab-btn">
+      <mat-icon>insights</mat-icon>
+      <span>Dashboard</span>
+    </a>
+    <a *ngIf="canAccessVerification()" routerLink="/work-plans/verification" routerLinkActive="active" class="sub-tab-btn">
+      <mat-icon>fact_check</mat-icon>
+      <span>Verification</span>
+    </a>
+    <a routerLink="/work-plans/tasks" routerLinkActive="active" class="sub-tab-btn">
+      <mat-icon>view_kanban</mat-icon>
+      <span>Task List</span>
+    </a>
+    <a *ngIf="canAccessReports()" routerLink="/work-plans/reports" routerLinkActive="active" class="sub-tab-btn">
+      <mat-icon>summarize</mat-icon>
+      <span>Reports</span>
+    </a>
+    <a *ngIf="canManageSettings()" routerLink="/work-plans/settings" routerLinkActive="active" class="sub-tab-btn">
+      <mat-icon>tune</mat-icon>
+      <span>Settings</span>
+    </a>
+  </div>
+
+  <!-- View Scope Selector Strip -->
+  <div class="scope-selector-strip">
+    <div class="scope-toggles" *ngIf="canViewAllSummary()">
+      <button type="button" class="scope-btn" [class.active]="viewScope() === 'all'" (click)="viewScope.set('all')">
+        <mat-icon>groups</mat-icon>
+        <span>All Team Members Summary</span>
+      </button>
+      <button type="button" class="scope-btn" [class.active]="viewScope() === 'own'" (click)="viewScope.set('own')">
+        <mat-icon>person</mat-icon>
+        <span>My Work Plan Only</span>
+      </button>
+    </div>
+
+    <div class="restricted-scope-banner" *ngIf="!canViewAllSummary()">
+      <mat-icon class="lock-icon">lock</mat-icon>
+      <span>
+        <strong>Personal Scope Active:</strong> Viewing your personal assigned Work Plan. Cross-team All Users Summary is restricted to authorized roles (configured in <a routerLink="/work-plans/settings" class="settings-link">Work Plan Settings</a>).
+      </span>
+    </div>
+  </div>
+
+  <!-- SECTION 1: OVERALL / PERSONAL USERS SUMMARY -->
+  <div class="section-container">
+    <div class="section-header">
+      <div class="header-left">
+        <div class="section-icon-box" [ngClass]="effectiveViewScope() === 'all' ? 'slate' : 'indigo'">
+          <mat-icon>{{ effectiveViewScope() === 'all' ? 'groups' : 'person' }}</mat-icon>
+        </div>
+        <div>
+          <h2 class="section-title">{{ effectiveViewScope() === 'all' ? 'Overall Users Summary' : 'My Work Plan Summary' }}</h2>
+          <p class="section-desc">
+            {{ effectiveViewScope() === 'all' 
+              ? 'Consolidated team capacity and execution metrics across all regional leads.' 
+              : 'Personal directive metrics and milestone progress for your assigned directives.' }}
+          </p>
+        </div>
+      </div>
+
+      <!-- Scoping Controls -->
+      <div class="scope-controls">
+        <mat-form-field appearance="outline" class="mini-select">
+          <mat-label>Execution Cycle</mat-label>
+          <mat-select [ngModel]="selectedMonth()" (ngModelChange)="selectedMonth.set($event)">
+            <mat-option value="all">All Cycles</mat-option>
+            <mat-option *ngFor="let m of availableMonths()" [value]="m">{{ formatMonth(m) }}</mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="mini-select">
+          <mat-label>Division Scope</mat-label>
+          <mat-select [ngModel]="selectedDivision()" (ngModelChange)="selectedDivision.set($event)">
+            <mat-option value="all">All Divisions</mat-option>
+            <mat-option *ngFor="let d of divisions()" [value]="d.name">{{ d.name }}</mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="mini-select">
+          <mat-label>Department Scope</mat-label>
+          <mat-select [ngModel]="selectedDepartment()" (ngModelChange)="selectedDepartment.set($event)">
+            <mat-option value="all">All Departments</mat-option>
+            <mat-option *ngFor="let dept of departments()" [value]="dept.name">{{ dept.name }}</mat-option>
+          </mat-select>
+        </mat-form-field>
+      </div>
+    </div>
+
+    <!-- 4 High-Level Metric KPI Cards -->
+    <div class="overall-kpi-grid">
+      <!-- Card 1: Active Officers / Leads -->
+      <mat-card class="kpi-card">
+        <div class="kpi-inner">
+          <div class="kpi-top">
+            <span class="kpi-label">Active Regional Leads</span>
+            <div class="kpi-icon-box indigo">
+              <mat-icon>supervisor_account</mat-icon>
+            </div>
+          </div>
+          <div class="kpi-value-row">
+            <span class="kpi-number">{{ overallUsersSummary().totalOfficers }}</span>
+            <span class="kpi-badge indigo">Assigned Officers</span>
+          </div>
+          <div class="kpi-footer">
+            <span>Managing branch directives</span>
+          </div>
+        </div>
+      </mat-card>
+
+      <!-- Card 2: Total Directives Managed -->
+      <mat-card class="kpi-card">
+        <div class="kpi-inner">
+          <div class="kpi-top">
+            <span class="kpi-label">Total Assigned Directives</span>
+            <div class="kpi-icon-box slate">
+              <mat-icon>assignment</mat-icon>
+            </div>
+          </div>
+          <div class="kpi-value-row">
+            <span class="kpi-number">{{ overallUsersSummary().totalDirectives }}</span>
+            <span class="kpi-badge slate">{{ overallUsersSummary().inProgressDirectives }} Active</span>
+          </div>
+          <div class="kpi-footer">
+            <span>Across all operational categories</span>
+          </div>
+        </div>
+      </mat-card>
+
+      <!-- Card 3: Overall Milestone Completion Rate -->
+      <mat-card class="kpi-card">
+        <div class="kpi-inner">
+          <div class="kpi-top">
+            <span class="kpi-label">Team Milestone Completion</span>
+            <div class="kpi-icon-box emerald">
+              <mat-icon>verified</mat-icon>
+            </div>
+          </div>
+          <div class="kpi-value-row">
+            <span class="kpi-number">{{ overallUsersSummary().milestoneRate }}%</span>
+            <span class="kpi-badge emerald">{{ overallUsersSummary().completedMilestones }}/{{ overallUsersSummary().totalMilestones }} Tasks</span>
+          </div>
+          <div class="kpi-footer">
+            <mat-progress-bar mode="determinate" [value]="overallUsersSummary().milestoneRate" class="kpi-progress"></mat-progress-bar>
+          </div>
+        </div>
+      </mat-card>
+
+      <!-- Card 4: Total Budget Managed -->
+      <mat-card class="kpi-card">
+        <div class="kpi-inner">
+          <div class="kpi-top">
+            <span class="kpi-label">Total Allocated Funds</span>
+            <div class="kpi-icon-box amber">
+              <mat-icon>account_balance_wallet</mat-icon>
+            </div>
+          </div>
+          <div class="kpi-value-row">
+            <span class="kpi-number">LKR {{ (overallUsersSummary().totalBudget || 0) | number }}</span>
+            <span class="kpi-badge amber">Branch Funds</span>
+          </div>
+          <div class="kpi-footer">
+            <span>Under officer stewardship</span>
+          </div>
+        </div>
+      </mat-card>
+    </div>
+
+    <!-- Capacity & Status Distribution Strip -->
+    <mat-card class="distribution-strip">
+      <div class="strip-header">
+        <span class="strip-title">Portfolio Status Breakdown</span>
+        <span class="strip-meta">Overall Team Execution Rate: <strong>{{ overallUsersSummary().overallProgress }}%</strong></span>
+      </div>
+      <div class="strip-pills">
+        <div class="status-chip in-progress">
+          <span class="chip-dot"></span>
+          <span>In Progress: <strong>{{ overallUsersSummary().inProgressDirectives }}</strong></span>
+        </div>
+        <div class="status-chip completed">
+          <span class="chip-dot"></span>
+          <span>Delivered: <strong>{{ overallUsersSummary().completedDirectives }}</strong></span>
+        </div>
+        <div class="status-chip review">
+          <span class="chip-dot"></span>
+          <span>Under Audit: <strong>{{ overallUsersSummary().underReviewDirectives }}</strong></span>
+        </div>
+        <div class="status-chip urgent" *ngIf="overallUsersSummary().urgentDirectives > 0">
+          <span class="chip-dot"></span>
+          <span>Urgent Priority: <strong>{{ overallUsersSummary().urgentDirectives }}</strong></span>
+        </div>
+      </div>
+    </mat-card>
+  </div>
+
+  <!-- SECTION 2: EACH USER / PERSONAL DIRECTIVES SUMMARY -->
+  <div class="section-container">
+    <div class="section-header">
+      <div class="header-left">
+        <div class="section-icon-box indigo">
+          <mat-icon>{{ effectiveViewScope() === 'all' ? 'person_search' : 'assignment_ind' }}</mat-icon>
+        </div>
+        <div>
+          <h2 class="section-title">{{ effectiveViewScope() === 'all' ? 'Each User Summary' : 'My Assigned Directives' }}</h2>
+          <p class="section-desc">
+            {{ effectiveViewScope() === 'all' 
+              ? 'Individual workload distribution, assigned directives, and milestone completion for each officer.' 
+              : 'Detailed operational task breakdown and milestone deliverables assigned to your account.' }}
+          </p>
+        </div>
+      </div>
+
+      <!-- Controls & Toggle -->
+      <div class="each-user-controls">
+        <!-- Search Input -->
+        <div class="search-wrap">
+          <mat-icon class="search-icon">search</mat-icon>
+          <input type="text" [ngModel]="searchQuery()" (ngModelChange)="searchQuery.set($event)" 
+                 placeholder="Search officer name, email, division..." class="search-input">
+          <button *ngIf="searchQuery()" mat-icon-button class="clear-btn" (click)="searchQuery.set('')">
+            <mat-icon>close</mat-icon>
+          </button>
+        </div>
+
+        <!-- View Mode Switcher -->
+        <div class="view-toggle">
+          <button type="button" class="mode-btn" [class.active]="userViewMode() === 'cards'" (click)="userViewMode.set('cards')" matTooltip="User Cards Grid">
+            <mat-icon>grid_view</mat-icon>
+          </button>
+          <button type="button" class="mode-btn" [class.active]="userViewMode() === 'table'" (click)="userViewMode.set('table')" matTooltip="Executive Table">
+            <mat-icon>table_chart</mat-icon>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- VIEW A: USER SUMMARY CARDS GRID -->
+    <div class="user-cards-grid" *ngIf="userViewMode() === 'cards'">
+      <mat-card class="user-summary-card" *ngFor="let user of eachUserSummary()">
+        <div class="card-top">
+          <div class="user-profile-row">
+            <div class="user-avatar">{{ getInitials(user.leadName) }}</div>
+            <div class="user-meta">
+              <h3 class="user-name">{{ user.leadName }}</h3>
+              <span class="user-email">{{ user.leadEmail }}</span>
+            </div>
+          </div>
+          <span class="division-pill">{{ user.division }}</span>
+        </div>
+
+        <!-- Metric Numbers Grid -->
+        <div class="user-metrics-row">
+          <div class="metric-box">
+            <span class="metric-num">{{ user.totalPlans }}</span>
+            <span class="metric-lbl">Directives</span>
+          </div>
+          <div class="metric-box">
+            <span class="metric-num">{{ user.inProgressCount }}</span>
+            <span class="metric-lbl">In Progress</span>
+          </div>
+          <div class="metric-box">
+            <span class="metric-num text-emerald">{{ user.completedCount }}</span>
+            <span class="metric-lbl">Delivered</span>
+          </div>
+          <div class="metric-box">
+            <span class="metric-num">LKR {{ (user.totalBudget || 0) | number }}</span>
+            <span class="metric-lbl">Budget</span>
+          </div>
+        </div>
+
+        <!-- Milestone Progress -->
+        <div class="milestone-progress-wrap">
+          <div class="progress-labels">
+            <span class="progress-title">Milestones ({{ user.completedMilestones }}/{{ user.totalMilestones }})</span>
+            <span class="progress-pct">{{ user.milestoneRate }}%</span>
+          </div>
+          <mat-progress-bar mode="determinate" [value]="user.milestoneRate" class="user-progress"></mat-progress-bar>
+        </div>
+
+        <!-- Directives Mini List / Tags -->
+        <div class="directives-preview">
+          <div class="preview-label">Active Directives:</div>
+          <div class="preview-chips">
+            <span *ngFor="let plan of user.plans.slice(0, 2)" class="plan-chip" (click)="openPlanDetail(plan)" [matTooltip]="plan.title">
+              <mat-icon class="plan-chip-icon">bolt</mat-icon>
+              {{ plan.title }}
+            </span>
+            <span *ngIf="user.plans.length > 2" class="more-plans-tag" (click)="openUserModal(user)">
+              +{{ user.plans.length - 2 }} more
+            </span>
+          </div>
+        </div>
+
+        <!-- Card Footer -->
+        <div class="card-footer">
+          <div class="priority-pills">
+            <span *ngIf="user.urgentCount > 0" class="urgent-tag">
+              <mat-icon>priority_high</mat-icon> {{ user.urgentCount }} Urgent
+            </span>
+            <span *ngIf="user.underReviewCount > 0" class="review-tag">
+              <mat-icon>fact_check</mat-icon> {{ user.underReviewCount }} Review
+            </span>
+          </div>
+          <button mat-stroked-button color="primary" class="inspect-btn" (click)="openUserModal(user)">
+            <mat-icon>visibility</mat-icon> View All ({{ user.totalPlans }})
+          </button>
+        </div>
+      </mat-card>
+
+      <!-- Empty State -->
+      <div class="empty-state" *ngIf="eachUserSummary().length === 0">
+        <mat-icon class="empty-icon">{{ effectiveViewScope() === 'all' ? 'search_off' : 'assignment_ind' }}</mat-icon>
+        <h4>{{ effectiveViewScope() === 'all' ? 'No officer records found' : 'No personal directives assigned' }}</h4>
+        <p>
+          {{ effectiveViewScope() === 'all' 
+            ? 'No work plans match the selected search criteria or scoping filters.' 
+            : 'You currently have no active work plans assigned to your user account. Click below to draft a new directive.' }}
+        </p>
+        <button mat-flat-button color="primary" class="create-own-btn" *ngIf="effectiveViewScope() === 'own' && canCreatePlan()" (click)="openCreateDialog()">
+          <mat-icon>add_circle_outline</mat-icon> + Create My First Directive
+        </button>
+      </div>
+    </div>
+
+    <!-- VIEW B: USER SUMMARY EXECUTIVE TABLE -->
+    <mat-card class="table-card" *ngIf="userViewMode() === 'table'">
+      <div class="table-responsive">
+        <table mat-table [dataSource]="eachUserSummary()" class="executive-table">
+
+          <!-- Officer Column -->
+          <ng-container matColumnDef="officer">
+            <th mat-header-cell *matHeaderCellDef> Regional Lead / Officer </th>
+            <td mat-cell *matCellDef="let user" (click)="openUserModal(user)" class="clickable-cell">
+              <div class="officer-cell">
+                <div class="officer-avatar">{{ getInitials(user.leadName) }}</div>
+                <div class="officer-info">
+                  <span class="officer-name">{{ user.leadName }}</span>
+                  <span class="officer-email">{{ user.leadEmail }}</span>
+                </div>
+              </div>
+            </td>
+          </ng-container>
+
+          <!-- Division Column -->
+          <ng-container matColumnDef="division">
+            <th mat-header-cell *matHeaderCellDef> Division </th>
+            <td mat-cell *matCellDef="let user">
+              <span class="division-badge">{{ user.division }}</span>
+            </td>
+          </ng-container>
+
+          <!-- Directives / Assigned Tasks Column -->
+          <ng-container matColumnDef="directives">
+            <th mat-header-cell *matHeaderCellDef> Assigned Tasks </th>
+            <td mat-cell *matCellDef="let user">
+              <div class="table-directives-chips">
+                <span *ngFor="let plan of user.plans.slice(0, 2)" class="plan-chip" (click)="openPlanDetail(plan)" [matTooltip]="plan.title">
+                  <mat-icon class="plan-chip-icon">bolt</mat-icon>
+                  {{ plan.title }}
+                </span>
+                <span *ngIf="user.plans.length > 2" class="more-plans-tag" (click)="openUserModal(user)">
+                  +{{ user.plans.length - 2 }} more
+                </span>
+              </div>
+            </td>
+          </ng-container>
+
+          <!-- Total Plans Column -->
+          <ng-container matColumnDef="totalPlans">
+            <th mat-header-cell *matHeaderCellDef> Directives </th>
+            <td mat-cell *matCellDef="let user">
+              <span class="count-badge">{{ user.totalPlans }}</span>
+            </td>
+          </ng-container>
+
+          <!-- Status Breakdown Column -->
+          <ng-container matColumnDef="statusBreakdown">
+            <th mat-header-cell *matHeaderCellDef> Status Breakdown </th>
+            <td mat-cell *matCellDef="let user">
+              <div class="table-status-pills">
+                <span class="mini-status in-progress" *ngIf="user.inProgressCount > 0">{{ user.inProgressCount }} In Progress</span>
+                <span class="mini-status review" *ngIf="user.underReviewCount > 0">{{ user.underReviewCount }} Review</span>
+                <span class="mini-status completed" *ngIf="user.completedCount > 0">{{ user.completedCount }} Delivered</span>
+                <span class="mini-status urgent" *ngIf="user.urgentCount > 0">{{ user.urgentCount }} Urgent</span>
+              </div>
+            </td>
+          </ng-container>
+
+          <!-- Milestones Column -->
+          <ng-container matColumnDef="milestones">
+            <th mat-header-cell *matHeaderCellDef> Tasks Progress </th>
+            <td mat-cell *matCellDef="let user">
+              <div class="tbl-progress-wrap">
+                <span class="tbl-progress-txt">{{ user.completedMilestones }}/{{ user.totalMilestones }} ({{ user.milestoneRate }}%)</span>
+                <mat-progress-bar mode="determinate" [value]="user.milestoneRate" class="tbl-bar"></mat-progress-bar>
+              </div>
+            </td>
+          </ng-container>
+
+          <!-- Avg Progress Column -->
+          <ng-container matColumnDef="avgProgress">
+            <th mat-header-cell *matHeaderCellDef> Avg Progress </th>
+            <td mat-cell *matCellDef="let user">
+              <strong>{{ user.avgProgress }}%</strong>
+            </td>
+          </ng-container>
+
+          <!-- Budget Column -->
+          <ng-container matColumnDef="budget">
+            <th mat-header-cell *matHeaderCellDef> Managed Funds </th>
+            <td mat-cell *matCellDef="let user">
+              <span class="budget-text">LKR {{ (user.totalBudget || 0) | number }}</span>
+            </td>
+          </ng-container>
+
+          <!-- Actions Column -->
+          <ng-container matColumnDef="actions">
+            <th mat-header-cell *matHeaderCellDef class="text-right"> Actions </th>
+            <td mat-cell *matCellDef="let user" class="text-right">
+              <button mat-stroked-button color="primary" class="table-action-btn" (click)="openUserModal(user)">
+                <mat-icon>visibility</mat-icon> Inspect Tasks
+              </button>
+            </td>
+          </ng-container>
+
+          <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+          <tr mat-row *matRowDef="let row; columns: displayedColumns;" class="tbl-row"></tr>
+
+          <tr class="mat-row" *matNoDataRow>
+            <td class="mat-cell empty-cell" [attr.colspan]="displayedColumns.length">
+              No officer summary matches the selected criteria.
+            </td>
+          </tr>
+        </table>
+      </div>
+    </mat-card>
+  </div>
+
+  <!-- INLINE MODAL / DRAWER FOR INSPECTING A SINGLE USER'S DIRECTIVES -->
+  <div class="user-modal-backdrop" *ngIf="selectedUserForModal()" (click)="closeUserModal()">
+    <div class="user-modal-card" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <div class="modal-officer-info">
+          <div class="user-avatar lg">{{ getInitials(selectedUserForModal()!.leadName) }}</div>
+          <div>
+            <h3 class="modal-title">{{ selectedUserForModal()!.leadName }}</h3>
+            <span class="modal-email">{{ selectedUserForModal()!.leadEmail }} &bull; {{ selectedUserForModal()!.division }}</span>
+          </div>
+        </div>
+        <button mat-icon-button (click)="closeUserModal()" class="close-btn"><mat-icon>close</mat-icon></button>
+      </div>
+
+      <!-- Modal Quick Summary Bar -->
+      <div class="modal-summary-bar">
+        <div class="sum-item">
+          <span class="sum-label">Directives</span>
+          <span class="sum-val">{{ selectedUserForModal()!.totalPlans }}</span>
+        </div>
+        <div class="sum-item">
+          <span class="sum-label">In Progress</span>
+          <span class="sum-val">{{ selectedUserForModal()!.inProgressCount }}</span>
+        </div>
+        <div class="sum-item">
+          <span class="sum-label">Delivered</span>
+          <span class="sum-val text-emerald">{{ selectedUserForModal()!.completedCount }}</span>
+        </div>
+        <div class="sum-item">
+          <span class="sum-label">Milestone Rate</span>
+          <span class="sum-val">{{ selectedUserForModal()!.milestoneRate }}%</span>
+        </div>
+        <div class="sum-item">
+          <span class="sum-label">Budget</span>
+          <span class="sum-val">LKR {{ (selectedUserForModal()!.totalBudget || 0) | number }}</span>
+        </div>
+      </div>
+
+      <!-- Assigned Plans List -->
+      <div class="modal-plans-list">
+        <h4 class="list-heading">Assigned Directives & Tasks</h4>
+        <div class="plan-item-row" *ngFor="let plan of selectedUserForModal()!.plans" (click)="openPlanDetail(plan)">
+          <div class="plan-item-left">
+            <div class="plan-item-title-row">
+              <span class="item-title">{{ plan.title }}</span>
+              <span class="priority-tag" [ngClass]="plan.priority.toLowerCase()">{{ plan.priority }}</span>
+            </div>
+            <p class="item-desc">{{ plan.description }}</p>
+            <div class="item-meta">
+              <span class="item-category">{{ plan.category }}</span>
+              <span class="item-date"><mat-icon class="mini-cal">event</mat-icon> Target: {{ plan.targetDate }}</span>
+              <span class="item-milestones">{{ plan.milestones.length }} Tasks</span>
+            </div>
+          </div>
+          <div class="plan-item-right">
+            <span class="status-pill" [ngClass]="{
+              'emerald': plan.status === 'Completed',
+              'indigo': plan.status === 'In Progress',
+              'amber': plan.status === 'Under Review',
+              'slate': plan.status === 'Draft',
+              'coral': plan.status === 'Delayed'
+            }">{{ plan.status }}</span>
+            <div class="progress-mini-wrap">
+              <mat-progress-bar mode="determinate" [value]="plan.progress" class="mini-bar"></mat-progress-bar>
+              <span class="mini-pct">{{ plan.progress }}%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button mat-button (click)="closeUserModal()">Close</button>
+        <a mat-flat-button color="primary" routerLink="/work-plans/tasks" (click)="closeUserModal()">
+          Open Master Task List
+        </a>
+      </div>
+    </div>
+  </div>
+
+</div>

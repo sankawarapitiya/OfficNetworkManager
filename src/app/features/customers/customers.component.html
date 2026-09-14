@@ -1,0 +1,139 @@
+<div class="page-container">
+  <!-- Header -->
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Customers</h1>
+      <p class="page-subtitle">Manage your client base and view registration details.</p>
+    </div>
+    <div class="header-actions">
+      <button *ngIf="canExportCustomers()" mat-stroked-button (click)="exportCustomers()">
+        <mat-icon>file_download</mat-icon> Export
+      </button>
+      <button *ngIf="canCreateCustomer()" mat-flat-button color="primary" (click)="openCreateModal()">
+        <mat-icon>add</mat-icon> New Customer
+      </button>
+    </div>
+  </div>
+
+  <!-- Module Dashboard -->
+  <div class="metrics-grid">
+    <mat-card class="metric-card">
+      <mat-card-content>
+        <p class="metric-label">Total Registered Clients</p>
+        <p class="metric-value">{{ totalClients() }}</p>
+      </mat-card-content>
+    </mat-card>
+    <mat-card class="metric-card">
+      <mat-card-content>
+        <p class="metric-label">Recent Registrations (7 Days)</p>
+        <p class="metric-value">{{ recentRegistrations() }}</p>
+      </mat-card-content>
+    </mat-card>
+    <mat-card class="metric-card">
+      <mat-card-content>
+        <p class="metric-label">Active Divisions</p>
+        <p class="metric-value">{{ divisions().length || 'Setup in Settings' }}</p>
+      </mat-card-content>
+    </mat-card>
+  </div>
+
+  <!-- Filters -->
+  <mat-card class="filters-card">
+    <mat-card-content class="filters-content">
+      <mat-form-field appearance="outline" class="search-field">
+        <mat-label>Search</mat-label>
+        <mat-icon matPrefix>search</mat-icon>
+        <input matInput [ngModel]="searchTerm()" (ngModelChange)="searchTerm.set($event); onFilterChange()" placeholder="Search by name, NIC, or phone...">
+      </mat-form-field>
+      
+      <mat-form-field appearance="outline">
+        <mat-label>Division</mat-label>
+        <mat-select [ngModel]="filterDivision()" (ngModelChange)="filterDivision.set($event); onFilterChange()">
+          <mat-option value="">All Divisions</mat-option>
+          <mat-option *ngFor="let div of divisions()" [value]="div.name">{{ div.name }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Status</mat-label>
+        <mat-select [ngModel]="filterStatus()" (ngModelChange)="filterStatus.set($event); onFilterChange()">
+          <mat-option value="">All Statuses</mat-option>
+          <mat-option value="active">Active</mat-option>
+          <mat-option value="inactive">Inactive</mat-option>
+        </mat-select>
+      </mat-form-field>
+    </mat-card-content>
+  </mat-card>
+
+  <!-- Table -->
+  <mat-card class="table-card">
+    <div class="table-container">
+      <table mat-table [dataSource]="paginatedCustomers()">
+        
+        <ng-container matColumnDef="name">
+          <th mat-header-cell *matHeaderCellDef> Name & NIC </th>
+          <td mat-cell *matCellDef="let customer">
+            <div class="user-cell">
+              <div class="user-avatar">{{ customer.name.charAt(0) | uppercase }}</div>
+              <div class="user-info">
+                <span class="user-name">{{ customer.name }}</span>
+                <span class="user-meta">NIC: {{ customer.nic }}</span>
+              </div>
+            </div>
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="contact">
+          <th mat-header-cell *matHeaderCellDef> Contact </th>
+          <td mat-cell *matCellDef="let customer">
+            <div class="contact-info">
+              <span>{{ customer.tpno }}</span>
+              <span class="contact-address" [title]="customer.address">{{ customer.address }}</span>
+            </div>
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="division">
+          <th mat-header-cell *matHeaderCellDef> Division </th>
+          <td mat-cell *matCellDef="let customer"> 
+            <span class="division-badge">{{ customer.division }}</span>
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="status">
+          <th mat-header-cell *matHeaderCellDef> Status </th>
+          <td mat-cell *matCellDef="let customer"> 
+            <span class="status-badge" [ngClass]="customer.status">{{ customer.status | titlecase }}</span>
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="actions">
+          <th mat-header-cell *matHeaderCellDef class="actions-header"> Actions </th>
+          <td mat-cell *matCellDef="let customer" class="actions-cell">
+            <button *ngIf="canEditCustomer()" mat-icon-button color="primary" (click)="openEditModal(customer)" matTooltip="Edit">
+              <mat-icon>edit</mat-icon>
+            </button>
+            <button *ngIf="canDeleteCustomer()" mat-icon-button color="warn" (click)="deleteCustomer(customer.id!)" matTooltip="Delete">
+              <mat-icon>delete</mat-icon>
+            </button>
+          </td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+        <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+        
+        <tr class="mat-row" *matNoDataRow>
+          <td class="mat-cell empty-cell" colspan="5" *ngIf="isLoading()">
+            <mat-spinner diameter="40"></mat-spinner>
+            <p>Loading customers...</p>
+          </td>
+          <td class="mat-cell empty-cell" colspan="5" *ngIf="!isLoading()">
+            No customers found matching the current criteria.
+          </td>
+        </tr>
+      </table>
+    </div>
+    
+    <mat-paginator [length]="filteredCustomers().length" [pageSize]="10" [pageSizeOptions]="[5, 10, 25, 100]" aria-label="Select page" (page)="onPageChange($event)"></mat-paginator>
+  </mat-card>
+</div>

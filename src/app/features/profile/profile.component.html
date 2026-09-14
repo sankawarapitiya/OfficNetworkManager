@@ -1,0 +1,217 @@
+<div class="page-container max-w-6xl mx-auto">
+  <div class="page-header">
+    <h1 class="page-title">My Profile & Security</h1>
+  </div>
+
+  <mat-card class="profile-card">
+    <div class="avatar-header">
+      <div class="avatar-circle">
+        {{ authService.currentUser()?.displayName?.charAt(0) || authService.currentUser()?.email?.charAt(0) || 'U' | uppercase }}
+      </div>
+      <h2>{{ authService.currentUser()?.displayName || 'User' }}</h2>
+      <p>{{ authService.currentUser()?.email }}</p>
+    </div>
+
+    <mat-tab-group (selectedTabChange)="onTabChange($event)">
+      <!-- Tab 1: My Account -->
+      <mat-tab label="My Account">
+        <div class="tab-content grid-layout">
+          <!-- Edit Form -->
+          <div class="form-section">
+            <h3 class="section-title">Profile Information</h3>
+            <div *ngIf="successMessage()" class="success-banner">{{ successMessage() }}</div>
+            
+            <form [formGroup]="profileForm" (ngSubmit)="saveProfile()" class="flex-col">
+              <mat-form-field appearance="outline" class="w-full">
+                <mat-label>Display Name</mat-label>
+                <input matInput formControlName="displayName">
+              </mat-form-field>
+              
+              <mat-form-field appearance="outline" class="w-full">
+                <mat-label>Email Address</mat-label>
+                <input matInput formControlName="email">
+                <mat-hint>Contact IT to change your email address.</mat-hint>
+              </mat-form-field>
+
+              <mat-form-field appearance="outline" class="w-full">
+                <mat-label>Assigned Department</mat-label>
+                <mat-select formControlName="department">
+                  <mat-option value="">-- No Department Assigned --</mat-option>
+                  <mat-option *ngFor="let dept of departments()" [value]="dept.name">
+                    {{ dept.name }} <span *ngIf="dept.code">({{ dept.code }})</span>
+                  </mat-option>
+                </mat-select>
+                <mat-icon matSuffix>domain</mat-icon>
+                <mat-hint>Departments can be managed in General Settings</mat-hint>
+              </mat-form-field>
+              
+              <div class="actions">
+                <button mat-flat-button color="primary" type="submit" [disabled]="profileForm.invalid || isSaving()">
+                  {{ isSaving() ? 'Saving...' : 'Save Changes' }}
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <!-- Roles & Permissions -->
+          <div class="roles-section">
+            <h3 class="section-title">My Roles & Organization</h3>
+            
+            <div *ngIf="rbacService.userRoles() as roles; else noRoles">
+              <div class="policy-group">
+                <h4>Assigned Department</h4>
+                <div class="dept-badge-row">
+                  <span class="dept-badge" *ngIf="roles.department; else noDept">
+                    <mat-icon class="dept-icon">domain</mat-icon>
+                    <strong>{{ roles.department }}</strong>
+                  </span>
+                  <ng-template #noDept>
+                    <span class="empty-text">No department assigned.</span>
+                  </ng-template>
+                </div>
+              </div>
+
+              <div class="policy-group">
+                <h4>Assigned Roles</h4>
+                <div class="user-roles-chips">
+                  <span *ngFor="let role of roles.roles" class="role-chip" [ngClass]="getRoleChipClass(role)">
+                    {{ role }}
+                  </span>
+                  <span *ngIf="roles.roles.length === 0" class="empty-text">No roles assigned.</span>
+                </div>
+              </div>
+
+              <div class="policy-group">
+                <h4>Location Access</h4>
+                <mat-chip-set>
+                  <mat-chip *ngFor="let loc of roles.locations" color="accent" selected>{{ loc }}</mat-chip>
+                  <span *ngIf="roles.locations.length === 0" class="empty-text">Global Access</span>
+                </mat-chip-set>
+              </div>
+
+              <div class="policy-group">
+                <h4>System Capabilities & Permissions</h4>
+                <div class="user-perms-tally">
+                  <span class="perm-pill">
+                    <mat-icon class="perm-icon">verified_user</mat-icon>
+                    <strong>{{ rbacService.userEffectivePermissions().length }} Active Part Capabilities</strong>
+                  </span>
+                  <p class="perm-explanation">
+                    Derived dynamically from assigned organizational roles and direct user permission policies.
+                  </p>
+                </div>
+              </div>
+
+              <div class="policy-group">
+                <h4>Accessible Modules</h4>
+                <ul>
+                  <li *ngFor="let mod of roles.accessible_modules">{{ mod | titlecase }}</li>
+                  <li *ngIf="roles.accessible_modules.length === 0">All modules accessible</li>
+                </ul>
+              </div>
+            </div>
+            <ng-template #noRoles>
+              <p class="empty-text">No specific role information found. You might be using default access.</p>
+            </ng-template>
+          </div>
+        </div>
+      </mat-tab>
+
+      <!-- Tab 2: User Management (Admin Only) -->
+      <mat-tab label="User Management" *ngIf="rbacService.hasRole('admin')">
+        <ng-template mat-tab-label>
+          <mat-icon class="tab-icon">admin_panel_settings</mat-icon> User Management
+        </ng-template>
+        
+        <div class="tab-content">
+          <div class="admin-header">
+            <div>
+              <h3>System Users</h3>
+              <p>Manage departments, roles, and access boundaries for all registered platform accounts.</p>
+            </div>
+            <button mat-flat-button color="primary" (click)="openRoleModal()">
+              <mat-icon>person_add</mat-icon> Create User
+            </button>
+          </div>
+
+          <div class="table-container">
+            <table mat-table [dataSource]="allUsers()" class="mat-elevation-z1">
+              <!-- User Column -->
+              <ng-container matColumnDef="user">
+                <th mat-header-cell *matHeaderCellDef> User </th>
+                <td mat-cell *matCellDef="let user">
+                  <div class="font-medium">{{ user.displayName || 'Unknown' }}</div>
+                  <div class="text-xs text-gray-500">{{ user.email }}</div>
+                </td>
+              </ng-container>
+
+              <!-- Department Column -->
+              <ng-container matColumnDef="department">
+                <th mat-header-cell *matHeaderCellDef> Department </th>
+                <td mat-cell *matCellDef="let user">
+                  <span *ngIf="user.department" class="small-chip blue">
+                    <mat-icon class="chip-mini-icon">domain</mat-icon>
+                    {{ user.department }}
+                  </span>
+                  <span *ngIf="!user.department" class="empty-text">Unassigned</span>
+                </td>
+              </ng-container>
+
+              <!-- Assigned Roles Column -->
+              <ng-container matColumnDef="roles">
+                <th mat-header-cell *matHeaderCellDef> Assigned Roles </th>
+                <td mat-cell *matCellDef="let user">
+                  <div class="flex-chips">
+                    <span *ngFor="let role of user.roles" class="small-chip" [ngClass]="getRoleChipClass(role)">{{ role }}</span>
+                    <span *ngIf="!user.roles?.length" class="empty-text">None</span>
+                  </div>
+                </td>
+              </ng-container>
+
+              <!-- Granular Permissions Column -->
+              <ng-container matColumnDef="permissions">
+                <th mat-header-cell *matHeaderCellDef> Permissions </th>
+                <td mat-cell *matCellDef="let user">
+                  <div class="perm-cell-wrap">
+                    <span class="small-chip" [ngClass]="getUserPermCount(user) > 0 ? 'purple' : 'gray'">
+                      <mat-icon class="chip-mini-icon">verified_user</mat-icon>
+                      {{ getUserPermCount(user) }} Parts
+                    </span>
+                    <span class="custom-badge" *ngIf="user.permissions?.length">Custom</span>
+                  </div>
+                </td>
+              </ng-container>
+
+              <!-- Locations Column -->
+              <ng-container matColumnDef="locations">
+                <th mat-header-cell *matHeaderCellDef> Locations </th>
+                <td mat-cell *matCellDef="let user">
+                  <div class="flex-chips">
+                    <span *ngFor="let loc of user.locations" class="small-chip green">{{ loc }}</span>
+                    <span *ngIf="!user.locations?.length" class="empty-text">Global</span>
+                  </div>
+                </td>
+              </ng-container>
+
+              <!-- Actions Column -->
+              <ng-container matColumnDef="actions">
+                <th mat-header-cell *matHeaderCellDef class="text-right"></th>
+                <td mat-cell *matCellDef="let user" class="text-right">
+                  <button mat-button color="primary" (click)="openRoleModal(user)">Manage Access</button>
+                </td>
+              </ng-container>
+
+              <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+              <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+              
+              <tr class="mat-row" *matNoDataRow>
+                <td class="mat-cell empty-cell" colspan="6" *ngIf="isLoadingUsers()">Loading users...</td>
+                <td class="mat-cell empty-cell" colspan="6" *ngIf="!isLoadingUsers()">No users found. Users must sign in once to appear here.</td>
+              </tr>
+            </table>
+          </div>
+        </div>
+      </mat-tab>
+    </mat-tab-group>
+  </mat-card>
+</div>

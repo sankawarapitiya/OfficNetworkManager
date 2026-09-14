@@ -1,0 +1,95 @@
+<mat-toolbar class="header-toolbar">
+  <!-- Sidenav Toggle Button -->
+  <button mat-icon-button (click)="toggleSidenav.emit()" matTooltip="Toggle Sidebar" class="toggle-btn">
+    <mat-icon>menu</mat-icon>
+  </button>
+  
+  <!-- Global Search Bar with Shortcut -->
+  <div class="search-container">
+    <mat-icon class="search-icon">search</mat-icon>
+    <input type="text" placeholder="Search..." class="search-input">
+    <span class="search-badge">⌘K</span>
+  </div>
+
+  <span class="spacer"></span>
+
+  <!-- Network Connectivity Status Indicator -->
+  <div class="network-badge" [ngClass]="isOnline() ? 'online' : 'offline'" [matTooltip]="isOnline() ? 'Connected to Cloud' : 'Offline - Changes saved locally'">
+    <span class="pulse-dot"></span>
+    <span class="network-label">{{ isOnline() ? 'Online' : 'Offline Protection' }}</span>
+  </div>
+
+  <div class="divider-vertical"></div>
+
+  <!-- Notifications Bell with Menu -->
+  <button mat-icon-button [matMenuTriggerFor]="notificationsMenu" (click)="markRead()" class="action-icon-btn" matTooltip="Notifications & Event Logs">
+    <mat-icon [class.has-unread]="hasUnread()">notifications_none</mat-icon>
+  </button>
+
+  <mat-menu #notificationsMenu="matMenu" class="notifications-menu" xPosition="before">
+    <div class="notifications-header">
+      <div class="notif-title-group">
+        <h3>System Audit Activity</h3>
+        <span class="notif-count">{{ recentLogs().length }} events</span>
+      </div>
+      <a routerLink="/system-log" class="view-all-link">View Full Log</a>
+    </div>
+    <mat-divider></mat-divider>
+    
+    <div *ngIf="recentLogs().length === 0" class="no-logs">
+      <mat-icon>check_circle_outline</mat-icon>
+      <p>All caught up! No recent actions.</p>
+    </div>
+
+    <div class="logs-scroll-area">
+      <button mat-menu-item *ngFor="let log of recentLogs()" class="log-item">
+        <div class="log-content">
+          <div class="log-top">
+            <span class="status-pill" [ngClass]="log.action.toLowerCase()">{{ log.action }}</span>
+            <span class="log-time">{{ log.timestamp | date:'shortTime' }}</span>
+          </div>
+          <p class="log-desc">{{ log.description }}</p>
+          <span class="log-meta">{{ log.userName }} · {{ log.module }}</span>
+        </div>
+      </button>
+    </div>
+  </mat-menu>
+
+  <div class="divider-vertical"></div>
+
+  <!-- User Profile Menu -->
+  <button mat-button [matMenuTriggerFor]="profileMenu" class="user-pill-btn">
+    <div class="avatar-circle">
+      {{ getUserInitials() }}
+    </div>
+    <div class="user-info-text hidden sm:flex">
+      <span class="user-name">{{ getUserDisplayName() }}</span>
+      <span class="user-role">Enterprise Admin</span>
+    </div>
+    <mat-icon class="dropdown-arrow">expand_more</mat-icon>
+  </button>
+
+  <mat-menu #profileMenu="matMenu" xPosition="before" class="profile-dropdown-menu">
+    <div class="profile-menu-header">
+      <div class="avatar-circle large">{{ getUserInitials() }}</div>
+      <div class="header-user-meta">
+        <span class="header-name">{{ getUserDisplayName() }}</span>
+        <span class="header-email">{{ authService.currentUser()?.email }}</span>
+      </div>
+    </div>
+    <mat-divider></mat-divider>
+    <button mat-menu-item routerLink="/profile">
+      <mat-icon>badge</mat-icon>
+      <span>My Profile & Security</span>
+    </button>
+    <button mat-menu-item routerLink="/settings">
+      <mat-icon>tune</mat-icon>
+      <span>System Settings</span>
+    </button>
+    <mat-divider></mat-divider>
+    <button mat-menu-item (click)="onLogout()" class="logout-menu-item">
+      <mat-icon color="warn">logout</mat-icon>
+      <span class="text-warn">Sign Out</span>
+    </button>
+  </mat-menu>
+</mat-toolbar>

@@ -1,0 +1,114 @@
+<!-- Sidebar Header -->
+<div class="sidebar-header">
+  <div class="brand-group">
+    <div class="brand-logo">
+      <mat-icon>dashboard_customize</mat-icon>
+    </div>
+    <div class="brand-text">
+      <span class="brand-title">DONM Admin</span>
+      <span class="brand-subtitle">Enterprise Suite</span>
+    </div>
+  </div>
+  <button mat-icon-button (click)="toggleCollapse.emit()" matTooltip="Collapse Sidebar" class="collapse-btn">
+    <mat-icon>keyboard_double_arrow_left</mat-icon>
+  </button>
+</div>
+
+<!-- Main Navigation Sections -->
+<div class="nav-content-wrapper">
+  
+  <div class="nav-section-label">MAIN DASHBOARD</div>
+  <mat-nav-list class="nav-list">
+    <a mat-list-item *ngIf="rbacService.canAccessModule('dashboard')" routerLink="/dashboard" routerLinkActive="active-link">
+      <mat-icon matListItemIcon>space_dashboard</mat-icon>
+      <span matListItemTitle>Overview</span>
+    </a>
+  </mat-nav-list>
+
+  <div class="nav-section-label">OPERATIONS</div>
+  <mat-nav-list class="nav-list">
+    <a mat-list-item *ngIf="rbacService.canAccessModule('customers')" routerLink="/customers" routerLinkActive="active-link">
+      <mat-icon matListItemIcon>groups</mat-icon>
+      <span matListItemTitle>Customers</span>
+    </a>
+    <a mat-list-item *ngIf="rbacService.canAccessModule('land')" routerLink="/land" routerLinkActive="active-link">
+      <mat-icon matListItemIcon>domain</mat-icon>
+      <span matListItemTitle>Land Registry</span>
+    </a>
+    <!-- Work Plans with Sub-categories -->
+    <div class="nav-expandable-group" *ngIf="rbacService.canAccessModule('work-plans')">
+      <div class="nav-parent-item" [class.expanded]="workPlansExpanded()" [class.parent-active]="isWorkPlansActive()">
+        <a routerLink="/work-plans/tasks" class="parent-link">
+          <mat-icon class="parent-icon">calendar_month</mat-icon>
+          <span class="parent-label">Work Plans</span>
+        </a>
+        <button type="button" class="expand-btn" (click)="toggleWorkPlans($event)" matTooltip="Toggle Sub-menu">
+          <mat-icon class="expand-icon">{{ workPlansExpanded() ? 'expand_less' : 'expand_more' }}</mat-icon>
+        </button>
+      </div>
+
+      <!-- Nested Sub-Categories -->
+      <div class="sub-nav-list" *ngIf="workPlansExpanded()">
+        <a routerLink="/work-plans/dashboard" routerLinkActive="active-sub-link" class="sub-nav-item">
+          <mat-icon class="sub-icon">insights</mat-icon>
+          <span class="sub-title">Dashboard</span>
+        </a>
+        <a *ngIf="canAccessVerification()" routerLink="/work-plans/verification" routerLinkActive="active-sub-link" class="sub-nav-item">
+          <mat-icon class="sub-icon">fact_check</mat-icon>
+          <span class="sub-title">Verification</span>
+        </a>
+        <a routerLink="/work-plans/tasks" routerLinkActive="active-sub-link" class="sub-nav-item">
+          <mat-icon class="sub-icon">view_kanban</mat-icon>
+          <span class="sub-title">Task List</span>
+        </a>
+        <a *ngIf="canAccessReports()" routerLink="/work-plans/reports" routerLinkActive="active-sub-link" class="sub-nav-item">
+          <mat-icon class="sub-icon">summarize</mat-icon>
+          <span class="sub-title">Reports</span>
+        </a>
+        <a *ngIf="canManageSettings()" routerLink="/work-plans/settings" routerLinkActive="active-sub-link" class="sub-nav-item">
+          <mat-icon class="sub-icon">tune</mat-icon>
+          <span class="sub-title">Settings</span>
+        </a>
+      </div>
+    </div>
+    <a mat-list-item *ngIf="rbacService.canAccessModule('letters')" routerLink="/letters" routerLinkActive="active-link">
+      <mat-icon matListItemIcon>mark_email_read</mat-icon>
+      <span matListItemTitle>Official Letters</span>
+    </a>
+    <a mat-list-item *ngIf="rbacService.canAccessModule('hr')" routerLink="/hr" routerLinkActive="active-link">
+      <mat-icon matListItemIcon>badge</mat-icon>
+      <span matListItemTitle>HR Directory</span>
+    </a>
+  </mat-nav-list>
+
+  <div class="nav-section-label" *ngIf="rbacService.hasRole('admin')">ADMINISTRATION</div>
+  <mat-nav-list class="nav-list">
+    <a mat-list-item routerLink="/profile" routerLinkActive="active-link">
+      <mat-icon matListItemIcon>manage_accounts</mat-icon>
+      <span matListItemTitle>User Profiles & RBAC</span>
+    </a>
+    <a mat-list-item *ngIf="rbacService.hasRole('admin')" routerLink="/settings" routerLinkActive="active-link">
+      <mat-icon matListItemIcon>tune</mat-icon>
+      <span matListItemTitle>Settings & Schemas</span>
+    </a>
+    <a mat-list-item *ngIf="rbacService.hasRole('admin')" routerLink="/system-log" routerLinkActive="active-link">
+      <mat-icon matListItemIcon>receipt_long</mat-icon>
+      <span matListItemTitle>System Audit Log</span>
+    </a>
+  </mat-nav-list>
+
+</div>
+
+<!-- Sidebar Bottom / Footer -->
+<div class="sidebar-footer">
+  <div class="system-status-box">
+    <div class="status-box-header">
+      <span class="status-indicator-dot"></span>
+      <span class="status-box-title">Network Offline Engine</span>
+    </div>
+    <span class="status-box-desc">Persistence active with local IndexedDB</span>
+  </div>
+  <div class="version-meta">
+    <span>DONM Enterprise v1.1.0</span>
+  </div>
+</div>

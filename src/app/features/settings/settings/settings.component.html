@@ -1,0 +1,531 @@
+<div class="settings-page-wrapper">
+
+  <!-- Header Banner -->
+  <div class="settings-hero">
+    <div class="hero-left">
+      <div class="hero-tag">
+        <mat-icon class="tag-icon">admin_panel_settings</mat-icon>
+        <span>Platform Governance & Schemas</span>
+      </div>
+      <h1 class="hero-title">Platform Settings, Roles & Schemas</h1>
+      <p class="hero-subtitle">
+        Manage role-permission mappings for each system module with granular part management, custom data schemas, and organizational departments.
+      </p>
+    </div>
+  </div>
+
+  <!-- Settings Tabs -->
+  <mat-tab-group class="settings-tabs" animationDuration="200ms">
+
+    <!-- ============================================================ -->
+    <!-- TAB 1: ROLE & PERMISSION MAPPING (MODULE & PART MANAGEMENT) -->
+    <!-- ============================================================ -->
+    <mat-tab>
+      <ng-template mat-tab-label>
+        <mat-icon class="tab-label-icon">security</mat-icon>
+        <span>Role & Permission Mapping</span>
+      </ng-template>
+
+      <div class="tab-body-wrapper">
+
+        <!-- Role Selector Strip -->
+        <div class="role-selector-card">
+          <div class="role-selector-header">
+            <div class="title-wrap">
+              <mat-icon class="title-icon">manage_accounts</mat-icon>
+              <div>
+                <h3>Select Role to Configure</h3>
+                <p>Configure default module capabilities and granular part permissions for each system role</p>
+              </div>
+            </div>
+
+            <!-- Global Action Buttons -->
+            <div class="role-actions-bar">
+              <button mat-stroked-button (click)="selectAllForRole()" matTooltip="Grant all system permissions to this role">
+                <mat-icon>select_all</mat-icon> Select All
+              </button>
+              <button mat-stroked-button (click)="deselectAllForRole()" matTooltip="Revoke all permissions for this role">
+                <mat-icon>deselect</mat-icon> Clear All
+              </button>
+              <button mat-stroked-button (click)="resetRoleToDefault()" matTooltip="Restore system default permissions">
+                <mat-icon>restart_alt</mat-icon> Reset Defaults
+              </button>
+              <button mat-flat-button color="primary" (click)="saveRolePermissions()" [disabled]="isSavingPermissions()" class="save-perms-btn">
+                <mat-icon>save</mat-icon> {{ isSavingPermissions() ? 'Saving...' : 'Save All Role Mappings' }}
+              </button>
+            </div>
+          </div>
+
+          <!-- Role Pill Tabs -->
+          <div class="roles-pills-row">
+            <button *ngFor="let role of availableRoles" 
+                    type="button" 
+                    class="role-pill-btn" 
+                    [class.active]="selectedRole() === role"
+                    (click)="selectRole(role)">
+              <span class="role-name">{{ role }}</span>
+              <span class="role-count-badge">
+                {{ (rolePermissions()[role] || []).length }} / {{ totalSystemPermissions }}
+              </span>
+            </button>
+          </div>
+
+          <!-- Active Role Info Box -->
+          <div class="active-role-infobox">
+            <div class="infobox-left">
+              <span class="infobox-role">{{ selectedRole() }}</span>
+              <p class="infobox-desc">{{ getRoleDesc(selectedRole()) }}</p>
+            </div>
+            <div class="infobox-right">
+              <div class="metric-block">
+                <span class="metric-num">{{ currentRolePermissionsCount() }} / {{ totalSystemPermissions }}</span>
+                <span class="metric-lbl">Total Parts Permitted</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Modules & Parts Accordion -->
+        <div class="modules-accordion-wrapper">
+          <div class="accordion-header-row">
+            <h4>Module Capabilities & Part Permissions</h4>
+            <span class="hint-text">Expand any module to view and toggle granular part permissions</span>
+          </div>
+
+          <mat-accordion multi="true">
+            <mat-expansion-panel *ngFor="let mod of modules" [expanded]="true" class="module-panel">
+              <mat-expansion-panel-header>
+                <mat-panel-title class="panel-title-content">
+                  <div class="mod-icon-avatar" [ngClass]="mod.badgeColor">
+                    <mat-icon>{{ mod.icon }}</mat-icon>
+                  </div>
+                  <div class="mod-title-text">
+                    <span class="mod-name">{{ mod.moduleName }}</span>
+                    <span class="mod-desc-subtle">{{ mod.description }}</span>
+                  </div>
+                </mat-panel-title>
+
+                <mat-panel-description class="panel-desc-content">
+                  <span class="mod-count-pill" [class.full]="isModuleFullySelected(mod)" [class.zero]="getModuleSelectedCount(mod) === 0">
+                    {{ getModuleSelectedCount(mod) }} / {{ mod.parts.length }} parts
+                  </span>
+                  <button mat-button class="toggle-mod-btn" (click)="$event.stopPropagation(); toggleAllInModule(mod)">
+                    {{ isModuleFullySelected(mod) ? 'Deselect Module' : 'Select All Parts' }}
+                  </button>
+                </mat-panel-description>
+              </mat-expansion-panel-header>
+
+              <!-- Granular Parts Grid -->
+              <div class="parts-grid">
+                <div *ngFor="let part of mod.parts" 
+                     class="part-item-card" 
+                     [class.enabled]="isPermissionEnabled(part.id)"
+                     (click)="togglePermission(part.id)">
+                  <div class="part-checkbox-wrap">
+                    <mat-checkbox [checked]="isPermissionEnabled(part.id)" 
+                                  (click)="$event.stopPropagation()"
+                                  (change)="togglePermission(part.id)" 
+                                  color="primary">
+                    </mat-checkbox>
+                  </div>
+                  <div class="part-content">
+                    <div class="part-header-line">
+                      <span class="part-name">{{ part.name }}</span>
+                      <span class="part-id-badge">{{ part.id }}</span>
+                    </div>
+                    <p class="part-desc">{{ part.description }}</p>
+                  </div>
+                </div>
+              </div>
+
+            </mat-expansion-panel>
+          </mat-accordion>
+        </div>
+
+        <!-- Floating / Bottom Save Strip -->
+        <div class="save-bar-footer">
+          <div class="save-bar-left">
+            <mat-icon class="check-icon">verified_user</mat-icon>
+            <span>Role mappings apply dynamically across the application and define default privileges for all system users.</span>
+          </div>
+          <button mat-flat-button color="primary" (click)="saveRolePermissions()" [disabled]="isSavingPermissions()">
+            <mat-icon>save</mat-icon> Save All Role Mappings
+          </button>
+        </div>
+
+      </div>
+    </mat-tab>
+
+    <!-- ============================================================ -->
+    <!-- TAB 2: PLATFORM & ORGANIZATIONAL DEPARTMENTS                 -->
+    <!-- ============================================================ -->
+    <mat-tab>
+      <ng-template mat-tab-label>
+        <mat-icon class="tab-label-icon">domain</mat-icon>
+        <span>Organization & Departments</span>
+      </ng-template>
+
+      <div class="tab-body-wrapper">
+        <div class="settings-grid">
+
+          <!-- Card: Organizational Departments Management -->
+          <mat-card class="settings-card department-card">
+            <div class="card-header">
+              <div class="header-left">
+                <div class="icon-avatar indigo"><mat-icon>domain</mat-icon></div>
+                <div>
+                  <h2>Organizational Departments</h2>
+                  <p>Define official government departments for user profile assignment and leadership hierarchies</p>
+                </div>
+              </div>
+              <div class="header-right">
+                <span class="count-badge">{{ departments().length }} Active Departments</span>
+              </div>
+            </div>
+
+            <div class="card-body">
+
+              <!-- Department Form Box (Add / Edit) -->
+              <div class="dept-form-box" [class.editing]="isEditingDepartment()">
+                <div class="form-title-row">
+                  <mat-icon class="form-icon">{{ isEditingDepartment() ? 'edit_note' : 'add_circle' }}</mat-icon>
+                  <h3>{{ isEditingDepartment() ? 'Edit Department: ' + deptName : 'Add New Department' }}</h3>
+                </div>
+
+                <div class="form-grid-row">
+                  <mat-form-field appearance="outline" class="col-name">
+                    <mat-label>Department Name</mat-label>
+                    <input matInput [(ngModel)]="deptName" placeholder="e.g. Survey & Cadastral Mapping" required>
+                  </mat-form-field>
+
+                  <mat-form-field appearance="outline" class="col-code">
+                    <mat-label>Dept Code</mat-label>
+                    <input matInput [(ngModel)]="deptCode" placeholder="e.g. SURV" maxlength="6">
+                  </mat-form-field>
+
+                  <!-- Head of Department Typeahead -->
+                  <mat-form-field appearance="outline" class="col-lead">
+                    <mat-label>Head of Department / Lead</mat-label>
+                    <input matInput 
+                           [(ngModel)]="deptLeadName" 
+                           (input)="onDeptLeadInput($event)"
+                           (focus)="onDeptLeadFocus()"
+                           [matAutocomplete]="autoLead" 
+                           placeholder="Search or enter officer name..."
+                           autocomplete="off">
+                    <mat-icon matSuffix>person_search</mat-icon>
+                    
+                    <mat-autocomplete #autoLead="matAutocomplete" 
+                                      [displayWith]="displayLeadFn"
+                                      (optionSelected)="onLeadSelected($event.option.value)">
+                      <mat-option *ngFor="let user of filteredSystemUsers()" [value]="user">
+                        <div class="user-autocomplete-item">
+                          <div class="user-avatar-sm">
+                            {{ getUserInitial(user) }}
+                          </div>
+                          <div class="user-text-wrap">
+                            <div class="user-primary-name">
+                              {{ user.displayName || user.email || 'Unnamed Officer' }}
+                            </div>
+                            <div class="user-sub-details">
+                              <span class="user-email-text">{{ user.email }}</span>
+                              <span class="user-role-badge">
+                                {{ getUserRolePreview(user) }}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </mat-option>
+                      <mat-option *ngIf="filteredSystemUsers().length === 0" disabled>
+                        <span class="no-users-hint">No matching system users found</span>
+                      </mat-option>
+                    </mat-autocomplete>
+                    <mat-hint>Typeahead searches registered system users</mat-hint>
+                  </mat-form-field>
+
+                  <!-- Verification Quota Dropdown -->
+                  <mat-form-field appearance="outline" class="col-quota">
+                    <mat-label>Verification Quota</mat-label>
+                    <mat-select [(ngModel)]="deptVerificationQuota">
+                      <mat-option [value]="1">1 Officer (Stage 1)</mat-option>
+                      <mat-option [value]="2">2 Officers (Stages 1 & 2)</mat-option>
+                      <mat-option [value]="3">3 Officers (Stages 1, 2 & 3)</mat-option>
+                      <mat-option [value]="4">4 Officers (Stages 1 to 4)</mat-option>
+                      <mat-option [value]="5">5 Officers (Stages 1 to 5)</mat-option>
+                    </mat-select>
+                    <mat-hint>Required sign-off stages</mat-hint>
+                  </mat-form-field>
+                </div>
+
+                <div class="form-grid-row">
+                  <mat-form-field appearance="outline" class="col-full">
+                    <mat-label>Department Scope & Responsibilities</mat-label>
+                    <input matInput [(ngModel)]="deptDescription" placeholder="Brief outline of operations and jurisdiction...">
+                  </mat-form-field>
+                </div>
+
+                <div class="form-actions-row">
+                  <button mat-flat-button color="primary" (click)="saveDepartment()" [disabled]="!deptName.trim()">
+                    <mat-icon>{{ isEditingDepartment() ? 'check' : 'add' }}</mat-icon>
+                    {{ isEditingDepartment() ? 'Update Department' : 'Create Department' }}
+                  </button>
+                  <button mat-stroked-button *ngIf="isEditingDepartment()" (click)="cancelEditDepartment()">
+                    Cancel
+                  </button>
+                </div>
+              </div>
+
+              <!-- Departments List Grid -->
+              <div class="departments-grid" *ngIf="departments().length > 0">
+                <div class="dept-card-item" *ngFor="let dept of departments()">
+                  <div class="dept-top">
+                    <div class="dept-name-group">
+                      <span class="dept-code-pill">{{ dept.code || 'DEPT' }}</span>
+                      <h4 class="dept-name">{{ dept.name }}</h4>
+                    </div>
+                    <div class="dept-actions">
+                      <button mat-icon-button (click)="editDepartment(dept)" matTooltip="Edit Department" class="edit-btn">
+                        <mat-icon>edit</mat-icon>
+                      </button>
+                      <button mat-icon-button (click)="deleteDepartment(dept)" matTooltip="Delete Department" class="del-btn">
+                        <mat-icon>delete</mat-icon>
+                      </button>
+                    </div>
+                  </div>
+
+                  <p class="dept-desc" *ngIf="dept.description">{{ dept.description }}</p>
+
+                  <div class="dept-bottom">
+                    <span class="lead-info">
+                      <mat-icon class="lead-icon">badge</mat-icon>
+                      Head: <strong>{{ dept.leadName || 'Unassigned' }}</strong>
+                    </span>
+                    <span class="quota-badge" [class.multi]="(dept.verificationQuota || 1) > 1">
+                      <mat-icon class="quota-icon">{{ (dept.verificationQuota || 1) > 1 ? 'verified_user' : 'person' }}</mat-icon>
+                      {{ (dept.verificationQuota || 1) > 1 ? (dept.verificationQuota + ' Verifiers Required') : '1 Verifier Required' }}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Empty State -->
+              <div class="empty-state-box" *ngIf="departments().length === 0">
+                <mat-icon class="empty-icon">domain_disabled</mat-icon>
+                <h4>No Departments Configured</h4>
+                <p>Add departments to assign system users, divisional branches, and work plan directors.</p>
+                <button mat-stroked-button color="primary" (click)="seedDefaultDepartments()">
+                  <mat-icon>playlist_add</mat-icon> Seed Standard Departments
+                </button>
+              </div>
+
+            </div>
+          </mat-card>
+
+          <!-- Card: Office Divisions -->
+          <mat-card class="settings-card">
+            <div class="card-header">
+              <div class="header-left">
+                <div class="icon-avatar slate"><mat-icon>location_city</mat-icon></div>
+                <div>
+                  <h2>Office Divisions</h2>
+                  <p>Operational regional administrative divisions across customer branches, parcels, and land files</p>
+                </div>
+              </div>
+              <div class="header-right">
+                <span class="count-badge">{{ divisions().length }} Divisions</span>
+              </div>
+            </div>
+
+            <div class="card-body">
+              <div class="add-division-row">
+                <mat-form-field appearance="outline" class="division-input">
+                  <mat-label>New Division Name</mat-label>
+                  <input matInput [(ngModel)]="newDivisionName" placeholder="e.g. Central Capital District">
+                </mat-form-field>
+                <button mat-flat-button color="primary" (click)="addDivision()" [disabled]="!newDivisionName.trim()" class="add-div-btn">
+                  <mat-icon>add</mat-icon> Add Division
+                </button>
+              </div>
+
+              <div class="divisions-chips-list">
+                <div class="division-chip-item" *ngFor="let div of divisions()">
+                  <div class="div-info">
+                    <mat-icon class="div-icon">domain</mat-icon>
+                    <span class="div-name">{{ div.name }}</span>
+                  </div>
+                  <button mat-icon-button (click)="deleteDivision(div)" matTooltip="Remove Division" class="remove-div-btn">
+                    <mat-icon>close</mat-icon>
+                  </button>
+                </div>
+              </div>
+
+              <div class="empty-state-box mini" *ngIf="divisions().length === 0">
+                <mat-icon>domain_disabled</mat-icon>
+                <span>No divisions configured. Type a division name above and click Add Division.</span>
+              </div>
+            </div>
+          </mat-card>
+
+          <!-- Card: Work Plan Task Delegation & On-Behalf Creation Roles -->
+          <mat-card class="settings-card delegation-card">
+            <div class="card-header">
+              <div class="header-left">
+                <div class="icon-avatar purple"><mat-icon>supervisor_account</mat-icon></div>
+                <div>
+                  <h2>Work Plan Task Delegation & On-Behalf Creation Roles</h2>
+                  <p>Configure which system roles are authorized to create tasks on behalf of another selected user and designate the Regional Lead for verification.</p>
+                </div>
+              </div>
+              <div class="header-right">
+                <button mat-flat-button color="primary" (click)="saveWorkPlanDelegationRoles()" [disabled]="isSavingDelegationRoles()">
+                  <mat-icon>save</mat-icon> {{ isSavingDelegationRoles() ? 'Saving...' : 'Save Delegation Roles' }}
+                </button>
+              </div>
+            </div>
+
+            <div class="card-body">
+              <div class="delegation-roles-grid">
+                <div class="role-delegation-item" *ngFor="let role of availableRoles" 
+                     [class.selected]="isDelegationRolePermitted(role)"
+                     (click)="toggleDelegationRole(role)">
+                  <div class="item-left">
+                    <mat-checkbox [checked]="isDelegationRolePermitted(role)" 
+                                  (change)="$event ? toggleDelegationRole(role) : null" 
+                                  (click)="$event.stopPropagation()" 
+                                  color="primary">
+                    </mat-checkbox>
+                    <div class="item-text">
+                      <span class="role-title">{{ role }}</span>
+                      <span class="role-desc">{{ getRoleDesc(role) }}</span>
+                    </div>
+                  </div>
+                  <span class="delegation-badge" [class.allowed]="isDelegationRolePermitted(role)">
+                    <mat-icon class="badge-icon">{{ isDelegationRolePermitted(role) ? 'how_to_reg' : 'person' }}</mat-icon>
+                    {{ isDelegationRolePermitted(role) ? 'Can Create On-Behalf' : 'Own Tasks Only' }}
+                  </span>
+                </div>
+              </div>
+
+              <div class="delegation-info-strip">
+                <mat-icon class="strip-icon">info</mat-icon>
+                <span>
+                  <strong>Delegation & Verification Policy:</strong> When a user creates a task, it belongs to him. Special roles selected above can create tasks on behalf of another selected user and set the Regional Lead for verification purpose. The designated user will see the task in their personal "My directives only" list.
+                </span>
+              </div>
+            </div>
+          </mat-card>
+
+        </div>
+      </div>
+    </mat-tab>
+
+    <!-- ============================================================ -->
+    <!-- TAB 3: DYNAMIC SCHEMAS & CUSTOM FIELDS                       -->
+    <!-- ============================================================ -->
+    <mat-tab>
+      <ng-template mat-tab-label>
+        <mat-icon class="tab-label-icon">schema</mat-icon>
+        <span>Module Schemas</span>
+      </ng-template>
+
+      <div class="tab-body-wrapper">
+        <mat-card class="settings-card">
+          <div class="card-header">
+            <div class="header-left">
+              <div class="icon-avatar teal"><mat-icon>data_object</mat-icon></div>
+              <div>
+                <h2>Dynamic Module Schemas</h2>
+                <p>Define custom form attributes, validation schemas, and extended fields for core application modules</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="card-body">
+            <!-- Module Selection Strip -->
+            <div class="schema-module-picker">
+              <span class="picker-label">Target Module:</span>
+              <div class="picker-buttons">
+                <button *ngFor="let mod of availableSchemaModules" 
+                        type="button" 
+                        class="schema-mod-btn"
+                        [class.active]="selectedSchemaModule() === mod.id"
+                        (click)="selectSchemaModule(mod.id)">
+                  {{ mod.name }}
+                </button>
+              </div>
+            </div>
+
+            <!-- Add Field Form -->
+            <div class="schema-form-box">
+              <h4>Add Custom Schema Field to {{ selectedSchemaModule() | titlecase }}</h4>
+              
+              <div class="form-grid-schema">
+                <mat-form-field appearance="outline">
+                  <mat-label>Field Identifier (key)</mat-label>
+                  <input matInput [(ngModel)]="newFieldName" placeholder="e.g. tax_id_number">
+                  <mat-hint>Lowercase alphanumeric & underscore</mat-hint>
+                </mat-form-field>
+
+                <mat-form-field appearance="outline">
+                  <mat-label>Display Label</mat-label>
+                  <input matInput [(ngModel)]="newFieldLabel" placeholder="e.g. Tax Registration ID">
+                </mat-form-field>
+
+                <mat-form-field appearance="outline">
+                  <mat-label>Data Type</mat-label>
+                  <mat-select [(ngModel)]="newFieldType">
+                    <mat-option value="text">Text / String</mat-option>
+                    <mat-option value="number">Numeric</mat-option>
+                    <mat-option value="dropdown">Dropdown Options</mat-option>
+                    <mat-option value="date">Calendar Date</mat-option>
+                  </mat-select>
+                </mat-form-field>
+
+                <div class="required-toggle-wrap">
+                  <mat-checkbox [(ngModel)]="newFieldRequired" color="primary">
+                    Required Field
+                  </mat-checkbox>
+                </div>
+              </div>
+
+              <div class="schema-form-actions">
+                <button mat-flat-button color="primary" (click)="addFieldToSchema()" [disabled]="!newFieldName.trim() || !newFieldLabel.trim()">
+                  <mat-icon>add</mat-icon> Add Field to Schema
+                </button>
+              </div>
+            </div>
+
+            <!-- Current Fields List -->
+            <div class="schema-fields-section">
+              <h4>Configured Custom Fields ({{ currentSchema()?.fields?.length || 0 }})</h4>
+              
+              <div class="fields-list" *ngIf="currentSchema() && currentSchema()!.fields.length > 0; else noFields">
+                <div class="field-item-card" *ngFor="let field of currentSchema()!.fields">
+                  <div class="field-item-left">
+                    <span class="field-type-pill">{{ field.type }}</span>
+                    <span class="field-label-text">{{ field.label }}</span>
+                    <code class="field-key-code">{{ field.name }}</code>
+                    <span class="field-req-tag" *ngIf="field.required">Required</span>
+                  </div>
+                  <button mat-icon-button color="warn" (click)="removeFieldFromSchema(field)" matTooltip="Remove field">
+                    <mat-icon>delete</mat-icon>
+                  </button>
+                </div>
+              </div>
+
+              <ng-template #noFields>
+                <div class="empty-state-box mini">
+                  <mat-icon>schema</mat-icon>
+                  <span>No custom schema fields configured for {{ selectedSchemaModule() }}. Use the form above to add custom dynamic attributes.</span>
+                </div>
+              </ng-template>
+            </div>
+
+          </div>
+        </mat-card>
+      </div>
+    </mat-tab>
+
+  </mat-tab-group>
+
+</div>

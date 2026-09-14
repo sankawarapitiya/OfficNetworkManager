@@ -1,0 +1,19 @@
+<mat-sidenav-container class="layout-container" [hasBackdrop]="isMobile()">
+  <!-- Sidebar -->
+  <mat-sidenav #sidenav [mode]="isMobile() ? 'over' : 'side'" [opened]="!isMobile()" class="app-sidenav">
+    <app-sidebar (toggleCollapse)="sidenav.toggle()"></app-sidebar>
+  </mat-sidenav>
+
+  <!-- Main Content Wrapper -->
+  <mat-sidenav-content class="layout-main-wrapper">
+    <!-- Header -->
+    <app-header (toggleSidenav)="sidenav.toggle()"></app-header>
+
+    <!-- Main Content Area -->
+    <main class="content-scrollable-area">
+      <div class="content-inner" [@fadeAnimation]="getRouteAnimationData()">
+        <router-outlet></router-outlet>
+      </div>
+    </main>
+  </mat-sidenav-content>
+</mat-sidenav-container>

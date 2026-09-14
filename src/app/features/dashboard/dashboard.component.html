@@ -1,0 +1,294 @@
+<div class="dashboard-page">
+  
+  <!-- Hero Greeting Header -->
+  <div class="hero-banner">
+    <div class="hero-content">
+      <div class="hero-tag">
+        <span class="pulse-dot-emerald"></span>
+        <span>Distributed Office Network · Active Sync</span>
+      </div>
+      <h1 class="hero-title">Welcome back, {{ getFirstName() }}!</h1>
+      <p class="hero-subtitle">
+        Monitor real-time regional office operations, customer records, and decentralized task execution.
+      </p>
+    </div>
+    <div class="hero-actions">
+      <button mat-stroked-button routerLink="/system-log">
+        <mat-icon>history</mat-icon> Audit History
+      </button>
+      <button mat-flat-button color="primary" routerLink="/customers">
+        <mat-icon>add</mat-icon> New Registration
+      </button>
+    </div>
+  </div>
+
+  <!-- Three KPI Metric Cards with Smooth Micro-Charts -->
+  <div class="kpi-grid">
+    
+    <!-- KPI 1: Revenue / Operations -->
+    <mat-card class="kpi-card">
+      <div class="kpi-card-header">
+        <div class="kpi-meta">
+          <span class="kpi-title">Total Network Allocations</span>
+          <span class="kpi-sub">Fiscal year to date</span>
+        </div>
+        <span class="status-pill emerald">
+          <mat-icon class="trend-icon">trending_up</mat-icon> +14.8%
+        </span>
+      </div>
+      <div class="kpi-value-wrap">
+        <span class="kpi-number">LKR {{ totalAllocatedFunds() | number }}</span>
+      </div>
+      
+      <!-- Micro-Chart: Emerald Curved Wave -->
+      <div class="kpi-chart-wrapper">
+        <svg viewBox="0 0 300 70" preserveAspectRatio="none" class="micro-chart-svg">
+          <defs>
+            <linearGradient id="emeraldGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stop-color="#059669" stop-opacity="0.22" />
+              <stop offset="100%" stop-color="#059669" stop-opacity="0.0" />
+            </linearGradient>
+          </defs>
+          <path d="M 0 50 C 40 45, 70 20, 110 32 C 150 44, 180 15, 220 22 C 260 29, 280 10, 300 12 L 300 70 L 0 70 Z" fill="url(#emeraldGrad)" />
+          <path d="M 0 50 C 40 45, 70 20, 110 32 C 150 44, 180 15, 220 22 C 260 29, 280 10, 300 12" fill="none" stroke="#059669" stroke-width="2.5" stroke-linecap="round" />
+        </svg>
+      </div>
+    </mat-card>
+
+    <!-- KPI 2: Customers -->
+    <mat-card class="kpi-card">
+      <div class="kpi-card-header">
+        <div class="kpi-meta">
+          <span class="kpi-title">Active Registered Clients</span>
+          <span class="kpi-sub">Across office divisions</span>
+        </div>
+        <span class="status-pill indigo">
+          <mat-icon class="trend-icon">trending_up</mat-icon> Active
+        </span>
+      </div>
+      <div class="kpi-value-wrap">
+        <span class="kpi-number">{{ totalClientsCount() | number }} Clients</span>
+      </div>
+
+      <!-- Micro-Chart: Indigo Curved Wave -->
+      <div class="kpi-chart-wrapper">
+        <svg viewBox="0 0 300 70" preserveAspectRatio="none" class="micro-chart-svg">
+          <defs>
+            <linearGradient id="indigoGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stop-color="#4f46e5" stop-opacity="0.20" />
+              <stop offset="100%" stop-color="#4f46e5" stop-opacity="0.0" />
+            </linearGradient>
+          </defs>
+          <path d="M 0 45 C 45 40, 75 18, 120 30 C 165 42, 195 22, 235 15 C 265 10, 285 18, 300 8 L 300 70 L 0 70 Z" fill="url(#indigoGrad)" />
+          <path d="M 0 45 C 45 40, 75 18, 120 30 C 165 42, 195 22, 235 15 C 265 10, 285 18, 300 8" fill="none" stroke="#4f46e5" stroke-width="2.5" stroke-linecap="round" />
+        </svg>
+      </div>
+    </mat-card>
+
+    <!-- KPI 3: Issues & Approvals -->
+    <mat-card class="kpi-card">
+      <div class="kpi-card-header">
+        <div class="kpi-meta">
+          <span class="kpi-title">Active Directives & Tasks</span>
+          <span class="kpi-sub">Under active execution</span>
+        </div>
+        <span class="status-pill coral">
+          <mat-icon class="trend-icon">trending_up</mat-icon> Pipeline
+        </span>
+      </div>
+      <div class="kpi-value-wrap">
+        <span class="kpi-number">{{ pendingActionCount() | number }} Directives</span>
+      </div>
+
+      <!-- Micro-Chart: Coral Curved Wave -->
+      <div class="kpi-chart-wrapper">
+        <svg viewBox="0 0 300 70" preserveAspectRatio="none" class="micro-chart-svg">
+          <defs>
+            <linearGradient id="coralGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stop-color="#e11d48" stop-opacity="0.20" />
+              <stop offset="100%" stop-color="#e11d48" stop-opacity="0.0" />
+            </linearGradient>
+          </defs>
+          <path d="M 0 55 C 40 40, 80 50, 120 30 C 160 15, 190 35, 230 20 C 265 10, 285 24, 300 18 L 300 70 L 0 70 Z" fill="url(#coralGrad)" />
+          <path d="M 0 55 C 40 40, 80 50, 120 30 C 160 15, 190 35, 230 20 C 265 10, 285 24, 300 18" fill="none" stroke="#e11d48" stroke-width="2.5" stroke-linecap="round" />
+        </svg>
+      </div>
+    </mat-card>
+
+  </div>
+
+  <!-- Central Split Grid: Recent Activity & Data Table -->
+  <div class="dashboard-grid-content">
+    
+    <!-- Left Column: Recent Activity Feed (340px) -->
+    <mat-card class="activity-feed-card">
+      <div class="feed-header">
+        <div class="feed-title-wrap">
+          <mat-icon class="feed-header-icon">bolt</mat-icon>
+          <h3>Recent System Activity</h3>
+        </div>
+        <a routerLink="/system-log" class="feed-link">All Logs</a>
+      </div>
+      
+      <div class="activity-timeline">
+        <div class="timeline-item" *ngFor="let item of recentActivity()">
+          <div class="timeline-bullet" [ngClass]="item.action.toLowerCase()">
+            <mat-icon *ngIf="item.action === 'CREATED'">add_circle</mat-icon>
+            <mat-icon *ngIf="item.action === 'UPDATED'">edit_note</mat-icon>
+            <mat-icon *ngIf="item.action === 'DELETED'">delete</mat-icon>
+            <mat-icon *ngIf="item.action === 'LOGIN'">vpn_key</mat-icon>
+            <mat-icon *ngIf="item.action !== 'CREATED' && item.action !== 'UPDATED' && item.action !== 'DELETED' && item.action !== 'LOGIN'">circle</mat-icon>
+          </div>
+          <div class="timeline-content">
+            <div class="timeline-row-top">
+              <span class="timeline-user">{{ item.userName }}</span>
+              <span class="timeline-time">{{ item.timestamp | date:'shortTime' }}</span>
+            </div>
+            <p class="timeline-desc">{{ item.description }}</p>
+            <div class="timeline-badge-row">
+              <span class="status-pill slate">{{ item.module }}</span>
+              <span class="status-pill" [ngClass]="item.action.toLowerCase()">{{ item.action }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </mat-card>
+
+    <!-- Right Column: Central Data Table (Flex 1) -->
+    <mat-card class="data-table-card">
+      
+      <!-- Table Header with Search & Filter Tabs -->
+      <div class="table-card-header">
+        <div class="table-info">
+          <div class="table-title-row">
+            <h2>Active Department Work Plans</h2>
+            <span class="counter-badge">{{ filteredProjects().length }} Records</span>
+          </div>
+          <p class="table-subtitle">Multi-division projects synced across regional field units</p>
+        </div>
+
+        <div class="table-controls">
+          <!-- Filter Tabs -->
+          <div class="filter-pills">
+            <button class="filter-pill-btn" [class.active]="selectedFilter() === 'All'" (click)="setFilter('All')">All</button>
+            <button class="filter-pill-btn" [class.active]="selectedFilter() === 'In Progress'" (click)="setFilter('In Progress')">In Progress</button>
+            <button class="filter-pill-btn" [class.active]="selectedFilter() === 'Completed'" (click)="setFilter('Completed')">Completed</button>
+            <button class="filter-pill-btn" [class.active]="selectedFilter() === 'On Hold'" (click)="setFilter('On Hold')">On Hold</button>
+          </div>
+
+          <!-- Quick Search -->
+          <div class="table-search-input">
+            <mat-icon>search</mat-icon>
+            <input type="text" placeholder="Filter projects or leads..." [ngModel]="searchQuery()" (ngModelChange)="searchQuery.set($event)">
+          </div>
+        </div>
+      </div>
+
+      <!-- Table Container -->
+      <div class="table-container">
+        <table mat-table [dataSource]="filteredProjects()" class="modern-enterprise-table">
+          
+          <!-- Project Name Column -->
+          <ng-container matColumnDef="name">
+            <th mat-header-cell *matHeaderCellDef> Project / Directive </th>
+            <td mat-cell *matCellDef="let p" class="project-name-cell">
+              <div class="name-wrapper">
+                <span class="project-title">{{ p.name }}</span>
+                <span class="project-id">{{ p.id }}</span>
+              </div>
+            </td>
+          </ng-container>
+
+          <!-- Category Column -->
+          <ng-container matColumnDef="category">
+            <th mat-header-cell *matHeaderCellDef> Category </th>
+            <td mat-cell *matCellDef="let p">
+              <span class="category-tag">{{ p.category }}</span>
+            </td>
+          </ng-container>
+
+          <!-- Owner / Regional Lead Column -->
+          <ng-container matColumnDef="owner">
+            <th mat-header-cell *matHeaderCellDef> Regional Lead </th>
+            <td mat-cell *matCellDef="let p">
+              <div class="owner-cell">
+                <div class="owner-avatar">{{ getInitials(p.owner) }}</div>
+                <span class="owner-name">{{ p.owner }}</span>
+              </div>
+            </td>
+          </ng-container>
+
+          <!-- Status Column -->
+          <ng-container matColumnDef="status">
+            <th mat-header-cell *matHeaderCellDef> Status </th>
+            <td mat-cell *matCellDef="let p">
+              <span class="status-pill" 
+                    [ngClass]="{
+                      'emerald': p.status === 'Completed',
+                      'sky': p.status === 'In Progress',
+                      'amber': p.status === 'On Hold'
+                    }">
+                {{ p.status }}
+              </span>
+            </td>
+          </ng-container>
+
+          <!-- Progress Column -->
+          <ng-container matColumnDef="progress">
+            <th mat-header-cell *matHeaderCellDef> Completion </th>
+            <td mat-cell *matCellDef="let p">
+              <div class="progress-wrap">
+                <div class="progress-track">
+                  <div class="progress-fill" [style.width.%]="p.progress" [ngClass]="p.progress === 100 ? 'complete' : ''"></div>
+                </div>
+                <span class="progress-pct">{{ p.progress }}%</span>
+              </div>
+            </td>
+          </ng-container>
+
+          <!-- Due Date Column -->
+          <ng-container matColumnDef="dueDate">
+            <th mat-header-cell *matHeaderCellDef> Target Date </th>
+            <td mat-cell *matCellDef="let p" class="date-cell">
+              <mat-icon class="calendar-icon">event</mat-icon>
+              <span>{{ p.dueDate }}</span>
+            </td>
+          </ng-container>
+
+          <!-- Actions Column -->
+          <ng-container matColumnDef="actions">
+            <th mat-header-cell *matHeaderCellDef class="actions-header"></th>
+            <td mat-cell *matCellDef="let p" class="actions-cell">
+              <button mat-icon-button [matMenuTriggerFor]="rowMenu" class="row-menu-btn">
+                <mat-icon>more_vert</mat-icon>
+              </button>
+              <mat-menu #rowMenu="matMenu" xPosition="before">
+                <button mat-menu-item routerLink="/work-plans">
+                  <mat-icon>visibility</mat-icon>
+                  <span>View Details</span>
+                </button>
+                <button mat-menu-item>
+                  <mat-icon>file_download</mat-icon>
+                  <span>Export Summary</span>
+                </button>
+              </mat-menu>
+            </td>
+          </ng-container>
+
+          <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+          <tr mat-row *matRowDef="let row; columns: displayedColumns;" class="project-row"></tr>
+
+          <tr class="mat-row" *matNoDataRow>
+            <td class="mat-cell empty-table-cell" colspan="7">
+              <mat-icon>search_off</mat-icon>
+              <p>No project directives match the selected criteria.</p>
+            </td>
+          </tr>
+        </table>
+      </div>
+
+    </mat-card>
+
+  </div>
+
+</div>

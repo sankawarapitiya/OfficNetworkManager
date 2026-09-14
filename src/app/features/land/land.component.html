@@ -1,0 +1,11 @@
+<div class="p-6">
+  <div class="mb-6 flex justify-between items-center">
+    <h1 class="text-2xl font-medium">Land Management</h1>
+    <button *ngIf="canRegisterDeed()" mat-flat-button color="primary" (click)="registerNewParcel()">Register New Parcel</button>
+  </div>
+  <mat-card>
+    <mat-card-content class="text-center p-12 text-gray-500">
+      Land Management Module (WIP)
+    </mat-card-content>
+  </mat-card>
+</div>
