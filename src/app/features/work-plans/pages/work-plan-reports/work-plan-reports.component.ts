@@ -528,31 +528,120 @@ export class WorkPlanReportsComponent implements OnInit, OnDestroy {
     return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
   });
 
+  // Helper to check if a plan satisfies non-month filter conditions
+  matchesGeneralFilters(plan: WorkPlan, officer: string = this.selectedOfficer()): boolean {
+    // Division filter
+    if (this.selectedDivision() !== 'all' && plan.division !== this.selectedDivision()) {
+      return false;
+    }
+
+    // Department filter
+    if (this.selectedDepartment() !== 'all') {
+      const dept = getPlanDepartment(plan);
+      if (dept.toLowerCase() !== this.selectedDepartment().toLowerCase()) {
+        return false;
+      }
+    }
+
+    // Priority filter
+    if (this.selectedPriority() !== 'all' && plan.priority !== this.selectedPriority()) {
+      return false;
+    }
+
+    // Search Query
+    if (this.searchQuery().trim()) {
+      const q = this.searchQuery().toLowerCase().trim();
+      const matchTitle = plan.title?.toLowerCase().includes(q);
+      const matchDesc = plan.description?.toLowerCase().includes(q);
+      const matchLead = plan.leadName?.toLowerCase().includes(q) || plan.ownerName?.toLowerCase().includes(q);
+      const matchDept = (plan.department || plan.division || '').toLowerCase().includes(q);
+      if (!matchTitle && !matchDesc && !matchLead && !matchDept) return false;
+    }
+
+    // Officer filter
+    if (officer !== 'all') {
+      const off = officer.toLowerCase().trim();
+      const oEmail = (plan.ownerEmail || '').toLowerCase().trim();
+      const oName = (plan.ownerName || '').toLowerCase().trim();
+      const officerMatch = (oEmail || oName)
+        ? (oEmail === off || oName === off)
+        : ((plan.leadEmail || '').toLowerCase().trim() === off || (plan.leadName || '').toLowerCase().trim() === off);
+      if (!officerMatch) return false;
+    }
+
+    return true;
+  }
+
+  isPlanRollover(plan: WorkPlan): boolean {
+    const activeMonth = this.selectedMonth() === 'all' ? this.currentRunningMonth() : this.selectedMonth();
+    const pMonth = getWorkPlanMonth(plan);
+    return pMonth < activeMonth && plan.status !== 'Completed';
+  }
+
+  getPlanMonthLabel(plan: WorkPlan): string {
+    return formatMonthDisplay(getWorkPlanMonth(plan));
+  }
+
+  getPlanMonthShort(plan: WorkPlan): string {
+    const mStr = getWorkPlanMonth(plan);
+    if (!mStr || mStr.length < 7) return mStr;
+    const [year, month] = mStr.split('-');
+    const date = new Date(parseInt(year, 10), parseInt(month, 10) - 1, 1);
+    return date.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+  }
+
   // 1. Whole Month Pending Tasks (Pending, In Progress, Delayed, Under Review)
+  // Incorporates tasks originating in the selected month PLUS rollover directives from previous months
   pendingPlans = computed(() => {
-    const plans = this.monthPlans();
-    const officer = this.selectedOfficer();
+    const month = this.selectedMonth();
+    const plans = this.workPlans();
+    const activeMonth = month === 'all' ? this.currentRunningMonth() : month;
 
     return plans.filter(p => {
       const isPending = p.status === 'In Progress' || p.status === 'Delayed' || p.status === 'Draft' || p.status === 'Under Review';
       if (!isPending) return false;
 
-      if (officer !== 'all') {
-        const off = officer.toLowerCase().trim();
-        const oEmail = (p.ownerEmail || '').toLowerCase().trim();
-        const oName = (p.ownerName || '').toLowerCase().trim();
-        const officerMatch = (oEmail || oName)
-          ? (oEmail === off || oName === off)
-          : ((p.leadEmail || '').toLowerCase().trim() === off || (p.leadName || '').toLowerCase().trim() === off);
-        if (!officerMatch) return false;
-      }
+      const pMonth = getWorkPlanMonth(p);
+      const isThisMonth = (month === 'all' || pMonth === month);
+      const isRollover = (pMonth < activeMonth);
 
-      return true;
+      if (!isThisMonth && !isRollover) return false;
+
+      return this.matchesGeneralFilters(p);
     }).sort((a, b) => {
+      // 1. Rollover from previous month(s) ALWAYS appear FIRST!
+      const aRollover = this.isPlanRollover(a);
+      const bRollover = this.isPlanRollover(b);
+      if (aRollover && !bRollover) return -1;
+      if (!aRollover && bRollover) return 1;
+
+      // 2. Within each group, Delayed tasks come first
       if (a.status === 'Delayed' && b.status !== 'Delayed') return -1;
       if (b.status === 'Delayed' && a.status !== 'Delayed') return 1;
-      return a.targetDate.localeCompare(b.targetDate);
+
+      // 3. Then sort by target date
+      return (a.targetDate || '').localeCompare(b.targetDate || '');
     });
+  });
+
+  // KPIs specific to the Whole Month Pending Directives Report (including rollover breakdown)
+  pendingKPIs = computed(() => {
+    const list = this.pendingPlans();
+    const total = list.length;
+    const rollover = list.filter(p => this.isPlanRollover(p)).length;
+    const thisMonth = total - rollover;
+    const delayed = list.filter(p => p.status === 'Delayed').length;
+    const inProgress = list.filter(p => p.status === 'In Progress' || p.status === 'Under Review').length;
+    const totalBudget = list.reduce((sum, p) => sum + (p.budget || 0), 0);
+
+    return {
+      total,
+      thisMonth,
+      rollover,
+      delayed,
+      inProgress,
+      totalBudget
+    };
   });
 
   // 2. Whole Month Completed Tasks with Status & Verification
@@ -1089,17 +1178,20 @@ export class WorkPlanReportsComponent implements OnInit, OnDestroy {
 
   private generatePendingCsv(): string {
     const rows = [
-      ['Ref ID', 'Title', 'Assigned Officer', 'Department', 'Division', 'Priority', 'Status', 'Start Date', 'Target Date', 'Progress %', 'Overdue Info', 'Milestones Completed', 'Total Milestones', 'Budget']
+      ['Ref ID', 'Title', 'Schedule Type', 'Assigned Officer', 'Department', 'Division', 'Priority', 'Status', 'Start Date', 'Target Date', 'Progress %', 'Overdue Info', 'Milestones Completed', 'Total Milestones', 'Budget']
     ];
 
     for (const p of this.pendingPlans()) {
       const ms = p.milestones || [];
       const msDone = ms.filter(m => m.completed).length;
       const overdue = this.getDaysRemaining(p.targetDate).text;
+      const isRollover = this.isPlanRollover(p);
+      const scheduleType = isRollover ? `Rollover (from ${this.getPlanMonthLabel(p)})` : 'Current Month';
 
       rows.push([
         p.id || 'N/A',
         p.title,
+        scheduleType,
         p.ownerName || p.leadName || 'Unassigned',
         getPlanDepartment(p),
         p.division,

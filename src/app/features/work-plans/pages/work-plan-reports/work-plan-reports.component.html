@@ -133,7 +133,10 @@
         <mat-icon>pending_actions</mat-icon>
         <div class="tab-label-group">
           <span class="tab-title">Whole Month Pending</span>
-          <span class="tab-count">{{ pendingPlans().length }} tasks</span>
+          <span class="tab-count">
+            {{ pendingKPIs().total }} tasks
+            <span class="tab-rollover-tag" *ngIf="pendingKPIs().rollover > 0">({{ pendingKPIs().rollover }} rollover)</span>
+          </span>
         </div>
         <button type="button" class="tab-print-icon-btn" (click)="$event.stopPropagation(); triggerPrint('pending')" matTooltip="Quick Print Pending Directives (A4)">
           <mat-icon>print</mat-icon>
@@ -275,7 +278,12 @@
             <mat-icon>pending_actions</mat-icon>
             <span>Whole Month Pending Directives</span>
           </span>
-          <span class="report-count-info">{{ pendingPlans().length }} outstanding tasks</span>
+          <span class="report-count-info">
+            Total Incomplete: <strong>{{ pendingKPIs().total }}</strong>
+            <span class="count-breakdown-pill" *ngIf="pendingKPIs().rollover > 0">
+              ({{ pendingKPIs().thisMonth }} this month &bull; <strong class="text-amber">{{ pendingKPIs().rollover }} rollover from previous</strong>)
+            </span>
+          </span>
         </div>
         <div class="toolbar-right">
           <button mat-stroked-button class="section-action-btn" [matMenuTriggerFor]="columnPickerMenu" matTooltip="Select visible columns">
@@ -318,6 +326,15 @@
               <td class="val"><strong>{{ getFormattedMonth() }}</strong></td>
             </tr>
             <tr>
+              <td class="lbl">Incomplete:</td>
+              <td class="val">
+                <strong>{{ pendingKPIs().total }} Total</strong>
+                <span class="meta-rollover-tag" *ngIf="pendingKPIs().rollover > 0">
+                  ({{ pendingKPIs().thisMonth }} this month + {{ pendingKPIs().rollover }} rollover)
+                </span>
+              </td>
+            </tr>
+            <tr>
               <td class="lbl">Generated:</td>
               <td class="val">{{ generatedAt() | date:'yyyy-MM-dd HH:mm' }}</td>
             </tr>
@@ -333,21 +350,42 @@
 
       <!-- KPI Summary Cards -->
       <div class="summary-kpi-row">
-        <div class="kpi-mini-card amber">
-          <span class="kpi-num">{{ pendingPlans().length }}</span>
-          <span class="kpi-label">Total Incomplete</span>
+        <div class="kpi-mini-card amber total-incomplete-card">
+          <div class="kpi-num-row">
+            <span class="kpi-num">{{ pendingKPIs().total }}</span>
+            <div class="kpi-split-tag" *ngIf="pendingKPIs().rollover > 0">
+              <span class="tag-this">{{ pendingKPIs().thisMonth }} This Month</span>
+              <span class="tag-roll">+{{ pendingKPIs().rollover }} Rollover</span>
+            </div>
+          </div>
+          <span class="kpi-label">Total Incomplete (This Month & Previous)</span>
         </div>
         <div class="kpi-mini-card red">
-          <span class="kpi-num">{{ reportKPIs().delayed }}</span>
+          <span class="kpi-num">{{ pendingKPIs().delayed }}</span>
           <span class="kpi-label">Critically Delayed</span>
         </div>
         <div class="kpi-mini-card blue">
-          <span class="kpi-num">{{ reportKPIs().inProgress }}</span>
+          <span class="kpi-num">{{ pendingKPIs().inProgress }}</span>
           <span class="kpi-label">Under Execution</span>
         </div>
         <div class="kpi-mini-card green">
-          <span class="kpi-num">LKR {{ (reportKPIs().totalBudget | number:'1.0-0') || '0' }}</span>
+          <span class="kpi-num">LKR {{ (pendingKPIs().totalBudget | number:'1.0-0') || '0' }}</span>
           <span class="kpi-label">Portfolio Budget</span>
+        </div>
+      </div>
+
+      <!-- Rollover Notice Strip (when previous incomplete directives are carried over) -->
+      <div class="rollover-schedule-alert" *ngIf="pendingKPIs().rollover > 0">
+        <div class="alert-left">
+          <mat-icon class="alert-icon">history</mat-icon>
+          <div class="alert-text">
+            <strong>{{ pendingKPIs().rollover }} Rollover Directive(s) Carried Over from Previous Months</strong>
+            <span>Prioritized and highlighted at the top of this schedule to ensure backlog clearance.</span>
+          </div>
+        </div>
+        <div class="alert-counts">
+          <span class="count-chip rollover-chip">{{ pendingKPIs().rollover }} Previous Rollover</span>
+          <span class="count-chip current-chip">{{ pendingKPIs().thisMonth }} Current Month</span>
         </div>
       </div>
 
@@ -369,14 +407,28 @@
             </tr>
           </thead>
           <tbody>
-            <tr *ngFor="let p of pendingPlans(); let idx = index" [class.delayed-row]="p.status === 'Delayed'">
-              <td *ngIf="isColVisible('pending', 'num')" class="text-center font-mono">{{ idx + 1 }}</td>
+            <tr *ngFor="let p of pendingPlans(); let idx = index" 
+                [class.delayed-row]="p.status === 'Delayed'"
+                [class.rollover-row]="isPlanRollover(p)">
+              <td *ngIf="isColVisible('pending', 'num')" class="text-center font-mono">
+                {{ idx + 1 }}
+                <span class="rollover-dot" *ngIf="isPlanRollover(p)" matTooltip="Rollover from previous cycle">&bull;</span>
+              </td>
               <td *ngIf="isColVisible('pending', 'refId')" class="font-mono text-xs">
                 <strong>{{ p.id ? p.id.substring(0, 10) : 'WP-' + (idx + 101) }}</strong>
+                <div class="ref-rollover-tag" *ngIf="isPlanRollover(p)">
+                  {{ getPlanMonthShort(p) }}
+                </div>
               </td>
               <td *ngIf="isColVisible('pending', 'title')">
                 <div class="task-title-cell">
-                  <strong>{{ p.title }}</strong>
+                  <div class="title-top-row">
+                    <span class="report-rollover-badge" *ngIf="isPlanRollover(p)" matTooltip="Rollover directive carried over from {{ getPlanMonthLabel(p) }}">
+                      <mat-icon class="badge-icon">history</mat-icon>
+                      <span>ROLLOVER ({{ getPlanMonthLabel(p) }})</span>
+                    </span>
+                    <strong class="directive-title-text">{{ p.title }}</strong>
+                  </div>
                   <div class="milestone-subline" *ngIf="p.milestones && p.milestones.length > 0">
                     <mat-icon class="ms-mini-icon">flag</mat-icon>
                     <span>Milestones: {{ (p.milestones | slice:0:2).length }} logged</span>
