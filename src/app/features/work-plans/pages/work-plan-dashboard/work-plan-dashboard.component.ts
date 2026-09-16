@@ -99,6 +99,15 @@ export class WorkPlanDashboardComponent implements OnInit {
     return this.rbacService.hasPermission('work-plans:view_all_summary') || this.rbacService.hasAnyRole(permittedRoles);
   });
 
+  canEditAndAssign = computed(() => {
+    if (this.rbacService.isAdmin() || this.rbacService.isSuperAdmin() || this.rbacService.isDivisionalAdmin() || this.rbacService.isDepartmentHead()) {
+      return true;
+    }
+    const settings = this.workPlanService.settings();
+    const permittedRoles = settings.rolesPermittedForEditAndAssign || ['Super Admin', 'Divisional Admin', 'Department Head'];
+    return this.rbacService.hasPermission('work-plans:edit_plan') || this.rbacService.hasAnyRole(permittedRoles);
+  });
+
   canAccessVerification = computed(() => {
     if (this.rbacService.isAdmin() || this.rbacService.isSuperAdmin() || this.rbacService.isDivisionalAdmin()) {
       return true;
@@ -153,6 +162,18 @@ export class WorkPlanDashboardComponent implements OnInit {
       next: (plans) => {
         this.workPlans.set(plans || []);
         this.isLoading.set(false);
+
+        // Keep selectedUserForModal in sync with latest plans if open
+        const curModal = this.selectedUserForModal();
+        if (curModal) {
+          const updatedUser = this.eachUserSummary().find(u =>
+            (u.leadEmail && u.leadEmail.toLowerCase() === curModal.leadEmail?.toLowerCase()) ||
+            (u.leadName && u.leadName.toLowerCase() === curModal.leadName?.toLowerCase())
+          );
+          if (updatedUser) {
+            this.selectedUserForModal.set(updatedUser);
+          }
+        }
       },
       error: () => {
         this.workPlans.set([]);
@@ -367,10 +388,51 @@ export class WorkPlanDashboardComponent implements OnInit {
   }
 
   openPlanDetail(plan: WorkPlan) {
-    this.dialog.open(WorkPlanDetailDialogComponent, {
-      width: '680px',
+    const ref = this.dialog.open(WorkPlanDetailDialogComponent, {
+      width: '740px',
       maxWidth: '95vw',
       data: { plan }
+    });
+
+    ref.afterClosed().subscribe((res) => {
+      if (res?.action === 'edit' && res.plan) {
+        this.openEditDialog(res.plan);
+      } else {
+        this.loadData();
+      }
+    });
+  }
+
+  openEditDialog(plan: WorkPlan) {
+    if (!this.canEditAndAssign()) {
+      this.snackBar.open('Editing directive specifications and reassigning officers is restricted to authorized roles (configured in Settings)', 'Dismiss', { duration: 3500 });
+      return;
+    }
+
+    const ref = this.dialog.open(WorkPlanDialogComponent, {
+      width: '740px',
+      maxWidth: '95vw',
+      data: {
+        plan,
+        divisions: this.divisions(),
+        departments: this.departments(),
+        canEditAndAssign: true
+      }
+    });
+
+    ref.afterClosed().subscribe(async (result) => {
+      if (result && plan.id) {
+        try {
+          await this.workPlanService.updateWorkPlan(plan.id, result);
+          this.eventLogService.logAction('UPDATED', 'WorkPlans', `Updated work plan "${result.title}"`);
+          this.snackBar.open('Work plan updated successfully!', 'Dismiss', { duration: 3500 });
+          this.loadData();
+        } catch (e) {
+          console.error('Error updating work plan', e);
+          this.snackBar.open('Offline protection: Changes saved to local queue', 'Dismiss', { duration: 3000 });
+          this.loadData();
+        }
+      }
     });
   }
 

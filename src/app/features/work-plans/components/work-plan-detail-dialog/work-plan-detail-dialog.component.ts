@@ -1198,8 +1198,11 @@ export class WorkPlanDetailDialogComponent {
   private dialog = inject(MatDialog);
 
   canEditAndAssign = computed(() => {
+    if (this.rbacService.isAdmin() || this.rbacService.isSuperAdmin() || this.rbacService.isDivisionalAdmin() || this.rbacService.isDepartmentHead()) {
+      return true;
+    }
     const roles = this.workPlanService.settings().rolesPermittedForEditAndAssign || ['Super Admin', 'Divisional Admin', 'Department Head'];
-    return this.rbacService.hasAnyRole(roles);
+    return this.rbacService.hasPermission('work-plans:edit_plan') || this.rbacService.hasAnyRole(roles);
   });
 
   canAccessVerification = computed(() => {
