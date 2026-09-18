@@ -87,6 +87,10 @@
       <mat-icon matListItemIcon>manage_accounts</mat-icon>
       <span matListItemTitle>User Profiles & RBAC</span>
     </a>
+    <a mat-list-item *ngIf="rbacService.hasRole('admin')" routerLink="/attendance" routerLinkActive="active-link">
+      <mat-icon matListItemIcon>fingerprint</mat-icon>
+      <span matListItemTitle>User Attendance</span>
+    </a>
     <a mat-list-item *ngIf="rbacService.hasRole('admin')" routerLink="/settings" routerLinkActive="active-link">
       <mat-icon matListItemIcon>tune</mat-icon>
       <span matListItemTitle>Settings & Schemas</span>

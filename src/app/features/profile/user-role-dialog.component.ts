@@ -42,12 +42,12 @@ import {
       </div>
 
       <form [formGroup]="userForm" class="dialog-form pt-2">
-        <ng-container *ngIf="!data.user">
-          <mat-form-field appearance="outline" class="full-width">
-            <mat-label>Display Name</mat-label>
-            <input matInput formControlName="displayName" required>
-          </mat-form-field>
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Display Name</mat-label>
+          <input matInput formControlName="displayName" [required]="!data.user">
+        </mat-form-field>
 
+        <ng-container *ngIf="!data.user">
           <mat-form-field appearance="outline" class="full-width">
             <mat-label>Email</mat-label>
             <input matInput type="email" formControlName="email" required>
@@ -71,6 +71,14 @@ import {
           </mat-select>
           <mat-icon matSuffix>domain</mat-icon>
           <mat-hint>Departments can be managed in General Settings</mat-hint>
+        </mat-form-field>
+
+        <!-- Fingerprint / Biometric ID Section -->
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Fingerprint / Biometric ID (user_finger_id)</mat-label>
+          <input matInput formControlName="user_finger_id" placeholder="e.g. 44 or EMP-44">
+          <mat-icon matSuffix>fingerprint</mat-icon>
+          <mat-hint>Biometric device user ID linked to attendance terminal</mat-hint>
         </mat-form-field>
 
         <!-- Assigned Roles Section -->
@@ -488,6 +496,7 @@ export class UserRoleDialogComponent {
       email: [data.user?.email || '', data.user ? [] : [Validators.required, Validators.email]],
       password: ['', data.user ? [] : [Validators.required, Validators.minLength(6)]],
       department: [data.user?.department || ''],
+      user_finger_id: [data.user?.user_finger_id || ''],
       roles: [data.user?.roles || (!data.user ? ['Staff'] : [])],
       locations: [data.user?.locations || []],
       accessible_modules: [data.user?.accessible_modules || []],

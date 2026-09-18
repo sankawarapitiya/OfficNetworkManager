@@ -1,0 +1,428 @@
+﻿<div class="page-container max-w-7xl mx-auto p-4 md:p-6">
+  <!-- Header -->
+  <div class="header-row">
+    <div>
+      <div class="title-with-badge">
+        <h1 class="page-title">User Attendance & Biometrics</h1>
+        <span class="server-status-pill" [class.online]="isServerOnline()" [class.offline]="!isServerOnline()">
+          <span class="status-dot"></span>
+          {{ isServerOnline() ? 'Biometric Engine Online (localhost:8088)' : 'Biometric Engine Offline' }}
+        </span>
+      </div>
+      <p class="page-desc">
+        Link system users with terminal biometric IDs (<code>user_finger_id</code>) and monitor running monthly attendance.
+      </p>
+    </div>
+
+    <!-- Controls -->
+    <div class="controls-group">
+      <mat-form-field appearance="outline" class="month-picker-field">
+        <mat-label>Running Month</mat-label>
+        <mat-select [value]="selectedMonth()" (selectionChange)="onMonthSelect($event.value)">
+          <mat-option *ngFor="let m of availableMonths()" [value]="m">
+            {{ m }}
+          </mat-option>
+        </mat-select>
+        <mat-icon matSuffix>calendar_month</mat-icon>
+      </mat-form-field>
+
+      <button mat-stroked-button (click)="refreshAll()" [disabled]="isLoading()" matTooltip="Refresh data and server health">
+        <mat-icon [class.spinning]="isLoading()">sync</mat-icon> Refresh
+      </button>
+
+      <button mat-flat-button color="primary" (click)="exportExcel()" [disabled]="!isServerOnline()" matTooltip="Download official monthly report as Excel .xlsx">
+        <mat-icon>file_download</mat-icon> Export Excel
+      </button>
+    </div>
+  </div>
+
+  <!-- Messages -->
+  <div *ngIf="successMsg()" class="alert alert-success">
+    <mat-icon>check_circle</mat-icon>
+    <span>{{ successMsg() }}</span>
+  </div>
+
+  <div *ngIf="errorMsg()" class="alert alert-error">
+    <mat-icon>error</mat-icon>
+    <span>{{ errorMsg() }}</span>
+  </div>
+
+  <div *ngIf="!isServerOnline()" class="alert alert-warning">
+    <mat-icon>warning</mat-icon>
+    <div>
+      <strong>Biometric API Service unreachable at http://localhost:8088/api</strong>
+      <p class="mb-0 text-xs">Make sure the AttendanceV5L service is running to sync punch logs and compute punctuality stats.</p>
+    </div>
+  </div>
+
+  <!-- Overview Metrics Cards -->
+  <div class="metrics-grid">
+    <mat-card class="metric-card">
+      <div class="metric-icon-wrap blue">
+        <mat-icon>group</mat-icon>
+      </div>
+      <div class="metric-info">
+        <span class="metric-label">System Accounts</span>
+        <span class="metric-value">{{ totalUsersCount() }}</span>
+        <span class="metric-sub">Registered platform users</span>
+      </div>
+    </mat-card>
+
+    <mat-card class="metric-card">
+      <div class="metric-icon-wrap purple">
+        <mat-icon>fingerprint</mat-icon>
+      </div>
+      <div class="metric-info">
+        <span class="metric-label">Biometric Linked</span>
+        <span class="metric-value">{{ linkedUsersCount() }} / {{ totalUsersCount() }}</span>
+        <span class="metric-sub">Assigned <code>user_finger_id</code></span>
+      </div>
+    </mat-card>
+
+    <mat-card class="metric-card">
+      <div class="metric-icon-wrap green">
+        <mat-icon>how_to_reg</mat-icon>
+      </div>
+      <div class="metric-info">
+        <span class="metric-label">Monthly Attendees</span>
+        <span class="metric-value">{{ activeAttendeesCount() }}</span>
+        <span class="metric-sub">Punches logged in {{ selectedMonth() }}</span>
+      </div>
+    </mat-card>
+
+    <mat-card class="metric-card">
+      <div class="metric-icon-wrap amber">
+        <mat-icon>schedule</mat-icon>
+      </div>
+      <div class="metric-info">
+        <span class="metric-label">Accumulated Hours</span>
+        <span class="metric-value">{{ totalWorkedHours() }}h</span>
+        <span class="metric-sub">Total linked staff time</span>
+      </div>
+    </mat-card>
+  </div>
+
+  <!-- Main Tabs -->
+  <mat-card class="content-card">
+    <mat-tab-group>
+      <!-- TAB 1: User Biometric Linkage & Calculated Attendance -->
+      <mat-tab>
+        <ng-template mat-tab-label>
+          <mat-icon class="tab-icon">badge</mat-icon>
+          User Attendance & Linkage ({{ users().length }})
+        </ng-template>
+
+        <div class="tab-body">
+          <div class="tab-header-row">
+            <div>
+              <h3>System Users Biometric Directory</h3>
+              <p>Connect user profiles to their physical fingerprint IDs and view their calculated attendance for {{ selectedMonth() }}.</p>
+            </div>
+          </div>
+
+          <div class="table-responsive">
+            <table mat-table [dataSource]="users()" class="mat-elevation-z1 app-table">
+              <!-- User Name & Email -->
+              <ng-container matColumnDef="user">
+                <th mat-header-cell *matHeaderCellDef> User </th>
+                <td mat-cell *matCellDef="let user">
+                  <div class="user-name-cell">
+                    <strong>{{ user.displayName || 'Unnamed' }}</strong>
+                    <span class="user-email">{{ user.email }}</span>
+                  </div>
+                </td>
+              </ng-container>
+
+              <!-- Department -->
+              <ng-container matColumnDef="department">
+                <th mat-header-cell *matHeaderCellDef> Department </th>
+                <td mat-cell *matCellDef="let user">
+                  <span *ngIf="user.department" class="dept-chip">
+                    <mat-icon class="chip-icon">domain</mat-icon>
+                    {{ user.department }}
+                  </span>
+                  <span *ngIf="!user.department" class="text-muted">Unassigned</span>
+                </td>
+              </ng-container>
+
+              <!-- Fingerprint ID -->
+              <ng-container matColumnDef="fingerprint">
+                <th mat-header-cell *matHeaderCellDef> Biometric Link </th>
+                <td mat-cell *matCellDef="let user">
+                  <div class="finger-link-wrap">
+                    <span *ngIf="user.user_finger_id" class="finger-chip">
+                      <mat-icon class="chip-icon">fingerprint</mat-icon>
+                      ID: {{ user.user_finger_id }}
+                    </span>
+                    <span *ngIf="!user.user_finger_id" class="unlinked-chip">
+                      <mat-icon class="chip-icon">link_off</mat-icon>
+                      Not Linked
+                    </span>
+                    <button mat-icon-button color="primary" class="mini-link-btn" (click)="openLinkDialog(user)" matTooltip="Change or set Biometric Fingerprint ID">
+                      <mat-icon>edit</mat-icon>
+                    </button>
+                  </div>
+                </td>
+              </ng-container>
+
+              <!-- Days Present -->
+              <ng-container matColumnDef="present">
+                <th mat-header-cell *matHeaderCellDef class="text-center"> Present </th>
+                <td mat-cell *matCellDef="let user" class="text-center">
+                  <ng-container *ngIf="getUserAttendance(user.user_finger_id) as att; else noAttPresent">
+                    <span class="badge-present">{{ att.days_present }} days</span>
+                  </ng-container>
+                  <ng-template #noAttPresent>
+                    <span class="text-muted">-</span>
+                  </ng-template>
+                </td>
+              </ng-container>
+
+              <!-- Days Absent -->
+              <ng-container matColumnDef="absent">
+                <th mat-header-cell *matHeaderCellDef class="text-center"> Absent </th>
+                <td mat-cell *matCellDef="let user" class="text-center">
+                  <ng-container *ngIf="getUserAttendance(user.user_finger_id) as att; else noAttAbsent">
+                    <span [class.text-red]="att.days_absent > 0">{{ att.days_absent }}</span>
+                  </ng-container>
+                  <ng-template #noAttAbsent>
+                    <span class="text-muted">-</span>
+                  </ng-template>
+                </td>
+              </ng-container>
+
+              <!-- Worked Time -->
+              <ng-container matColumnDef="worked_time">
+                <th mat-header-cell *matHeaderCellDef> Worked Time </th>
+                <td mat-cell *matCellDef="let user">
+                  <ng-container *ngIf="getUserAttendance(user.user_finger_id) as att; else noAttTime">
+                    <span class="font-mono font-medium">{{ att.total_worked_formatted }}</span>
+                  </ng-container>
+                  <ng-template #noAttTime>
+                    <span class="text-muted">-</span>
+                  </ng-template>
+                </td>
+              </ng-container>
+
+              <!-- OT Hours -->
+              <ng-container matColumnDef="ot">
+                <th mat-header-cell *matHeaderCellDef class="text-center"> Overtime </th>
+                <td mat-cell *matCellDef="let user" class="text-center">
+                  <ng-container *ngIf="getUserAttendance(user.user_finger_id) as att; else noAttOt">
+                    <span *ngIf="att.total_ot_hours > 0" class="ot-badge">+{{ att.total_ot_hours }}h</span>
+                    <span *ngIf="!att.total_ot_hours || att.total_ot_hours === 0" class="text-muted">0h</span>
+                  </ng-container>
+                  <ng-template #noAttOt>
+                    <span class="text-muted">-</span>
+                  </ng-template>
+                </td>
+              </ng-container>
+
+              <!-- Attendance % -->
+              <ng-container matColumnDef="attendance_pct">
+                <th mat-header-cell *matHeaderCellDef class="text-center"> Att. % </th>
+                <td mat-cell *matCellDef="let user" class="text-center">
+                  <ng-container *ngIf="getUserAttendance(user.user_finger_id) as att; else noAttPct">
+                    <span class="pct-badge">{{ att.attendance_pct }}</span>
+                  </ng-container>
+                  <ng-template #noAttPct>
+                    <span class="text-muted">-</span>
+                  </ng-template>
+                </td>
+              </ng-container>
+
+              <!-- Actions -->
+              <ng-container matColumnDef="actions">
+                <th mat-header-cell *matHeaderCellDef class="text-right"> Actions </th>
+                <td mat-cell *matCellDef="let user" class="text-right">
+                  <div class="action-btn-row">
+                    <button mat-stroked-button color="primary" 
+                            [disabled]="!user.user_finger_id || !isServerOnline()" 
+                            (click)="viewTimesheetForUser(user)">
+                      <mat-icon>calendar_view_day</mat-icon> Timesheet
+                    </button>
+                  </div>
+                </td>
+              </ng-container>
+
+              <tr mat-header-row *matHeaderRowDef="userDisplayedColumns"></tr>
+              <tr mat-row *matRowDef="let row; columns: userDisplayedColumns;"></tr>
+
+              <tr class="mat-row" *matNoDataRow>
+                <td class="mat-cell empty-cell" colspan="9">
+                  No users found in the system.
+                </td>
+              </tr>
+            </table>
+          </div>
+        </div>
+      </mat-tab>
+
+      <!-- TAB 2: Device Attendance Register (All Terminal Employees) -->
+      <mat-tab>
+        <ng-template mat-tab-label>
+          <mat-icon class="tab-icon">fingerprint</mat-icon>
+          Terminal Attendance Register ({{ terminalEmployees().length }})
+        </ng-template>
+
+        <div class="tab-body">
+          <div class="tab-header-row">
+            <div>
+              <h3>Biometric Terminal Employee Records</h3>
+              <p>Complete monthly calculated attendance records synced from the SpeedFace terminal ({{ selectedMonth() }}).</p>
+            </div>
+
+            <!-- Search input -->
+            <mat-form-field appearance="outline" class="search-field">
+              <mat-label>Search employee or ID...</mat-label>
+              <input matInput [ngModel]="terminalSearch()" (ngModelChange)="terminalSearch.set($event)" placeholder="e.g. 44, Lakmali, General">
+              <mat-icon matSuffix>search</mat-icon>
+            </mat-form-field>
+          </div>
+
+          <div class="table-responsive">
+            <table mat-table [dataSource]="filteredTerminalEmployees()" class="mat-elevation-z1 app-table">
+              <!-- User ID Column -->
+              <ng-container matColumnDef="user_id">
+                <th mat-header-cell *matHeaderCellDef> ID </th>
+                <td mat-cell *matCellDef="let emp">
+                  <span class="finger-chip">{{ emp.user_id }}</span>
+                </td>
+              </ng-container>
+
+              <!-- Employee Name Column -->
+              <ng-container matColumnDef="employee_name">
+                <th mat-header-cell *matHeaderCellDef> Employee Name </th>
+                <td mat-cell *matCellDef="let emp">
+                  <strong>{{ emp.employee_name }}</strong>
+                </td>
+              </ng-container>
+
+              <!-- Department Column -->
+              <ng-container matColumnDef="department">
+                <th mat-header-cell *matHeaderCellDef> Department </th>
+                <td mat-cell *matCellDef="let emp">
+                  <span class="dept-chip">{{ emp.department || 'General' }}</span>
+                </td>
+              </ng-container>
+
+              <!-- Shift Column -->
+              <ng-container matColumnDef="shift_name">
+                <th mat-header-cell *matHeaderCellDef> Assigned Shift </th>
+                <td mat-cell *matCellDef="let emp">
+                  <span class="text-xs text-muted">{{ emp.shift_name }}</span>
+                </td>
+              </ng-container>
+
+              <!-- Days Present Column -->
+              <ng-container matColumnDef="days_present">
+                <th mat-header-cell *matHeaderCellDef class="text-center"> Present </th>
+                <td mat-cell *matCellDef="let emp" class="text-center">
+                  <span class="badge-present">{{ emp.days_present }}</span>
+                </td>
+              </ng-container>
+
+              <!-- Days Absent Column -->
+              <ng-container matColumnDef="days_absent">
+                <th mat-header-cell *matHeaderCellDef class="text-center"> Absent </th>
+                <td mat-cell *matCellDef="let emp" class="text-center">
+                  <span [class.text-red]="emp.days_absent > 0">{{ emp.days_absent }}</span>
+                </td>
+              </ng-container>
+
+              <!-- Total Worked Column -->
+              <ng-container matColumnDef="total_worked">
+                <th mat-header-cell *matHeaderCellDef> Total Hours </th>
+                <td mat-cell *matCellDef="let emp">
+                  <span class="font-mono font-medium">{{ emp.total_worked_formatted }}</span>
+                </td>
+              </ng-container>
+
+              <!-- Total OT Column -->
+              <ng-container matColumnDef="total_ot">
+                <th mat-header-cell *matHeaderCellDef class="text-center"> OT </th>
+                <td mat-cell *matCellDef="let emp" class="text-center">
+                  <span *ngIf="emp.total_ot_hours > 0" class="ot-badge">+{{ emp.total_ot_hours }}h</span>
+                  <span *ngIf="!emp.total_ot_hours || emp.total_ot_hours === 0" class="text-muted">0h</span>
+                </td>
+              </ng-container>
+
+              <!-- Attendance % Column -->
+              <ng-container matColumnDef="attendance_pct">
+                <th mat-header-cell *matHeaderCellDef class="text-center"> Att. Rate </th>
+                <td mat-cell *matCellDef="let emp" class="text-center">
+                  <span class="pct-badge">{{ emp.attendance_pct }}</span>
+                </td>
+              </ng-container>
+
+              <!-- Actions Column -->
+              <ng-container matColumnDef="actions">
+                <th mat-header-cell *matHeaderCellDef class="text-right"> Actions </th>
+                <td mat-cell *matCellDef="let emp" class="text-right">
+                  <button mat-stroked-button color="primary" (click)="viewTimesheetForTerminalEmployee(emp)">
+                    <mat-icon>calendar_view_day</mat-icon> Timesheet
+                  </button>
+                </td>
+              </ng-container>
+
+              <tr mat-header-row *matHeaderRowDef="terminalDisplayedColumns"></tr>
+              <tr mat-row *matRowDef="let row; columns: terminalDisplayedColumns;"></tr>
+
+              <tr class="mat-row" *matNoDataRow>
+                <td class="mat-cell empty-cell" colspan="10">
+                  No terminal attendance records found for this period.
+                </td>
+              </tr>
+            </table>
+          </div>
+        </div>
+      </mat-tab>
+
+      <!-- TAB 3: Diagnostics -->
+      <mat-tab>
+        <ng-template mat-tab-label>
+          <mat-icon class="tab-icon">settings_ethernet</mat-icon>
+          Server & Diagnostics
+        </ng-template>
+
+        <div class="tab-body">
+          <div class="diagnostics-wrap">
+            <h3>Biometric Terminal Connection Details</h3>
+            <p>Real-time telemetry and database connection parameters for port 8088 service.</p>
+
+            <div class="diag-grid" *ngIf="health() as h">
+              <div class="diag-card">
+                <span class="diag-label">Server Status</span>
+                <span class="diag-val text-green">{{ h.status | uppercase }}</span>
+              </div>
+              <div class="diag-card">
+                <span class="diag-label">Database State</span>
+                <span class="diag-val text-blue">{{ h.database | titlecase }}</span>
+              </div>
+              <div class="diag-card">
+                <span class="diag-label">Total Punch Records</span>
+                <span class="diag-val">{{ h.records | number }}</span>
+              </div>
+              <div class="diag-card">
+                <span class="diag-label">Enrolled Biometric Employees</span>
+                <span class="diag-val">{{ h.employees }}</span>
+              </div>
+              <div class="diag-card">
+                <span class="diag-label">Uptime</span>
+                <span class="diag-val font-mono">{{ h.uptime }}s</span>
+              </div>
+              <div class="diag-card">
+                <span class="diag-label">API Endpoint</span>
+                <span class="diag-val font-mono text-xs">http://localhost:8088/api</span>
+              </div>
+            </div>
+
+            <div *ngIf="!health()" class="empty-cell p-4">
+              Cannot connect to biometric service on localhost:8088. Check console or start the server.
+            </div>
+          </div>
+        </div>
+      </mat-tab>
+    </mat-tab-group>
+  </mat-card>
+</div>

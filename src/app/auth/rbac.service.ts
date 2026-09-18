@@ -10,6 +10,7 @@ export interface UserRoles {
   locations: string[];
   accessible_modules: string[];
   department?: string;
+  user_finger_id?: string;
   permissions?: string[];
 }
 

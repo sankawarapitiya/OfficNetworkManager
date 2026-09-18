@@ -103,6 +103,12 @@ export const routes: Routes = [
       {
         path: 'profile',
         loadComponent: () => import('./features/profile/profile.component').then(m => m.ProfileComponent)
+      },
+      {
+        path: 'attendance',
+        loadComponent: () => import('./features/attendance/attendance.component').then(m => m.AttendanceComponent),
+        canActivate: [rbacGuard],
+        data: { requireRole: 'admin' }
       }
     ]
   },

@@ -26,6 +26,7 @@ export interface AppUser {
   email: string;
   displayName: string;
   department?: string;
+  user_finger_id?: string;
   roles: string[];
   locations: string[];
   accessible_modules: string[];
@@ -63,7 +64,7 @@ export class ProfileComponent implements OnInit {
   // Admin User Management
   allUsers = signal<AppUser[]>([]);
   isLoadingUsers = signal(false);
-  displayedColumns: string[] = ['user', 'department', 'roles', 'permissions', 'locations', 'actions'];
+  displayedColumns: string[] = ['user', 'user_finger_id', 'department', 'roles', 'permissions', 'locations', 'actions'];
 
   // Available roles for assignment
   availableRoles = [
@@ -94,7 +95,8 @@ export class ProfileComponent implements OnInit {
     this.profileForm = this.fb.group({
       displayName: ['', Validators.required],
       email: [{ value: '', disabled: true }],
-      department: ['']
+      department: [''],
+      user_finger_id: ['']
     });
 
     effect(() => {
@@ -104,7 +106,8 @@ export class ProfileComponent implements OnInit {
         this.profileForm.patchValue({
           displayName: user.displayName || '',
           email: user.email || '',
-          department: userRoles?.department || ''
+          department: userRoles?.department || '',
+          user_finger_id: userRoles?.user_finger_id || ''
         });
       }
     });
@@ -175,13 +178,15 @@ export class ProfileComponent implements OnInit {
         
         const appUser: Partial<AppUser> = {
           displayName: this.profileForm.value.displayName,
-          department: this.profileForm.value.department || ''
+          department: this.profileForm.value.department || '',
+          user_finger_id: this.profileForm.value.user_finger_id || ''
         };
         await this.firestoreService.updateDocument('users', user.uid, appUser).catch(() => {
           this.firestoreService.setDocument('users', user.uid, {
             email: user.email,
             displayName: this.profileForm.value.displayName,
             department: this.profileForm.value.department || '',
+            user_finger_id: this.profileForm.value.user_finger_id || '',
             roles: [],
             locations: [],
             accessible_modules: [],
@@ -260,6 +265,7 @@ export class ProfileComponent implements OnInit {
         email: formValue.email,
         displayName: formValue.displayName,
         department: formValue.department || '',
+        user_finger_id: formValue.user_finger_id || '',
         roles: formValue.roles || [],
         locations: formValue.locations || [],
         accessible_modules: formValue.accessible_modules || [],
@@ -280,13 +286,19 @@ export class ProfileComponent implements OnInit {
 
   async saveUserRoles(userId: string, formValue: any) {
     try {
-      await this.firestoreService.updateDocument('users', userId, {
+      const updatePayload: any = {
         department: formValue.department || '',
+        user_finger_id: formValue.user_finger_id || '',
         roles: formValue.roles,
         locations: formValue.locations,
         accessible_modules: formValue.accessible_modules,
         permissions: formValue.permissions || []
-      });
+      };
+      if (formValue.displayName) {
+        updatePayload.displayName = formValue.displayName;
+      }
+
+      await this.firestoreService.updateDocument('users', userId, updatePayload);
       this.successMessage.set('User access, roles & permissions updated successfully!');
       setTimeout(() => this.successMessage.set(''), 3000);
     } catch (err) {
