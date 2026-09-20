@@ -61,15 +61,15 @@
   <div class="controls-card">
     <div class="controls-row-top">
 
-      <!-- View Scope Toggles (if permitted) -->
-      <div class="scope-toggle-group" *ngIf="canViewAllSummary()">
+      <!-- View Scope Toggles: All Department Plans vs My Schedule -->
+      <div class="scope-toggle-group">
+        <button type="button" class="scope-btn" [class.active]="viewScope() === 'all'" (click)="onScopeChange('all')">
+          <mat-icon>dashboard</mat-icon>
+          <span>All Directives</span>
+        </button>
         <button type="button" class="scope-btn" [class.active]="viewScope() === 'own'" (click)="onScopeChange('own')">
           <mat-icon>person</mat-icon>
-          <span>My Schedule</span>
-        </button>
-        <button type="button" class="scope-btn" [class.active]="viewScope() === 'all'" (click)="onScopeChange('all')">
-          <mat-icon>groups</mat-icon>
-          <span>Officer View</span>
+          <span>My Directives</span>
         </button>
       </div>
 
@@ -101,21 +101,21 @@
         </mat-form-field>
       </div>
 
-      <!-- Officer Selector Dropdown (When viewing all or permitted) -->
-      <div class="officer-picker" *ngIf="viewScope() === 'all' && canViewAllSummary()">
+      <!-- Officer Attendance Selector Dropdown -->
+      <div class="officer-picker">
         <mat-form-field appearance="outline" class="officer-field" subscriptSizing="dynamic">
-          <mat-label>Select Officer</mat-label>
+          <mat-label>View Officer Attendance</mat-label>
           <mat-select [value]="selectedOfficerId()" (selectionChange)="onOfficerChange($event.value)">
+            <mat-option value="all">
+              <mat-icon>groups</mat-icon> All Officers / Team Overview
+            </mat-option>
             <mat-option value="me">
               <mat-icon>person</mat-icon> Myself ({{ currentUser()?.displayName || 'Current Officer' }})
-            </mat-option>
-            <mat-option value="all">
-              <mat-icon>groups</mat-icon> All Officers (Workload Matrix)
             </mat-option>
             <mat-divider></mat-divider>
             <mat-option *ngFor="let u of users()" [value]="u.id || u.email">
               <span class="user-option-row">
-                <span>{{ u.displayName || u.email }}</span>
+                <span class="user-name-text">{{ u.displayName || u.email }}</span>
                 <span class="user-finger-tag" *ngIf="u.user_finger_id" matTooltip="Biometric ID Linked">
                   <mat-icon class="finger-mini-icon">fingerprint</mat-icon> #{{ u.user_finger_id }}
                 </span>
@@ -222,7 +222,7 @@
         <mat-icon>badge</mat-icon>
       </div>
       <div class="kpi-body">
-        <span class="kpi-label">Officer Profile</span>
+        <span class="kpi-label">Inspecting Attendance For</span>
         <span class="kpi-val text-truncate">{{ activeOfficer()?.displayName || 'Officer' }}</span>
         <span class="kpi-sub">
           {{ activeOfficer()?.user_finger_id ? ('Biometric ID: #' + activeOfficer()?.user_finger_id) : 'No Fingerprint Linked' }}
@@ -258,24 +258,27 @@
           </span>
 
           <!-- Biometric Attendance Status Pill -->
-          <div *ngIf="day.attendance" class="attendance-pill" [ngClass]="getAttendanceBadgeClass(day.attendance.daily_status)" [matTooltip]="(day.attendance.daily_status || '') + (day.attendance.check_in_time ? ' (' + day.attendance.check_in_time + ' - ' + (day.attendance.check_out_time || 'Present') + ')' : '')">
+          <div *ngIf="day.attendance" class="attendance-pill" [ngClass]="getAttendanceBadgeClass(day.attendance.daily_status, day.attendance.daily_badge)" [matTooltip]="(day.attendance.daily_status || '') + (day.attendance.check_in_time && day.attendance.check_in_time !== '-' ? ' (' + day.attendance.check_in_time + ' - ' + (day.attendance.check_out_time || 'Present') + ')' : '')">
             <span class="status-dot"></span>
-            <span class="status-text">{{ day.attendance.daily_status }}</span>
-            <span class="punch-mini" *ngIf="day.attendance.check_in_time">{{ day.attendance.check_in_time }}</span>
+            <span class="status-text">{{ getAttendanceDisplayLabel(day.attendance) }}</span>
+            <span class="punch-mini" *ngIf="day.attendance.check_in_time && day.attendance.check_in_time !== '-'">{{ day.attendance.check_in_time.substring(0, 5) }}</span>
           </div>
         </div>
 
         <!-- Directives active on this day -->
         <div class="day-plans-container">
-          <div *ngFor="let plan of day.plans.slice(0, 2)"
+          <div *ngFor="let plan of day.plans.slice(0, 3)"
                class="plan-chip"
                [ngClass]="getStatusClass(plan.status)"
                [class.priority-border]="plan.priority === 'Urgent' || plan.priority === 'High'"
                (click)="openPlanDetail(plan, $event)"
-               [matTooltip]="plan.title + ' (' + plan.status + ' - ' + plan.progress + '%)'">
+               [matTooltip]="plan.title + ' • ' + (plan.ownerName || 'Officer') + ' (' + plan.status + ' - ' + plan.progress + '%)'">
             
             <span class="plan-priority-indicator" [ngClass]="getPriorityClass(plan.priority)"></span>
             <span class="plan-chip-title">{{ plan.title }}</span>
+
+            <!-- Owner mini indicator -->
+            <span class="plan-owner-mini" *ngIf="plan.ownerName">{{ plan.ownerName }}</span>
 
             <!-- Deadline Due Icon -->
             <mat-icon *ngIf="isPlanDueOnDate(plan, day.date)" class="due-flag-icon" matTooltip="Directive Due Date!">
@@ -286,9 +289,9 @@
             <span class="plan-chip-progress">{{ plan.progress }}%</span>
           </div>
 
-          <!-- More than 2 plans indicator -->
-          <div *ngIf="day.plans.length > 2" class="more-plans-badge">
-            +{{ day.plans.length - 2 }} more
+          <!-- More than 3 plans indicator -->
+          <div *ngIf="day.plans.length > 3" class="more-plans-badge">
+            +{{ day.plans.length - 3 }} more
           </div>
         </div>
 
@@ -309,7 +312,7 @@
         <div>
           <h2 class="inspector-date-title">{{ formatDateHeader(selDay.date) }}</h2>
           <span class="inspector-sub">
-            Day breakdown for {{ activeOfficer()?.displayName || 'Selected View' }} • {{ selDay.totalPlansCount }} Directives Active
+            Day breakdown for {{ activeOfficer()?.displayName || 'Selected Officer' }} • {{ selDay.totalPlansCount }} Directives Active
           </span>
         </div>
       </div>
@@ -327,13 +330,13 @@
       <div class="inspector-section attendance-section">
         <div class="section-title-row">
           <mat-icon class="sec-icon">fingerprint</mat-icon>
-          <h3>Biometric Attendance Record</h3>
+          <h3>Biometric Attendance Record ({{ activeOfficer()?.displayName || 'Officer' }})</h3>
         </div>
 
         <div *ngIf="selDay.attendance as att; else noAttendanceTpl" class="attendance-detail-box">
-          <div class="att-status-banner" [ngClass]="getAttendanceBadgeClass(att.daily_status)">
+          <div class="att-status-banner" [ngClass]="getAttendanceBadgeClass(att.daily_status, att.daily_badge)">
             <mat-icon class="att-icon">
-              {{ att.daily_status.includes('PRESENT') ? 'check_circle' : (att.daily_status.includes('ABSENT') ? 'cancel' : 'info') }}
+              {{ (att.daily_badge && att.daily_badge.includes('on-time')) || (att.daily_status && att.daily_status.includes('Full')) ? 'check_circle' : ((att.daily_badge && att.daily_badge.includes('absent')) || (att.daily_status && att.daily_status.includes('Absent')) ? 'cancel' : 'info') }}
             </mat-icon>
             <div>
               <span class="att-status-name">{{ att.daily_status }}</span>
@@ -377,8 +380,8 @@
             <p class="empty-desc">
               {{ !isServerOnline() ? 'Biometric terminal server is currently offline or unreachable.' : (!activeOfficer()?.user_finger_id ? 'No biometric fingerprint ID linked to this officer profile.' : 'No biometric punches logged for this date.') }}
             </p>
-            <button mat-stroked-button color="primary" class="check-srv-btn" (click)="checkBiometricHealth()">
-              <mat-icon>refresh</mat-icon> Retry Server Connection
+            <button mat-stroked-button color="primary" class="check-srv-btn" (click)="checkBiometricHealth(); loadAttendanceData()">
+              <mat-icon>refresh</mat-icon> Retry Attendance Sync
             </button>
           </div>
         </ng-template>

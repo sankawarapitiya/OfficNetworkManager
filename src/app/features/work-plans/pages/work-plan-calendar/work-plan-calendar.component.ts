@@ -87,16 +87,16 @@ export class WorkPlanCalendarComponent implements OnInit {
   private dialog = inject(MatDialog);
   private snackBar = inject(MatSnackBar);
 
-  // Month navigation
+  // Month navigation (Defaults to current month)
   selectedMonth = signal<string>(this.getCurrentMonthString()); // 'YYYY-MM'
   availableMonths = signal<string[]>(this.getRecentMonthsList());
 
   // Selected date for day inspector
   selectedDate = signal<string>(this.getTodayDateString());
 
-  // Scope & Filters
-  viewScope = signal<'own' | 'all'>('own');
-  selectedOfficerId = signal<string>('me');
+  // Scope & Filters (DEFAULT TO 'all' so all department plans are visible!)
+  viewScope = signal<'all' | 'own'>('all');
+  selectedOfficerId = signal<string>('all'); // 'all' or officer id
   selectedDivision = signal<string>('all');
   selectedDepartment = signal<string>('all');
   selectedStatus = signal<string>('all');
@@ -179,33 +179,47 @@ export class WorkPlanCalendarComponent implements OnInit {
     return this.rbacService.hasPermission('work-plans:manage_policies') || this.rbacService.isSuperAdmin() || this.rbacService.isAdmin();
   });
 
-  // Effective Active Officer for Calendar display
+  // Effective Active Officer whose biometric attendance is displayed on calendar
   activeOfficer = computed<AppUser | null>(() => {
     const curUser = this.currentUser();
     const officerId = this.selectedOfficerId();
+    const userList = this.users();
 
-    if (this.viewScope() === 'own' || officerId === 'me') {
-      if (!curUser) return null;
-      const match = this.users().find(u => 
-        (u.email && u.email.toLowerCase() === curUser.email?.toLowerCase()) ||
-        (u.id && u.id === curUser.uid)
+    if (officerId === 'me' || this.viewScope() === 'own') {
+      const match = userList.find(u => 
+        (u.email && u.email.toLowerCase() === curUser?.email?.toLowerCase()) ||
+        (u.id && u.id === curUser?.uid)
       );
-      return match || {
-        displayName: curUser.displayName || 'Staff Officer',
-        email: curUser.email || '',
-        id: curUser.uid,
-        user_finger_id: undefined,
-        roles: [],
-        locations: [],
-        accessible_modules: []
-      };
-    }
-
-    if (officerId === 'all') {
+      if (match) return match;
+      if (curUser) {
+        return {
+          displayName: curUser.displayName || 'Staff Officer',
+          email: curUser.email || '',
+          id: curUser.uid,
+          user_finger_id: undefined,
+          roles: [],
+          locations: [],
+          accessible_modules: []
+        };
+      }
       return null;
     }
 
-    return this.users().find(u => u.id === officerId || u.email === officerId) || null;
+    if (officerId && officerId !== 'all') {
+      return userList.find(u => u.id === officerId || u.email === officerId || u.user_finger_id === officerId) || null;
+    }
+
+    // When 'all', prefer the logged-in user if they have a linked fingerprint ID, or first linked officer
+    const curMatch = userList.find(u => 
+      (u.email && u.email.toLowerCase() === curUser?.email?.toLowerCase()) ||
+      (u.id && u.id === curUser?.uid)
+    );
+    if (curMatch && curMatch.user_finger_id) {
+      return curMatch;
+    }
+
+    const firstLinked = userList.find(u => !!u.user_finger_id && u.user_finger_id.trim() !== '');
+    return firstLinked || userList[0] || null;
   });
 
   // Month Display Title (e.g. "September 2026")
@@ -218,17 +232,17 @@ export class WorkPlanCalendarComponent implements OnInit {
     let plans = this.workPlans();
     const curUser = this.currentUser();
     const scope = this.viewScope();
-    const officer = this.activeOfficer();
     const officerId = this.selectedOfficerId();
+    const officer = this.activeOfficer();
     const div = this.selectedDivision();
     const dept = this.selectedDepartment();
     const st = this.selectedStatus();
     const q = this.searchQuery().trim().toLowerCase();
 
-    // 1. Scope / Officer filter
-    if (scope === 'own' || officerId === 'me') {
+    // 1. Scope / Officer filter:
+    if (scope === 'own') {
       plans = plans.filter(p => isWorkPlanOwner(p, curUser?.email, curUser?.displayName, curUser?.uid));
-    } else if (officerId !== 'all' && officer) {
+    } else if (officerId !== 'all' && officerId !== 'me' && officer) {
       plans = plans.filter(p => isWorkPlanOwner(p, officer.email, officer.displayName, officer.id));
     }
 
@@ -404,16 +418,10 @@ export class WorkPlanCalendarComponent implements OnInit {
   });
 
   ngOnInit() {
-    if (!this.canViewAllSummary()) {
-      this.viewScope.set('own');
-      this.selectedOfficerId.set('me');
-    }
-
     this.checkBiometricHealth();
-    this.loadUsers();
     this.loadWorkPlans();
     this.loadSettings();
-    this.loadAttendanceData();
+    this.loadUsers();
   }
 
   // --- Data Loading & Coordination ---
@@ -428,7 +436,19 @@ export class WorkPlanCalendarComponent implements OnInit {
 
   loadUsers() {
     this.firestoreService.getCollection<AppUser>('users').subscribe({
-      next: (uList) => this.users.set(uList || [])
+      next: (uList) => {
+        this.users.set(uList || []);
+
+        // Coordinate active officer once users are loaded
+        if (this.selectedOfficerId() === 'all') {
+          const cur = this.currentUser();
+          const curMatch = uList?.find(u => u.email?.toLowerCase() === cur?.email?.toLowerCase());
+          if (curMatch?.user_finger_id) {
+            // Keep 'all' for plan filter, but active officer uses curMatch
+          }
+        }
+        this.loadAttendanceData();
+      }
     });
   }
 
@@ -469,17 +489,23 @@ export class WorkPlanCalendarComponent implements OnInit {
     const month = this.selectedMonth();
     const officer = this.activeOfficer();
 
+    // 1. Overall monthly report for all employees
     this.attendanceService.getMonthlyReport(month).subscribe({
       next: (res) => {
         if (res && res.records) {
           this.monthlyAttendanceReport.set(res);
           this.isServerOnline.set(true);
         }
+      },
+      error: () => {
+        this.isServerOnline.set(false);
       }
     });
 
-    if (officer && officer.user_finger_id && officer.user_finger_id.trim() !== '') {
-      this.attendanceService.getUserMonthlyTimesheet(month, officer.user_finger_id).subscribe({
+    // 2. Fetch specific officer timesheet
+    const fingerId = officer?.user_finger_id;
+    if (fingerId && fingerId.trim() !== '') {
+      this.attendanceService.getUserMonthlyTimesheet(month, fingerId.trim()).subscribe({
         next: (res) => {
           if (res && res.success) {
             this.userTimesheetResponse.set(res);
@@ -538,7 +564,7 @@ export class WorkPlanCalendarComponent implements OnInit {
     }
   }
 
-  onScopeChange(scope: 'own' | 'all') {
+  onScopeChange(scope: 'all' | 'own') {
     this.viewScope.set(scope);
     if (scope === 'own') {
       this.selectedOfficerId.set('me');
@@ -692,21 +718,24 @@ export class WorkPlanCalendarComponent implements OnInit {
   }
 
   // --- Helper Methods ---
-  private getPlansForDate(plans: WorkPlan[], dateStr: string): WorkPlan[] {
+  getPlansForDate(plans: WorkPlan[], dateStr: string): WorkPlan[] {
     return plans.filter(p => {
-      if (p.startDate && p.targetDate) {
-        const s = p.startDate.substring(0, 10);
-        const t = p.targetDate.substring(0, 10);
+      const s = p.startDate ? p.startDate.substring(0, 10) : '';
+      const t = p.targetDate ? p.targetDate.substring(0, 10) : '';
+
+      // Direct date range match
+      if (s && t) {
         if (s <= dateStr && dateStr <= t) return true;
-      } else if (p.startDate) {
-        if (p.startDate.substring(0, 10) === dateStr) return true;
-      } else if (p.targetDate) {
-        if (p.targetDate.substring(0, 10) === dateStr) return true;
+      } else if (s) {
+        if (s === dateStr) return true;
+      } else if (t) {
+        if (t === dateStr) return true;
       }
 
+      // Check assignedMonth if no strict dates
       const planMonth = getWorkPlanMonth(p);
       if (planMonth && planMonth === dateStr.substring(0, 7)) {
-        return true;
+        if (!s && !t) return true;
       }
 
       return false;
@@ -791,15 +820,42 @@ export class WorkPlanCalendarComponent implements OnInit {
     }
   }
 
-  getAttendanceBadgeClass(status?: string): string {
-    if (!status) return 'badge-muted';
-    const s = status.toUpperCase();
-    if (s.includes('PRESENT')) return 'badge-present';
-    if (s.includes('ABSENT')) return 'badge-absent';
-    if (s.includes('HALF')) return 'badge-half';
-    if (s.includes('LEAVE') || s.includes('SHORT')) return 'badge-leave';
-    if (s.includes('WEEKEND')) return 'badge-weekend';
-    if (s.includes('HOLIDAY')) return 'badge-holiday';
+  getAttendanceBadgeClass(status?: string, badge?: string): string {
+    const b = (badge || '').toLowerCase();
+    const s = (status || '').toLowerCase();
+
+    if (b.includes('on-time') || s.includes('full day') || s.includes('present') || s.includes('on time')) {
+      return 'badge-present';
+    }
+    if (b.includes('absent') || s.includes('absent')) {
+      return 'badge-absent';
+    }
+    if (b.includes('half') || s.includes('half')) {
+      return 'badge-half';
+    }
+    if (b.includes('leave') || s.includes('leave')) {
+      return 'badge-leave';
+    }
+    if (b.includes('weekend') || s.includes('weekend')) {
+      return 'badge-weekend';
+    }
+    if (b.includes('holiday') || s.includes('holiday')) {
+      return 'badge-holiday';
+    }
     return 'badge-muted';
+  }
+
+  getAttendanceDisplayLabel(att?: DailyTimesheetRow): string {
+    if (!att || !att.daily_status) return '';
+    const s = att.daily_status.toLowerCase();
+    if (s.includes('full day') || s.includes('on time') || s.includes('present')) {
+      return 'Present';
+    }
+    if (s.includes('absent')) return 'Absent';
+    if (s.includes('half day')) return 'Half Day';
+    if (s.includes('leave')) return 'Leave';
+    if (s.includes('weekend')) return 'Weekend';
+    if (s.includes('holiday')) return 'Holiday';
+    return att.daily_status;
   }
 }
