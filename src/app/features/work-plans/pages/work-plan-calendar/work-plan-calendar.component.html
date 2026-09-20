@@ -59,7 +59,7 @@
     <!-- Row 1: Scope, Month Navigation, View Toggles & Officer Selector -->
     <div class="toolbar-row-primary">
       <div class="scope-toggle-group">
-        <button type="button" class="scope-btn" [class.active]="viewScope() === 'all'" (click)="onScopeChange('all')">
+        <button type="button" *ngIf="canViewTeamOverview()" class="scope-btn" [class.active]="viewScope() === 'all'" (click)="onScopeChange('all')">
           <mat-icon>dashboard</mat-icon>
           <span>All Directives</span>
         </button>
@@ -133,24 +133,26 @@
 
       <!-- Officer Attendance Selector -->
       <div class="officer-select-wrap">
-        <mat-form-field appearance="outline" class="officer-dropdown" subscriptSizing="dynamic">
+        <mat-form-field appearance="outline" class="officer-dropdown" subscriptSizing="dynamic" [matTooltip]="!canViewTeamOverview() ? 'Team Overview access is restricted to authorized roles in Work Plan Settings' : ''">
           <mat-label>View Officer Attendance</mat-label>
-          <mat-select [value]="selectedOfficerId()" (selectionChange)="onOfficerChange($event.value)" panelWidth="320px" panelClass="calendar-dropdown-panel officer-select-panel">
-            <mat-option value="all">
+          <mat-select [value]="selectedOfficerId()" (selectionChange)="onOfficerChange($event.value)" panelWidth="320px" panelClass="calendar-dropdown-panel officer-select-panel" [disabled]="!canViewTeamOverview()">
+            <mat-option *ngIf="canViewTeamOverview()" value="all">
               <mat-icon>groups</mat-icon> All Officers / Team Overview
             </mat-option>
             <mat-option value="me">
               <mat-icon>person</mat-icon> Myself ({{ currentUser()?.displayName || 'Current Officer' }})
             </mat-option>
-            <mat-divider></mat-divider>
-            <mat-option *ngFor="let u of users()" [value]="u.id || u.email">
-              <span class="user-option-item">
-                <span>{{ u.displayName || u.email }}</span>
-                <span class="finger-pill" *ngIf="u.user_finger_id">
-                  <mat-icon class="finger-icon">fingerprint</mat-icon> #{{ u.user_finger_id }}
+            <mat-divider *ngIf="canViewTeamOverview()"></mat-divider>
+            <ng-container *ngIf="canViewTeamOverview()">
+              <mat-option *ngFor="let u of users()" [value]="u.id || u.email">
+                <span class="user-option-item">
+                  <span>{{ u.displayName || u.email }}</span>
+                  <span class="finger-pill" *ngIf="u.user_finger_id">
+                    <mat-icon class="finger-icon">fingerprint</mat-icon> #{{ u.user_finger_id }}
+                  </span>
                 </span>
-              </span>
-            </mat-option>
+              </mat-option>
+            </ng-container>
           </mat-select>
         </mat-form-field>
       </div>

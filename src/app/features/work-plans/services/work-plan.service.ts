@@ -65,6 +65,7 @@ export interface WorkPlanPolicySettings {
   rolesPermittedForVerification: string[];
   rolesPermittedForEditAndAssign: string[];
   rolesPermittedToCreateOnBehalf: string[];
+  rolesPermittedForCalendarTeamOverview?: string[];
   rolesPermittedForAllReports?: string[];
   rolesPermittedForIndividualReports?: string[];
   rolesPermittedByReportType?: {
@@ -90,6 +91,7 @@ export const DEFAULT_WORK_PLAN_SETTINGS: WorkPlanPolicySettings = {
   rolesPermittedForVerification: ['Super Admin', 'Divisional Admin', 'Department Head'],
   rolesPermittedForEditAndAssign: ['Super Admin', 'Divisional Admin', 'Department Head'],
   rolesPermittedToCreateOnBehalf: ['Super Admin', 'Divisional Admin', 'Department Head'],
+  rolesPermittedForCalendarTeamOverview: ['Super Admin', 'Divisional Admin', 'Department Head'],
   rolesPermittedForAllReports: ['Super Admin', 'Divisional Admin', 'Department Head'],
   rolesPermittedForIndividualReports: ['Super Admin', 'Divisional Admin', 'Department Head', 'Staff', 'HR', 'Field Agent'],
   rolesPermittedByReportType: {
@@ -470,6 +472,9 @@ export class WorkPlanService {
             verification: [...all]
           };
         }
+        if (!parsed.rolesPermittedForCalendarTeamOverview) {
+          merged.rolesPermittedForCalendarTeamOverview = ['Super Admin', 'Divisional Admin', 'Department Head'];
+        }
         return merged;
       }
     } catch {}
@@ -481,6 +486,9 @@ export class WorkPlanService {
       next: (val) => {
         if (val) {
           const merged = { ...DEFAULT_WORK_PLAN_SETTINGS, ...val };
+          if (!val.rolesPermittedForCalendarTeamOverview) {
+            merged.rolesPermittedForCalendarTeamOverview = ['Super Admin', 'Divisional Admin', 'Department Head'];
+          }
           if (!val.rolesPermittedByReportType) {
             const all = val.rolesPermittedForAllReports || ['Super Admin', 'Divisional Admin', 'Department Head'];
             const ind = val.rolesPermittedForIndividualReports || ['Super Admin', 'Divisional Admin', 'Department Head', 'Staff', 'HR', 'Field Agent'];

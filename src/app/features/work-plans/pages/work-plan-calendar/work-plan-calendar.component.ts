@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal, computed } from '@angular/core';
+import { Component, OnInit, inject, signal, computed, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
@@ -131,14 +131,18 @@ export class WorkPlanCalendarComponent implements OnInit {
   currentUser = computed(() => this.authService.currentUser());
 
   // Permissions
-  canViewAllSummary = computed(() => {
-    if (this.rbacService.isAdmin() || this.rbacService.isSuperAdmin() || this.rbacService.isDivisionalAdmin() || this.rbacService.isDepartmentHead()) {
+  canViewTeamOverview = computed(() => {
+    if (this.rbacService.isAdmin() || this.rbacService.isSuperAdmin()) {
       return true;
     }
     const settings = this.workPlanService.settings();
-    const permittedRoles = settings.rolesPermittedForSummary || ['Super Admin', 'Divisional Admin', 'Department Head'];
-    return this.rbacService.hasPermission('work-plans:view_all_summary') || this.rbacService.hasAnyRole(permittedRoles);
+    const permittedRoles = settings.rolesPermittedForCalendarTeamOverview || ['Super Admin', 'Divisional Admin', 'Department Head'];
+    return this.rbacService.hasPermission('work-plans:calendar_team_overview') ||
+           this.rbacService.hasPermission('work-plans:view_all_summary') ||
+           this.rbacService.hasAnyRole(permittedRoles);
   });
+
+  canViewAllSummary = computed(() => this.canViewTeamOverview());
 
   canCreatePlan = computed(() => {
     return this.rbacService.isAdmin() || 
@@ -248,7 +252,7 @@ export class WorkPlanCalendarComponent implements OnInit {
     const q = this.searchQuery().trim().toLowerCase();
 
     // 1. Scope / Officer filter:
-    if (scope === 'own') {
+    if (!this.canViewTeamOverview() || scope === 'own') {
       plans = plans.filter(p => isWorkPlanOwner(p, curUser?.email, curUser?.displayName, curUser?.uid));
     } else if (officerId !== 'all' && officerId !== 'me' && officer) {
       plans = plans.filter(p => isWorkPlanOwner(p, officer.email, officer.displayName, officer.id));
@@ -425,8 +429,26 @@ export class WorkPlanCalendarComponent implements OnInit {
     return this.calendarDays().find(c => c.date === dStr) || null;
   });
 
+  constructor() {
+    effect(() => {
+      const allowed = this.canViewTeamOverview();
+      if (!allowed) {
+        if (this.viewScope() === 'all') {
+          this.viewScope.set('own');
+        }
+        if (this.selectedOfficerId() === 'all') {
+          this.selectedOfficerId.set('me');
+        }
+      }
+    }, { allowSignalWrites: true });
+  }
+
   ngOnInit() {
     this.checkBiometricHealth();
+    if (!this.canViewTeamOverview()) {
+      this.viewScope.set('own');
+      this.selectedOfficerId.set('me');
+    }
     this.loadWorkPlans();
     this.loadSettings();
     this.loadUsers();
@@ -497,18 +519,22 @@ export class WorkPlanCalendarComponent implements OnInit {
     const month = this.selectedMonth();
     const officer = this.activeOfficer();
 
-    // 1. Overall monthly report for all employees
-    this.attendanceService.getMonthlyReport(month).subscribe({
-      next: (res) => {
-        if (res && res.records) {
-          this.monthlyAttendanceReport.set(res);
-          this.isServerOnline.set(true);
+    // 1. Overall monthly report for all employees (only for authorized team overview roles)
+    if (this.canViewTeamOverview()) {
+      this.attendanceService.getMonthlyReport(month).subscribe({
+        next: (res) => {
+          if (res && res.records) {
+            this.monthlyAttendanceReport.set(res);
+            this.isServerOnline.set(true);
+          }
+        },
+        error: () => {
+          this.isServerOnline.set(false);
         }
-      },
-      error: () => {
-        this.isServerOnline.set(false);
-      }
-    });
+      });
+    } else {
+      this.monthlyAttendanceReport.set(null);
+    }
 
     // 2. Fetch specific officer timesheet
     const fingerId = officer?.user_finger_id;
@@ -573,6 +599,9 @@ export class WorkPlanCalendarComponent implements OnInit {
   }
 
   onScopeChange(scope: 'all' | 'own') {
+    if (scope === 'all' && !this.canViewTeamOverview()) {
+      return;
+    }
     this.viewScope.set(scope);
     if (scope === 'own') {
       this.selectedOfficerId.set('me');
@@ -581,6 +610,10 @@ export class WorkPlanCalendarComponent implements OnInit {
   }
 
   onOfficerChange(officerId: string) {
+    if (officerId !== 'me' && !this.canViewTeamOverview()) {
+      this.selectedOfficerId.set('me');
+      return;
+    }
     this.selectedOfficerId.set(officerId);
     this.loadAttendanceData();
   }

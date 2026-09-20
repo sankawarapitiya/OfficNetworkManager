@@ -120,6 +120,43 @@ import { SettingsService, Department } from '../../../settings/settings.service'
           </div>
         </mat-card>
 
+        <!-- Card: Calendar All Officers & Team Overview Permissions -->
+        <mat-card class="settings-card highlight-border-teal">
+          <div class="card-header">
+            <div class="header-icon-box teal"><mat-icon>calendar_month</mat-icon></div>
+            <div>
+              <h3>Calendar: All Officers & Team Overview Permissions</h3>
+              <p>Configure which roles can access "All Officers / Team Overview" on the Calendar, inspect other officers' biometric attendance, and view cross-departmental schedules. Unselected roles are restricted to viewing only their own attendance and personal work plans.</p>
+            </div>
+          </div>
+
+          <div class="settings-body">
+            <div class="roles-selection-grid">
+              <div class="role-checkbox-card" *ngFor="let role of availableRoles" [class.selected]="isCalendarTeamOverviewRolePermitted(role)" (click)="toggleCalendarTeamOverviewRolePermitted(role)">
+                <div class="role-card-left">
+                  <mat-checkbox [checked]="isCalendarTeamOverviewRolePermitted(role)" (change)="$event ? toggleCalendarTeamOverviewRolePermitted(role) : null" (click)="$event.stopPropagation()" color="primary">
+                  </mat-checkbox>
+                  <div class="role-text-col">
+                    <span class="role-name">{{ role }}</span>
+                    <span class="role-desc">{{ getRoleDescription(role) }}</span>
+                  </div>
+                </div>
+                <span class="role-badge" [class.allowed]="isCalendarTeamOverviewRolePermitted(role)" [class.restricted]="!isCalendarTeamOverviewRolePermitted(role)">
+                  <mat-icon class="badge-icon">{{ isCalendarTeamOverviewRolePermitted(role) ? 'groups' : 'lock' }}</mat-icon>
+                  {{ isCalendarTeamOverviewRolePermitted(role) ? 'Can View Team Overview' : 'Own Calendar Only' }}
+                </span>
+              </div>
+            </div>
+
+            <div class="info-alert-strip teal">
+              <mat-icon class="alert-icon">info</mat-icon>
+              <span>
+                <strong>Calendar Privacy Policy:</strong> Users whose roles are not checked above will see the Calendar strictly scoped to their own biometric attendance timesheet and assigned directives. The "All Officers / Team Overview" option and officer selection dropdown will be restricted.
+              </span>
+            </div>
+          </div>
+        </mat-card>
+
         <!-- Card 2: Verification Access & Audit Sign-off Permissions -->
         <mat-card class="settings-card highlight-border-emerald">
           <div class="card-header">
@@ -1380,6 +1417,12 @@ export class WorkPlanSettingsComponent implements OnInit {
     'Department Head'
   ]);
 
+  rolesPermittedForCalendarTeamOverview = signal<string[]>([
+    'Super Admin',
+    'Divisional Admin',
+    'Department Head'
+  ]);
+
   rolesPermittedForVerification = signal<string[]>([
     'Super Admin',
     'Divisional Admin',
@@ -1506,6 +1549,9 @@ export class WorkPlanSettingsComponent implements OnInit {
     if (s.rolesPermittedForSummary) {
       this.rolesPermittedForSummary.set([...s.rolesPermittedForSummary]);
     }
+    if (s.rolesPermittedForCalendarTeamOverview) {
+      this.rolesPermittedForCalendarTeamOverview.set([...s.rolesPermittedForCalendarTeamOverview]);
+    }
     if (s.rolesPermittedForVerification) {
       this.rolesPermittedForVerification.set([...s.rolesPermittedForVerification]);
     }
@@ -1626,6 +1672,19 @@ export class WorkPlanSettingsComponent implements OnInit {
       this.rolesPermittedForSummary.set(current.filter(r => r !== role));
     } else {
       this.rolesPermittedForSummary.set([...current, role]);
+    }
+  }
+
+  isCalendarTeamOverviewRolePermitted(role: string): boolean {
+    return this.rolesPermittedForCalendarTeamOverview().includes(role);
+  }
+
+  toggleCalendarTeamOverviewRolePermitted(role: string) {
+    const current = this.rolesPermittedForCalendarTeamOverview();
+    if (current.includes(role)) {
+      this.rolesPermittedForCalendarTeamOverview.set(current.filter(r => r !== role));
+    } else {
+      this.rolesPermittedForCalendarTeamOverview.set([...current, role]);
     }
   }
 
@@ -1781,6 +1840,7 @@ export class WorkPlanSettingsComponent implements OnInit {
       requireAllMilestones: this.requireAllMilestones,
       auditLogTransitions: this.auditLogTransitions,
       rolesPermittedForSummary: this.rolesPermittedForSummary(),
+      rolesPermittedForCalendarTeamOverview: this.rolesPermittedForCalendarTeamOverview(),
       rolesPermittedForVerification: this.rolesPermittedForVerification(),
       rolesPermittedForEditAndAssign: this.rolesPermittedForEditAndAssign(),
       rolesPermittedToCreateOnBehalf: this.rolesPermittedToCreateOnBehalf(),
@@ -1807,7 +1867,7 @@ export class WorkPlanSettingsComponent implements OnInit {
       }
     }
 
-    this.eventLogService.logAction('UPDATED', 'WorkPlans', 'Updated Work Plan operational, verification quotas, and report role policies');
+    this.eventLogService.logAction('UPDATED', 'WorkPlans', 'Updated Work Plan operational, verification quotas, calendar team overview, and report role policies');
     this.snackBar.open('Work plan operational & report visibility policies saved successfully', 'Dismiss', { duration: 3000 });
   }
 }
