@@ -1,4 +1,4 @@
-<div class="work-plan-calendar-page">
+<div class="work-plan-calendar-page" [class.fit-screen]="fitToScreen()">
 
   <!-- Compact Hero Banner -->
   <div class="hero-banner">
@@ -56,7 +56,7 @@
 
   <!-- Compact Controls & Filtering Toolbar -->
   <div class="controls-toolbar">
-    <!-- Row 1: Scope, Month Navigation, Officer Selector -->
+    <!-- Row 1: Scope, Month Navigation, View Toggles & Officer Selector -->
     <div class="toolbar-row-primary">
       <div class="scope-toggle-group">
         <button type="button" class="scope-btn" [class.active]="viewScope() === 'all'" (click)="onScopeChange('all')">
@@ -90,6 +90,45 @@
             </mat-option>
           </mat-select>
         </mat-form-field>
+      </div>
+
+      <!-- View Optimization Controls (Full Month vs Split View, Fit to View) -->
+      <div class="view-mode-group">
+        <div class="segmented-control" matTooltip="Toggle between Full Month Grid and Split Screen with Day Details">
+          <button type="button" 
+                  class="seg-btn" 
+                  [class.active]="layoutMode() === 'full'" 
+                  (click)="setLayoutMode('full')">
+            <mat-icon>calendar_view_month</mat-icon>
+            <span>Full Month</span>
+          </button>
+          <button type="button" 
+                  class="seg-btn" 
+                  [class.active]="layoutMode() === 'split'" 
+                  (click)="setLayoutMode('split')">
+            <mat-icon>view_sidebar</mat-icon>
+            <span>Split View</span>
+          </button>
+        </div>
+
+        <button type="button" 
+                class="view-toggle-btn" 
+                [class.active]="fitToScreen()" 
+                (click)="toggleFitToScreen()"
+                [matTooltip]="fitToScreen() ? 'Fit-to-View Active: Entire month fits without scrolling.' : 'Scrollable Active: Large cards with vertical scrolling.'">
+          <mat-icon>{{ fitToScreen() ? 'fit_screen' : 'unfold_more' }}</mat-icon>
+          <span>{{ fitToScreen() ? 'Fit to View' : 'Scrollable' }}</span>
+        </button>
+
+        <button type="button" 
+                *ngIf="layoutMode() === 'full'"
+                class="view-toggle-btn inspector-toggle-btn" 
+                [class.active]="showInspector()" 
+                (click)="toggleInspector()"
+                matTooltip="Show/Hide Selected Day Details">
+          <mat-icon>feed</mat-icon>
+          <span>Day Details</span>
+        </button>
       </div>
 
       <!-- Officer Attendance Selector -->
@@ -175,10 +214,14 @@
     </div>
   </div>
 
-  <!-- Optimized Two-Column Calendar Workspace Layout -->
-  <div class="calendar-workspace">
+  <!-- Responsive Calendar Workspace Layout -->
+  <div class="calendar-workspace" 
+       [class.layout-full]="layoutMode() === 'full'"
+       [class.layout-split]="layoutMode() === 'split'"
+       [class.fit-screen]="fitToScreen()"
+       [style.--weeks-count]="weeksCount()">
 
-    <!-- LEFT COLUMN: Month Calendar Grid -->
+    <!-- CALENDAR GRID CARD (100% full width in full mode, primary in split mode) -->
     <div class="calendar-grid-card mat-elevation-z1">
 
       <!-- Weekday Headers (Mon - Sun) -->
@@ -188,7 +231,7 @@
         </div>
       </div>
 
-      <!-- 7-Column Monthly Days Matrix -->
+      <!-- 7-Column Monthly Days Matrix (All 1..30/31 dates guaranteed visible!) -->
       <div class="grid-days-matrix">
         <div *ngFor="let day of calendarDays()"
              class="calendar-cell"
@@ -200,15 +243,20 @@
 
           <!-- Day Cell Top Header -->
           <div class="cell-header">
-            <span class="day-num" [class.today-circle]="day.isToday">
-              {{ day.dayNumber }}
-            </span>
+            <div class="day-num-wrap">
+              <span class="day-num" [class.today-circle]="day.isToday">
+                {{ day.dayNumber }}
+              </span>
+              <span class="month-name-tag" *ngIf="day.dayNumber === 1 || !day.isCurrentMonth">
+                {{ getMonthAbbr(day.date) }}
+              </span>
+            </div>
 
-            <!-- Compact Attendance Badge -->
+            <!-- Compact Attendance Badge / Indicator -->
             <div *ngIf="day.attendance" 
                  class="att-tag" 
                  [ngClass]="getAttendanceBadgeClass(day.attendance.daily_status, day.attendance.daily_badge)"
-                 [matTooltip]="(day.attendance.daily_status || '') + (day.attendance.check_in_time && day.attendance.check_in_time !== '-' ? ' (In: ' + day.attendance.check_in_time + ' - Out: ' + (day.attendance.check_out_time || 'Present') + ')' : '')">
+                 [matTooltip]="(day.attendance.daily_status || '') + (day.attendance.check_in_time && day.attendance.check_in_time !== '-' ? ' (In: ' + day.attendance.check_in_time + ' - Out: ' + (day.attendance.check_out_time || 'Present') + ' • ' + (day.attendance.worked_formatted || '') + ')' : '')">
               <span class="att-indicator-dot"></span>
               <span class="att-text">{{ getAttendanceDisplayLabel(day.attendance) }}</span>
               <span class="att-time" *ngIf="day.attendance.check_in_time && day.attendance.check_in_time !== '-'">
@@ -229,7 +277,7 @@
               <span class="plan-title-text">{{ plan.title }}</span>
               <span class="plan-owner-tag" *ngIf="plan.ownerName">{{ plan.ownerName }}</span>
 
-              <mat-icon *ngIf="isPlanDueOnDate(plan, day.date)" class="due-flag" matTooltip="Directive Due Date!">flag</mat-icon>
+              <mat-icon *ngIf="isPlanDueOnDate(plan, day.date)" class="due-flag" matTooltip="Directive Target Deadline!">flag</mat-icon>
               <span class="plan-pct">{{ plan.progress }}%</span>
             </div>
 
@@ -240,7 +288,11 @@
           </div>
 
           <!-- Quick Add Button on Hover -->
-          <button *ngIf="canCreatePlan()" mat-icon-button class="hover-add-btn" (click)="$event.stopPropagation(); openCreatePlanForDate(day.date)" matTooltip="Schedule directive for this date">
+          <button *ngIf="canCreatePlan()" 
+                  mat-icon-button 
+                  class="hover-add-btn" 
+                  (click)="$event.stopPropagation(); openCreatePlanForDate(day.date)" 
+                  matTooltip="Schedule directive for this date">
             <mat-icon>add</mat-icon>
           </button>
 
@@ -249,18 +301,37 @@
 
     </div>
 
-    <!-- RIGHT COLUMN: Selected Day Inspector (Dynamic Side-Panel) -->
-    <div class="calendar-inspector-card mat-elevation-z1" *ngIf="selectedCalendarDay() as selDay">
+    <!-- DOCKED INSPECTOR (Visible in Split View mode) -->
+    <div class="calendar-inspector-card mat-elevation-z1" 
+         *ngIf="layoutMode() === 'split' && selectedCalendarDay() as selDay">
+      <ng-container *ngTemplateOutlet="inspectorContent; context: { $implicit: selDay }"></ng-container>
+    </div>
 
-      <!-- Inspector Header & Date Navigation -->
-      <div class="inspector-card-header">
-        <div class="inspector-header-left">
-          <span class="inspector-badge">Selected Date</span>
-          <h2 class="inspector-date">{{ formatDateHeader(selDay.date) }}</h2>
-          <span class="inspector-officer-sub">
-            Showing schedule for <strong>{{ activeOfficer()?.displayName || 'Officer' }}</strong>
-          </span>
-        </div>
+  </div>
+
+  <!-- SLIDE-OUT DRAWER INSPECTOR (Used in Full Month mode when a day is inspected) -->
+  <div class="drawer-backdrop" 
+       *ngIf="layoutMode() === 'full' && showInspector()" 
+       (click)="closeInspector()">
+  </div>
+
+  <div class="calendar-inspector-drawer mat-elevation-z4" 
+       *ngIf="layoutMode() === 'full' && showInspector() && selectedCalendarDay() as selDay">
+    <ng-container *ngTemplateOutlet="inspectorContent; context: { $implicit: selDay }"></ng-container>
+  </div>
+
+  <!-- REUSABLE TEMPLATE FOR INSPECTOR CONTENT -->
+  <ng-template #inspectorContent let-selDay>
+    <!-- Inspector Header & Date Navigation -->
+    <div class="inspector-card-header">
+      <div class="inspector-header-left">
+        <span class="inspector-badge">Selected Date</span>
+        <h2 class="inspector-date">{{ formatDateHeader(selDay.date) }}</h2>
+        <span class="inspector-officer-sub">
+          Showing schedule for <strong>{{ activeOfficer()?.displayName || 'Officer' }}</strong>
+        </span>
+      </div>
+      <div class="inspector-header-actions">
         <div class="inspector-day-arrows">
           <button mat-icon-button (click)="previousDay()" matTooltip="Previous Day" class="day-nav-arrow">
             <mat-icon>chevron_left</mat-icon>
@@ -269,145 +340,146 @@
             <mat-icon>chevron_right</mat-icon>
           </button>
         </div>
+        <button mat-icon-button class="close-drawer-btn" (click)="closeInspector()" matTooltip="Close Details">
+          <mat-icon>close</mat-icon>
+        </button>
       </div>
+    </div>
 
-      <div class="inspector-scroll-content">
+    <div class="inspector-scroll-content">
 
-        <!-- 1. Biometric Attendance Box -->
-        <div class="inspector-section-block">
-          <div class="section-heading">
-            <mat-icon class="heading-ico">fingerprint</mat-icon>
-            <h3>Biometric Punch Record</h3>
-          </div>
-
-          <div *ngIf="selDay.attendance as att; else noAttBlock" class="att-details-card">
-            <div class="att-card-top" [ngClass]="getAttendanceBadgeClass(att.daily_status, att.daily_badge)">
-              <mat-icon class="att-status-ico">
-                {{ (att.daily_badge && att.daily_badge.includes('on-time')) || (att.daily_status && att.daily_status.includes('Full')) ? 'check_circle' : ((att.daily_badge && att.daily_badge.includes('absent')) || (att.daily_status && att.daily_status.includes('Absent')) ? 'cancel' : 'info') }}
-              </mat-icon>
-              <div>
-                <span class="att-main-status">{{ att.daily_status }}</span>
-                <span class="att-day-type">{{ att.day_name }} • {{ att.day_type }}</span>
-              </div>
-            </div>
-
-            <div class="att-punches-grid">
-              <div class="punch-tile">
-                <span class="punch-label">Check In</span>
-                <span class="punch-val">{{ att.check_in_time || 'No Punch' }}</span>
-                <span class="punch-sub-label" *ngIf="att.check_in_label">{{ att.check_in_label }}</span>
-              </div>
-              <div class="punch-tile">
-                <span class="punch-label">Check Out</span>
-                <span class="punch-val">{{ att.check_out_time || 'No Punch' }}</span>
-                <span class="punch-sub-label" *ngIf="att.check_out_label">{{ att.check_out_label }}</span>
-              </div>
-            </div>
-
-            <div class="att-stats-bar">
-              <div class="stat-item">
-                <span class="s-label">Worked</span>
-                <span class="s-val">{{ att.worked_formatted || '0m' }}</span>
-              </div>
-              <div class="stat-item">
-                <span class="s-label">Overtime</span>
-                <span class="s-val">{{ att.ot_hours || 0 }}h</span>
-              </div>
-              <div class="stat-item">
-                <span class="s-label">Punches</span>
-                <span class="s-val">{{ att.punch_count || 0 }}</span>
-              </div>
-            </div>
-          </div>
-
-          <ng-template #noAttBlock>
-            <div class="empty-att-state">
-              <mat-icon class="empty-ico">fingerprint</mat-icon>
-              <span class="empty-title">No Timesheet Record</span>
-              <p class="empty-msg">
-                {{ !isServerOnline() ? 'Biometric server is offline or unreachable.' : (!activeOfficer()?.user_finger_id ? 'No biometric fingerprint ID linked to this profile.' : 'No punch records logged for this date.') }}
-              </p>
-              <button mat-stroked-button color="primary" class="sync-btn" (click)="checkBiometricHealth(); loadAttendanceData()">
-                <mat-icon>refresh</mat-icon> Retry Attendance Sync
-              </button>
-            </div>
-          </ng-template>
+      <!-- 1. Biometric Attendance Box -->
+      <div class="inspector-section-block">
+        <div class="section-heading">
+          <mat-icon class="heading-ico">fingerprint</mat-icon>
+          <h3>Biometric Punch Record</h3>
         </div>
 
-        <!-- 2. Active Directives Box -->
-        <div class="inspector-section-block">
-          <div class="section-heading between">
-            <div class="heading-left">
-              <mat-icon class="heading-ico">task_alt</mat-icon>
-              <h3>Active Directives ({{ selDay.plans.length }})</h3>
+        <div *ngIf="selDay.attendance as att; else noAttBlock" class="att-details-card">
+          <div class="att-card-top" [ngClass]="getAttendanceBadgeClass(att.daily_status, att.daily_badge)">
+            <mat-icon class="att-status-ico">
+              {{ (att.daily_badge && att.daily_badge.includes('on-time')) || (att.daily_status && att.daily_status.includes('Full')) ? 'check_circle' : ((att.daily_badge && att.daily_badge.includes('absent')) || (att.daily_status && att.daily_status.includes('Absent')) ? 'cancel' : 'info') }}
+            </mat-icon>
+            <div>
+              <span class="att-main-status">{{ att.daily_status }}</span>
+              <span class="att-day-type">{{ att.day_name }} • {{ att.day_type }}</span>
             </div>
-            <button *ngIf="canCreatePlan()" mat-stroked-button color="primary" class="quick-add-plan-btn" (click)="openCreatePlanForDate(selDay.date)">
-              <mat-icon>add</mat-icon> New Plan
+          </div>
+
+          <div class="att-punches-grid">
+            <div class="punch-tile">
+              <span class="punch-label">Check In</span>
+              <span class="punch-val">{{ att.check_in_time || 'No Punch' }}</span>
+              <span class="punch-sub-label" *ngIf="att.check_in_label">{{ att.check_in_label }}</span>
+            </div>
+            <div class="punch-tile">
+              <span class="punch-label">Check Out</span>
+              <span class="punch-val">{{ att.check_out_time || 'No Punch' }}</span>
+              <span class="punch-sub-label" *ngIf="att.check_out_label">{{ att.check_out_label }}</span>
+            </div>
+          </div>
+
+          <div class="att-stats-bar">
+            <div class="stat-item">
+              <span class="s-label">Worked</span>
+              <span class="s-val">{{ att.worked_formatted || '0m' }}</span>
+            </div>
+            <div class="stat-item">
+              <span class="s-label">Overtime</span>
+              <span class="s-val">{{ att.ot_hours || 0 }}h</span>
+            </div>
+            <div class="stat-item">
+              <span class="s-label">Punches</span>
+              <span class="s-val">{{ att.punch_count || 0 }}</span>
+            </div>
+          </div>
+        </div>
+
+        <ng-template #noAttBlock>
+          <div class="empty-att-state">
+            <mat-icon class="empty-ico">fingerprint</mat-icon>
+            <span class="empty-title">No Timesheet Record</span>
+            <p class="empty-msg">
+              {{ !isServerOnline() ? 'Biometric server is offline or unreachable.' : (!activeOfficer()?.user_finger_id ? 'No biometric fingerprint ID linked to this profile.' : 'No punch records logged for this date.') }}
+            </p>
+            <button mat-stroked-button color="primary" class="sync-btn" (click)="checkBiometricHealth(); loadAttendanceData()">
+              <mat-icon>refresh</mat-icon> Retry Attendance Sync
             </button>
           </div>
+        </ng-template>
+      </div>
 
-          <div *ngIf="selDay.plans.length > 0; else noPlansBlock" class="plans-list-wrap">
-            <div *ngFor="let plan of selDay.plans" class="inspector-plan-card" (click)="openPlanDetail(plan)">
-              
-              <div class="plan-card-top">
-                <div class="tags-group">
-                  <span class="status-pill" [ngClass]="getStatusClass(plan.status)">{{ plan.status }}</span>
-                  <span class="priority-pill" [ngClass]="getPriorityClass(plan.priority)">{{ plan.priority }}</span>
-                  <span class="category-pill">{{ plan.category }}</span>
-                </div>
-                <div class="due-flag-pill" *ngIf="isPlanDueOnDate(plan, selDay.date)">
-                  <mat-icon class="flag-ico">flag</mat-icon> Due Today
-                </div>
-              </div>
-
-              <h4 class="plan-card-title">{{ plan.title }}</h4>
-
-              <div class="plan-meta-line">
-                <span><mat-icon class="meta-ico">corporate_fare</mat-icon> {{ plan.division }}</span>
-                <span><mat-icon class="meta-ico">person</mat-icon> {{ plan.ownerName || 'Staff' }}</span>
-                <span *ngIf="plan.targetDate"><mat-icon class="meta-ico">event</mat-icon> {{ plan.targetDate }}</span>
-              </div>
-
-              <!-- Progress bar -->
-              <div class="progress-box">
-                <div class="prog-labels">
-                  <span>Progress</span>
-                  <span class="prog-pct">{{ plan.progress }}%</span>
-                </div>
-                <mat-progress-bar mode="determinate" [value]="plan.progress" class="mini-prog-bar"></mat-progress-bar>
-              </div>
-
-              <!-- Milestones info -->
-              <div class="milestone-line" *ngIf="plan.milestones && plan.milestones.length > 0">
-                <mat-icon class="ms-ico">checklist</mat-icon>
-                <span>{{ plan.milestones.length }} Deliverable Milestones</span>
-              </div>
-
-              <div class="card-footer-action">
-                <button mat-button color="primary" class="card-detail-btn" (click)="$event.stopPropagation(); openPlanDetail(plan)">
-                  <mat-icon>edit_note</mat-icon> View & Edit Full Plan
-                </button>
-              </div>
-
-            </div>
+      <!-- 2. Active Directives Box -->
+      <div class="inspector-section-block">
+        <div class="section-heading between">
+          <div class="heading-left">
+            <mat-icon class="heading-ico">task_alt</mat-icon>
+            <h3>Active Directives ({{ selDay.plans.length }})</h3>
           </div>
-
-          <ng-template #noPlansBlock>
-            <div class="empty-plans-state">
-              <mat-icon class="empty-ico">check_circle_outline</mat-icon>
-              <span class="empty-title">No Directives Active</span>
-              <p class="empty-msg">No work plans scheduled or due on this date.</p>
-              <button *ngIf="canCreatePlan()" mat-stroked-button color="primary" (click)="openCreatePlanForDate(selDay.date)">
-                <mat-icon>add</mat-icon> Schedule Directive
-              </button>
-            </div>
-          </ng-template>
+          <button *ngIf="canCreatePlan()" mat-stroked-button color="primary" class="quick-add-plan-btn" (click)="openCreatePlanForDate(selDay.date)">
+            <mat-icon>add</mat-icon> New Plan
+          </button>
         </div>
 
+        <div *ngIf="selDay.plans.length > 0; else noPlansBlock" class="plans-list-wrap">
+          <div *ngFor="let plan of selDay.plans" class="inspector-plan-card" (click)="openPlanDetail(plan)">
+            
+            <div class="plan-card-top">
+              <div class="tags-group">
+                <span class="status-pill" [ngClass]="getStatusClass(plan.status)">{{ plan.status }}</span>
+                <span class="priority-pill" [ngClass]="getPriorityClass(plan.priority)">{{ plan.priority }}</span>
+                <span class="category-pill">{{ plan.category }}</span>
+              </div>
+              <div class="due-flag-pill" *ngIf="isPlanDueOnDate(plan, selDay.date)">
+                <mat-icon class="flag-ico">flag</mat-icon> Due Today
+              </div>
+            </div>
+
+            <h4 class="plan-card-title">{{ plan.title }}</h4>
+
+            <div class="plan-meta-line">
+              <span><mat-icon class="meta-ico">corporate_fare</mat-icon> {{ plan.division }}</span>
+              <span><mat-icon class="meta-ico">person</mat-icon> {{ plan.ownerName || 'Staff' }}</span>
+              <span *ngIf="plan.targetDate"><mat-icon class="meta-ico">event</mat-icon> {{ plan.targetDate }}</span>
+            </div>
+
+            <!-- Progress bar -->
+            <div class="progress-box">
+              <div class="prog-labels">
+                <span>Progress</span>
+                <span class="prog-pct">{{ plan.progress }}%</span>
+              </div>
+              <mat-progress-bar mode="determinate" [value]="plan.progress" class="mini-prog-bar"></mat-progress-bar>
+            </div>
+
+            <!-- Milestones info -->
+            <div class="milestone-line" *ngIf="plan.milestones && plan.milestones.length > 0">
+              <mat-icon class="ms-ico">checklist</mat-icon>
+              <span>{{ plan.milestones.length }} Deliverable Milestones</span>
+            </div>
+
+            <div class="card-footer-action">
+              <button mat-button color="primary" class="card-detail-btn" (click)="$event.stopPropagation(); openPlanDetail(plan)">
+                <mat-icon>edit_note</mat-icon> View & Edit Full Plan
+              </button>
+            </div>
+
+          </div>
+        </div>
+
+        <ng-template #noPlansBlock>
+          <div class="empty-plans-state">
+            <mat-icon class="empty-ico">check_circle_outline</mat-icon>
+            <span class="empty-title">No Directives Active</span>
+            <p class="empty-msg">No work plans scheduled or due on this date.</p>
+            <button *ngIf="canCreatePlan()" mat-stroked-button color="primary" (click)="openCreatePlanForDate(selDay.date)">
+              <mat-icon>add</mat-icon> Schedule Directive
+            </button>
+          </div>
+        </ng-template>
       </div>
 
     </div>
-
-  </div>
+  </ng-template>
 
 </div>

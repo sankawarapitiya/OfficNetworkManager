@@ -94,6 +94,14 @@ export class WorkPlanCalendarComponent implements OnInit {
   // Selected date for day inspector
   selectedDate = signal<string>(this.getTodayDateString());
 
+  // View Optimization & Layout Controls
+  layoutMode = signal<'full' | 'split'>('full'); // 'full' = 100% full month grid, 'split' = side-by-side
+  fitToScreen = signal<boolean>(true); // true = all 5-6 weeks fit on screen, false = scrollable
+  showInspector = signal<boolean>(false); // Drawer visibility in full-month mode
+
+  // Dynamic number of calendar weeks in currently displayed month (5 or 6)
+  weeksCount = computed(() => Math.ceil(this.calendarDays().length / 7));
+
   // Scope & Filters (DEFAULT TO 'all' so all department plans are visible!)
   viewScope = signal<'all' | 'own'>('all');
   selectedOfficerId = signal<string>('all'); // 'all' or officer id
@@ -605,6 +613,26 @@ export class WorkPlanCalendarComponent implements OnInit {
 
   selectDay(day: CalendarDay) {
     this.selectedDate.set(day.date);
+    this.showInspector.set(true);
+  }
+
+  setLayoutMode(mode: 'full' | 'split') {
+    this.layoutMode.set(mode);
+    if (mode === 'split') {
+      this.showInspector.set(true);
+    }
+  }
+
+  toggleFitToScreen() {
+    this.fitToScreen.update(v => !v);
+  }
+
+  toggleInspector() {
+    this.showInspector.update(v => !v);
+  }
+
+  closeInspector() {
+    this.showInspector.set(false);
   }
 
   // --- Dialog & Action Handlers ---
@@ -823,6 +851,15 @@ export class WorkPlanCalendarComponent implements OnInit {
     if (parts.length !== 3) return dateStr;
     const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
     return d.toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  }
+
+  getMonthAbbr(dateStr?: string): string {
+    if (!dateStr) return '';
+    const parts = dateStr.split('-');
+    if (parts.length < 2) return '';
+    const m = parseInt(parts[1], 10);
+    const names = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return names[m - 1] || '';
   }
 
   getStatusClass(status: string): string {
