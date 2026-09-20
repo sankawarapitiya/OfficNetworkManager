@@ -175,18 +175,152 @@
   background-color: #ffffff;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-container);
-  padding: 10px 14px;
+  padding: 8px 12px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
   box-shadow: var(--card-shadow);
+
+  /* Compact form-fields & reduced size for all dropdowns and inputs */
+  ::ng-deep .mat-mdc-form-field {
+    --mat-form-field-container-height: 28px !important;
+    --mat-form-field-container-vertical-padding: 0 !important;
+    font-size: 11px !important;
+
+    .mat-mdc-text-field-wrapper {
+      height: 28px !important;
+      max-height: 28px !important;
+      padding: 0 8px !important;
+      background-color: #ffffff !important;
+      border-radius: 6px !important;
+      box-shadow: none !important;
+    }
+
+    .mat-mdc-form-field-flex {
+      height: 28px !important;
+      align-items: center !important;
+    }
+
+    .mat-mdc-form-field-infix {
+      min-height: 28px !important;
+      height: 28px !important;
+      padding: 0 !important;
+      display: flex !important;
+      align-items: center !important;
+    }
+
+    .mat-mdc-floating-label {
+      top: 14px !important;
+      font-size: 10.5px !important;
+      line-height: 1 !important;
+      color: var(--text-muted) !important;
+    }
+
+    &.mat-form-field-should-float .mat-mdc-floating-label,
+    .mdc-floating-label--float-above {
+      top: 20px !important;
+      font-size: 9px !important;
+      font-weight: 600 !important;
+      transform: translateY(-100%) scale(0.82) !important;
+      color: var(--brand-indigo) !important;
+    }
+
+    .mat-mdc-select {
+      font-size: 11px !important;
+      line-height: 28px !important;
+    }
+
+    .mat-mdc-select-trigger {
+      height: 28px !important;
+      display: flex !important;
+      align-items: center !important;
+    }
+
+    .mat-mdc-select-value {
+      font-size: 11px !important;
+      font-weight: 500 !important;
+      color: var(--text-primary) !important;
+      line-height: 1.2 !important;
+    }
+
+    .mat-mdc-select-arrow-wrapper {
+      transform: scale(0.65) !important;
+      margin-left: 1px !important;
+    }
+
+    .mat-mdc-input-element {
+      font-size: 11px !important;
+      height: 28px !important;
+      line-height: 28px !important;
+      color: var(--text-primary) !important;
+      padding: 0 !important;
+
+      &::placeholder {
+        font-size: 10.5px !important;
+        color: var(--text-muted) !important;
+      }
+    }
+
+    .mat-mdc-form-field-icon-prefix {
+      padding: 0 4px 0 0 !important;
+      display: flex !important;
+      align-items: center !important;
+      height: 28px !important;
+    }
+
+    .mat-mdc-form-field-icon-suffix {
+      padding: 0 0 0 2px !important;
+      display: flex !important;
+      align-items: center !important;
+      height: 28px !important;
+    }
+
+    .mat-mdc-form-field-subscript-wrapper {
+      display: none !important;
+      height: 0 !important;
+      margin: 0 !important;
+      padding: 0 !important;
+    }
+
+    .mdc-notched-outline__leading {
+      border-radius: 6px 0 0 6px !important;
+      width: 6px !important;
+      border-color: var(--border-subtle) !important;
+    }
+
+    .mdc-notched-outline__notch {
+      border-color: var(--border-subtle) !important;
+    }
+
+    .mdc-notched-outline__trailing {
+      border-radius: 0 6px 6px 0 !important;
+      border-color: var(--border-subtle) !important;
+    }
+
+    &:hover {
+      .mdc-notched-outline__leading,
+      .mdc-notched-outline__notch,
+      .mdc-notched-outline__trailing {
+        border-color: #cbd5e1 !important;
+      }
+    }
+
+    &.mat-focused {
+      .mdc-notched-outline__leading,
+      .mdc-notched-outline__notch,
+      .mdc-notched-outline__trailing {
+        border-color: var(--brand-accent) !important;
+        border-width: 1.5px !important;
+      }
+    }
+  }
 
   .toolbar-row-primary {
     display: flex;
     align-items: center;
     justify-content: space-between;
     flex-wrap: wrap;
-    gap: 12px;
+    gap: 8px;
 
     .scope-toggle-group {
       display: inline-flex;
@@ -198,21 +332,21 @@
       .scope-btn {
         display: inline-flex;
         align-items: center;
-        gap: 5px;
-        padding: 5px 12px;
+        gap: 4px;
+        padding: 4px 10px;
         border-radius: 5px;
         border: none;
         background: transparent;
-        font-size: 12px;
+        font-size: 11.5px;
         font-weight: 500;
         color: var(--text-secondary);
         cursor: pointer;
         transition: all 0.15s ease;
 
         mat-icon {
-          font-size: 15px;
-          width: 15px;
-          height: 15px;
+          font-size: 14px;
+          width: 14px;
+          height: 14px;
         }
 
         &.active {
@@ -227,59 +361,60 @@
     .month-nav-box {
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 6px;
 
       .month-title-wrap {
         display: flex;
         align-items: center;
-        gap: 6px;
+        gap: 5px;
 
         .cal-icon {
           color: var(--brand-indigo);
-          font-size: 18px;
-          width: 18px;
-          height: 18px;
+          font-size: 16px;
+          width: 16px;
+          height: 16px;
         }
 
         .month-title-text {
-          font-size: 15px;
+          font-size: 13.5px;
           font-weight: 700;
           color: var(--text-primary);
-          min-width: 135px;
+          min-width: 120px;
           text-align: center;
         }
       }
 
       .nav-arrow-btn {
-        width: 32px;
-        height: 32px;
-        line-height: 32px;
+        width: 28px;
+        height: 28px;
+        line-height: 28px;
         color: var(--text-secondary);
 
         mat-icon {
-          font-size: 20px;
-          width: 20px;
-          height: 20px;
+          font-size: 18px;
+          width: 18px;
+          height: 18px;
         }
       }
 
       .today-btn {
-        height: 32px;
-        font-size: 12px;
+        height: 28px;
+        line-height: 28px;
+        font-size: 11px;
         font-weight: 600;
-        padding: 0 10px;
+        padding: 0 8px;
       }
 
       .month-picker-field {
-        width: 140px;
-        margin-bottom: -1.25em;
+        width: 110px;
+        margin: 0;
       }
     }
 
     .view-mode-group {
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 6px;
       flex-wrap: wrap;
 
       .segmented-control {
@@ -292,21 +427,21 @@
         .seg-btn {
           display: inline-flex;
           align-items: center;
-          gap: 4px;
-          padding: 4px 10px;
+          gap: 3px;
+          padding: 3px 8px;
           border-radius: 5px;
           border: none;
           background: transparent;
-          font-size: 11.5px;
+          font-size: 11px;
           font-weight: 500;
           color: var(--text-secondary);
           cursor: pointer;
           transition: all 0.15s ease;
 
           mat-icon {
-            font-size: 15px;
-            width: 15px;
-            height: 15px;
+            font-size: 14px;
+            width: 14px;
+            height: 14px;
           }
 
           &.active {
@@ -326,22 +461,22 @@
       .view-toggle-btn {
         display: inline-flex;
         align-items: center;
-        gap: 5px;
-        padding: 5px 10px;
-        height: 30px;
+        gap: 4px;
+        padding: 4px 8px;
+        height: 28px;
         border-radius: 6px;
         border: 1px solid var(--border-subtle);
         background-color: var(--canvas-bg);
-        font-size: 11.5px;
+        font-size: 11px;
         font-weight: 600;
         color: var(--text-secondary);
         cursor: pointer;
         transition: all 0.15s ease;
 
         mat-icon {
-          font-size: 15px;
-          width: 15px;
-          height: 15px;
+          font-size: 14px;
+          width: 14px;
+          height: 14px;
           color: var(--brand-accent);
         }
 
@@ -371,30 +506,32 @@
 
     .officer-select-wrap {
       .officer-dropdown {
-        min-width: 230px;
-        margin-bottom: -1.25em;
+        width: 180px;
+        min-width: 155px;
+        margin: 0;
 
         .user-option-item {
           display: flex;
           align-items: center;
           justify-content: space-between;
           width: 100%;
-          gap: 8px;
+          gap: 6px;
+          font-size: 11px;
 
           .finger-pill {
             display: inline-flex;
             align-items: center;
             gap: 2px;
-            font-size: 10px;
+            font-size: 9.5px;
             color: #059669;
             background: #ecfdf5;
-            padding: 1px 5px;
-            border-radius: 4px;
+            padding: 1px 4px;
+            border-radius: 3px;
 
             .finger-icon {
-              font-size: 11px;
-              width: 11px;
-              height: 11px;
+              font-size: 10px;
+              width: 10px;
+              height: 10px;
             }
           }
         }
@@ -407,41 +544,41 @@
     align-items: center;
     justify-content: space-between;
     flex-wrap: wrap;
-    gap: 10px;
+    gap: 8px;
     border-top: 1px solid #f1f5f9;
-    padding-top: 8px;
+    padding-top: 6px;
 
     .secondary-filters {
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 6px;
       flex-wrap: wrap;
 
       .compact-filter {
-        width: 135px;
-        margin-bottom: -1.25em;
+        width: 110px;
+        margin: 0;
       }
 
       .compact-search {
-        width: 180px;
-        margin-bottom: -1.25em;
+        width: 155px;
+        margin: 0;
 
         .search-ico {
-          font-size: 16px;
-          width: 16px;
-          height: 16px;
+          font-size: 14px;
+          width: 14px;
+          height: 14px;
           color: var(--text-muted);
         }
 
         .clear-btn {
-          width: 24px;
-          height: 24px;
-          line-height: 24px;
+          width: 20px;
+          height: 20px;
+          line-height: 20px;
 
           mat-icon {
-            font-size: 14px;
-            width: 14px;
-            height: 14px;
+            font-size: 12px;
+            width: 12px;
+            height: 12px;
           }
         }
       }
@@ -450,7 +587,7 @@
     .kpi-mini-strip {
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 6px;
       flex-wrap: wrap;
 
       .kpi-pill {
@@ -1861,3 +1998,51 @@
     opacity: 1;
   }
 }
+
+/* Reduced Compact Dropdown Panels & Options */
+::ng-deep .cdk-overlay-pane {
+  .mat-mdc-select-panel {
+    border-radius: 8px !important;
+    padding: 4px 0 !important;
+    border: 1px solid var(--border-subtle) !important;
+    box-shadow: 0 6px 20px rgba(15, 23, 42, 0.1) !important;
+    max-height: 250px !important;
+
+    .mat-mdc-option {
+      min-height: 28px !important;
+      height: 28px !important;
+      padding: 0 8px !important;
+      font-size: 11px !important;
+      line-height: 28px !important;
+
+      .mdc-list-item__primary-text {
+        font-size: 11px !important;
+      }
+
+      mat-icon {
+        font-size: 14px !important;
+        width: 14px !important;
+        height: 14px !important;
+        margin-right: 4px !important;
+      }
+
+      &.mdc-list-item--selected:not(.mdc-list-item--disabled) {
+        background-color: var(--brand-tint) !important;
+
+        .mdc-list-item__primary-text {
+          color: var(--brand-indigo) !important;
+          font-weight: 600 !important;
+        }
+      }
+
+      &:hover:not(.mdc-list-item--disabled) {
+        background-color: #f1f5f9 !important;
+      }
+    }
+
+    .mat-divider {
+      margin: 2px 0 !important;
+    }
+  }
+}
+
