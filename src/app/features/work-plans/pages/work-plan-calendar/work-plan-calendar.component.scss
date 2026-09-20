@@ -1999,50 +1999,116 @@
   }
 }
 
-/* Reduced Compact Dropdown Panels & Options */
+/* Comfortable, Big Enough Dropdown Panels & Options */
 ::ng-deep .cdk-overlay-pane {
-  .mat-mdc-select-panel {
-    border-radius: 8px !important;
-    padding: 4px 0 !important;
-    border: 1px solid var(--border-subtle) !important;
-    box-shadow: 0 6px 20px rgba(15, 23, 42, 0.1) !important;
-    max-height: 250px !important;
+  .calendar-dropdown-panel,
+  &.calendar-dropdown-panel .mat-mdc-select-panel {
+    border-radius: 10px !important;
+    padding: 6px 0 !important;
+    border: 1px solid var(--border-subtle, #e2e8f0) !important;
+    box-shadow: 0 10px 30px rgba(15, 23, 42, 0.16) !important;
+    max-height: 380px !important;
+    background-color: #ffffff !important;
 
     .mat-mdc-option {
-      min-height: 28px !important;
-      height: 28px !important;
-      padding: 0 8px !important;
-      font-size: 11px !important;
-      line-height: 28px !important;
+      min-height: 38px !important;
+      height: auto !important;
+      padding: 8px 14px !important;
+      font-size: 13px !important;
+      line-height: 1.4 !important;
 
       .mdc-list-item__primary-text {
-        font-size: 11px !important;
+        font-size: 13px !important;
+        font-weight: 500 !important;
+        color: var(--text-primary, #1e293b) !important;
+        display: flex !important;
+        align-items: center !important;
+        width: 100% !important;
       }
 
       mat-icon {
-        font-size: 14px !important;
-        width: 14px !important;
-        height: 14px !important;
-        margin-right: 4px !important;
+        font-size: 18px !important;
+        width: 18px !important;
+        height: 18px !important;
+        margin-right: 8px !important;
+        color: var(--text-muted, #64748b) !important;
       }
 
       &.mdc-list-item--selected:not(.mdc-list-item--disabled) {
-        background-color: var(--brand-tint) !important;
+        background-color: var(--brand-tint, rgba(99, 102, 241, 0.08)) !important;
 
         .mdc-list-item__primary-text {
-          color: var(--brand-indigo) !important;
+          color: var(--brand-indigo, #4338ca) !important;
           font-weight: 600 !important;
+        }
+
+        mat-icon {
+          color: var(--brand-accent, #6366f1) !important;
         }
       }
 
       &:hover:not(.mdc-list-item--disabled) {
         background-color: #f1f5f9 !important;
       }
+
+      .user-option-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        width: 100%;
+        gap: 12px;
+        font-size: 13px !important;
+
+        .finger-pill {
+          display: inline-flex;
+          align-items: center;
+          gap: 3px;
+          font-size: 11px !important;
+          font-weight: 600;
+          color: #059669;
+          background: #ecfdf5;
+          padding: 2px 6px;
+          border-radius: 4px;
+          border: 1px solid #a7f3d0;
+          flex-shrink: 0;
+
+          .finger-icon {
+            font-size: 13px !important;
+            width: 13px !important;
+            height: 13px !important;
+            margin-right: 2px !important;
+            color: #059669 !important;
+          }
+        }
+      }
     }
 
     .mat-divider {
-      margin: 2px 0 !important;
+      margin: 4px 0 !important;
+      border-top-color: #e2e8f0 !important;
     }
+  }
+
+  &.officer-select-panel,
+  .officer-select-panel {
+    min-width: 320px !important;
+  }
+
+  &.division-select-panel,
+  .division-select-panel,
+  &.department-select-panel,
+  .department-select-panel {
+    min-width: 220px !important;
+  }
+
+  &.status-select-panel,
+  .status-select-panel {
+    min-width: 190px !important;
+  }
+
+  &.month-select-panel,
+  .month-select-panel {
+    min-width: 180px !important;
   }
 }
 

@@ -84,7 +84,7 @@
         <button mat-stroked-button class="today-btn" (click)="goToToday()">Today</button>
 
         <mat-form-field appearance="outline" class="month-picker-field" subscriptSizing="dynamic">
-          <mat-select [value]="selectedMonth()" (selectionChange)="setMonth($event.value)">
+          <mat-select [value]="selectedMonth()" (selectionChange)="setMonth($event.value)" panelWidth="180px" panelClass="calendar-dropdown-panel month-select-panel">
             <mat-option *ngFor="let m of availableMonths()" [value]="m">
               {{ formatMonthDisplay(m) }}
             </mat-option>
@@ -135,7 +135,7 @@
       <div class="officer-select-wrap">
         <mat-form-field appearance="outline" class="officer-dropdown" subscriptSizing="dynamic">
           <mat-label>View Officer Attendance</mat-label>
-          <mat-select [value]="selectedOfficerId()" (selectionChange)="onOfficerChange($event.value)">
+          <mat-select [value]="selectedOfficerId()" (selectionChange)="onOfficerChange($event.value)" panelWidth="320px" panelClass="calendar-dropdown-panel officer-select-panel">
             <mat-option value="all">
               <mat-icon>groups</mat-icon> All Officers / Team Overview
             </mat-option>
@@ -161,7 +161,7 @@
       <div class="secondary-filters">
         <mat-form-field appearance="outline" class="compact-filter" subscriptSizing="dynamic">
           <mat-label>Division</mat-label>
-          <mat-select [value]="selectedDivision()" (selectionChange)="selectedDivision.set($event.value)">
+          <mat-select [value]="selectedDivision()" (selectionChange)="selectedDivision.set($event.value)" panelWidth="220px" panelClass="calendar-dropdown-panel division-select-panel">
             <mat-option value="all">All Divisions</mat-option>
             <mat-option *ngFor="let d of divisions()" [value]="d.name">{{ d.name }}</mat-option>
           </mat-select>
@@ -169,7 +169,7 @@
 
         <mat-form-field appearance="outline" class="compact-filter" subscriptSizing="dynamic">
           <mat-label>Department</mat-label>
-          <mat-select [value]="selectedDepartment()" (selectionChange)="selectedDepartment.set($event.value)">
+          <mat-select [value]="selectedDepartment()" (selectionChange)="selectedDepartment.set($event.value)" panelWidth="220px" panelClass="calendar-dropdown-panel department-select-panel">
             <mat-option value="all">All Departments</mat-option>
             <mat-option *ngFor="let d of departments()" [value]="d.name">{{ d.name }}</mat-option>
           </mat-select>
@@ -177,7 +177,7 @@
 
         <mat-form-field appearance="outline" class="compact-filter" subscriptSizing="dynamic">
           <mat-label>Status</mat-label>
-          <mat-select [value]="selectedStatus()" (selectionChange)="selectedStatus.set($event.value)">
+          <mat-select [value]="selectedStatus()" (selectionChange)="selectedStatus.set($event.value)" panelWidth="190px" panelClass="calendar-dropdown-panel status-select-panel">
             <mat-option value="all">All Statuses</mat-option>
             <mat-option value="In Progress">In Progress</mat-option>
             <mat-option value="Completed">Completed</mat-option>
