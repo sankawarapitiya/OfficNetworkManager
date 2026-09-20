@@ -577,6 +577,32 @@ export class WorkPlanCalendarComponent implements OnInit {
     this.loadAttendanceData();
   }
 
+  previousDay() {
+    const cur = this.selectedDate();
+    if (!cur) return;
+    const parts = cur.split('-').map(Number);
+    const d = new Date(parts[0], parts[1] - 1, parts[2] - 1);
+    const newDateStr = this.formatDateIso(d);
+    this.selectedDate.set(newDateStr);
+    const newMonth = newDateStr.substring(0, 7);
+    if (newMonth !== this.selectedMonth()) {
+      this.setMonth(newMonth);
+    }
+  }
+
+  nextDay() {
+    const cur = this.selectedDate();
+    if (!cur) return;
+    const parts = cur.split('-').map(Number);
+    const d = new Date(parts[0], parts[1] - 1, parts[2] + 1);
+    const newDateStr = this.formatDateIso(d);
+    this.selectedDate.set(newDateStr);
+    const newMonth = newDateStr.substring(0, 7);
+    if (newMonth !== this.selectedMonth()) {
+      this.setMonth(newMonth);
+    }
+  }
+
   selectDay(day: CalendarDay) {
     this.selectedDate.set(day.date);
   }
