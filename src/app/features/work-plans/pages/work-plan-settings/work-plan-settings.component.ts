@@ -66,6 +66,10 @@ import { SettingsService, Department } from '../../../settings/settings.service'
           <mat-icon>view_kanban</mat-icon>
           <span>Task List</span>
         </a>
+        <a routerLink="/work-plans/calendar" routerLinkActive="active" class="sub-tab-btn">
+          <mat-icon>calendar_month</mat-icon>
+          <span>Calendar</span>
+        </a>
         <a *ngIf="canAccessReports()" routerLink="/work-plans/reports" routerLinkActive="active" class="sub-tab-btn">
           <mat-icon>summarize</mat-icon>
           <span>Reports</span>

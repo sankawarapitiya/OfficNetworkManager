@@ -69,6 +69,12 @@ export const routes: Routes = [
             data: { module: 'work-plans', workPlanSubState: 'verification' }
           },
           {
+            path: 'calendar',
+            loadComponent: () => import('./features/work-plans/pages/work-plan-calendar/work-plan-calendar.component').then(m => m.WorkPlanCalendarComponent),
+            canActivate: [rbacGuard],
+            data: { module: 'work-plans', workPlanSubState: 'calendar' }
+          },
+          {
             path: 'reports',
             loadComponent: () => import('./features/work-plans/pages/work-plan-reports/work-plan-reports.component').then(m => m.WorkPlanReportsComponent),
             canActivate: [rbacGuard],

@@ -114,6 +114,13 @@ export const rbacGuard: CanActivateFn = (route, state) => {
             snackBar.open('Access Denied: You do not have permission to view Work Plan Dashboard.', 'Dismiss', { duration: 3500 });
             return router.parseUrl('/dashboard');
           }
+        } else if (workPlanSubState === 'calendar') {
+          const canViewCal = isAdminUser || rbacService.hasPermission('work-plans:view_tasks') || rbacService.canAccessModule('work-plans');
+          if (!canViewCal) {
+            console.warn(`[Access Guard] Access denied to Work Plan Calendar state`);
+            snackBar.open('Access Denied: You do not have permission to view Work Plan Calendar.', 'Dismiss', { duration: 3500 });
+            return router.parseUrl('/dashboard');
+          }
         }
       }
 

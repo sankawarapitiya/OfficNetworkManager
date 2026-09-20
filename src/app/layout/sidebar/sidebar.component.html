@@ -61,6 +61,10 @@
           <mat-icon class="sub-icon">view_kanban</mat-icon>
           <span class="sub-title">Task List</span>
         </a>
+        <a routerLink="/work-plans/calendar" routerLinkActive="active-sub-link" class="sub-nav-item">
+          <mat-icon class="sub-icon">calendar_month</mat-icon>
+          <span class="sub-title">Calendar</span>
+        </a>
         <a *ngIf="canAccessReports()" routerLink="/work-plans/reports" routerLinkActive="active-sub-link" class="sub-nav-item">
           <mat-icon class="sub-icon">summarize</mat-icon>
           <span class="sub-title">Reports</span>
