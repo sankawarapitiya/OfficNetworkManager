@@ -202,6 +202,60 @@ html, body {
   border-color: var(--border-subtle) !important;
 }
 
+/* Material Dialog Modern Smoothing */
+.mat-mdc-dialog-container .mdc-dialog__surface {
+  border-radius: 12px !important;
+  box-shadow: 0 20px 25px -5px rgba(15, 23, 42, 0.15), 0 8px 10px -6px rgba(15, 23, 42, 0.05) !important;
+  overflow: hidden !important;
+}
+
+/* Sleek, Clean Enterprise Form Fields & Dropdowns (Preserves MDC Notch & Label Precision) */
+.compact-field,
+.smart-form-field,
+.filter-card .mat-mdc-form-field,
+.dialog-body .mat-mdc-form-field {
+  font-size: 13px !important;
+
+  .mat-mdc-floating-label {
+    font-size: 13px;
+  }
+
+  input.mat-mdc-input-element,
+  .mat-mdc-select-value {
+    font-size: 13px !important;
+  }
+
+  .mat-mdc-form-field-subscript-wrapper {
+    font-size: 11px !important;
+  }
+}
+
+/* Compact Dropdown / Mat-Select Options Menu & Autocomplete Panel */
+.mat-mdc-select-panel,
+.mat-mdc-autocomplete-panel {
+  padding: 4px 0 !important;
+  border-radius: 8px !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1) !important;
+  border: 1px solid var(--border-light) !important;
+
+  .mat-mdc-option {
+    min-height: 36px !important;
+    padding: 0 12px !important;
+    font-size: 12.5px !important;
+
+    .mdc-list-item__primary-text {
+      font-size: 12.5px !important;
+      width: 100%;
+    }
+
+    .mat-pseudo-checkbox {
+      width: 15px !important;
+      height: 15px !important;
+      margin-right: 8px !important;
+    }
+  }
+}
+
 /* Status Badges Shared Utility */
 .status-pill {
   display: inline-flex;

@@ -90,9 +90,49 @@ export const routes: Routes = [
       },
       {
         path: 'letters',
-        loadComponent: () => import('./features/letters/letters.component').then(m => m.LettersComponent),
-        canActivate: [rbacGuard],
-        data: { module: 'letters', permission: 'letters:view_inward' }
+        children: [
+          {
+            path: '',
+            redirectTo: 'dashboard',
+            pathMatch: 'full'
+          },
+          {
+            path: 'dashboard',
+            loadComponent: () => import('./features/letters/pages/letter-dashboard/letter-dashboard.component').then(m => m.LetterDashboardComponent),
+            canActivate: [rbacGuard],
+            data: { module: 'letters', permission: 'letters:view_inward' }
+          },
+          {
+            path: 'inbox',
+            loadComponent: () => import('./features/letters/pages/letter-inbox/letter-inbox.component').then(m => m.LetterInboxComponent),
+            canActivate: [rbacGuard],
+            data: { module: 'letters', permission: 'letters:view_inward' }
+          },
+          {
+            path: 'actions',
+            loadComponent: () => import('./features/letters/pages/letter-actions/letter-actions.component').then(m => m.LetterActionsComponent),
+            canActivate: [rbacGuard],
+            data: { module: 'letters', permission: 'letters:view_inward' }
+          },
+          {
+            path: 'reports',
+            loadComponent: () => import('./features/letters/pages/letter-reports/letter-reports.component').then(m => m.LetterReportsComponent),
+            canActivate: [rbacGuard],
+            data: { module: 'letters', permission: 'letters:view_inward' }
+          },
+          {
+            path: 'audit',
+            loadComponent: () => import('./features/letters/pages/letter-audit/letter-audit.component').then(m => m.LetterAuditComponent),
+            canActivate: [rbacGuard],
+            data: { module: 'letters', permission: 'letters:view_inward' }
+          },
+          {
+            path: 'settings',
+            loadComponent: () => import('./features/letters/pages/letter-settings/letter-settings.component').then(m => m.LetterSettingsComponent),
+            canActivate: [rbacGuard],
+            data: { module: 'letters', permission: 'letters:view_inward' }
+          }
+        ]
       },
       {
         path: 'settings',

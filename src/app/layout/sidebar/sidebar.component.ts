@@ -65,4 +65,17 @@ export class SidebarComponent {
   isWorkPlansActive(): boolean {
     return this.router.url.startsWith('/work-plans');
   }
+
+  lettersExpanded = signal<boolean>(true);
+
+  toggleLetters(event?: MouseEvent) {
+    if (event) {
+      event.stopPropagation();
+    }
+    this.lettersExpanded.update(v => !v);
+  }
+
+  isLettersActive(): boolean {
+    return this.router.url.startsWith('/letters');
+  }
 }

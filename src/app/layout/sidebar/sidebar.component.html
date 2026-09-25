@@ -75,10 +75,46 @@
         </a>
       </div>
     </div>
-    <a mat-list-item *ngIf="rbacService.canAccessModule('letters')" routerLink="/letters" routerLinkActive="active-link">
-      <mat-icon matListItemIcon>mark_email_read</mat-icon>
-      <span matListItemTitle>Official Letters</span>
-    </a>
+    <!-- Official Letters with Sub-categories -->
+    <div class="nav-expandable-group" *ngIf="rbacService.canAccessModule('letters')">
+      <div class="nav-parent-item" [class.expanded]="lettersExpanded()" [class.parent-active]="isLettersActive()">
+        <a routerLink="/letters/inbox" class="parent-link">
+          <mat-icon class="parent-icon">mark_email_read</mat-icon>
+          <span class="parent-label">Official Letters</span>
+        </a>
+        <button type="button" class="expand-btn" (click)="toggleLetters($event)" matTooltip="Toggle Sub-menu">
+          <mat-icon class="expand-icon">{{ lettersExpanded() ? 'expand_less' : 'expand_more' }}</mat-icon>
+        </button>
+      </div>
+
+      <!-- Nested Sub-Categories -->
+      <div class="sub-nav-list" *ngIf="lettersExpanded()">
+        <a routerLink="/letters/dashboard" routerLinkActive="active-sub-link" class="sub-nav-item">
+          <mat-icon class="sub-icon">insights</mat-icon>
+          <span class="sub-title">Dashboard</span>
+        </a>
+        <a routerLink="/letters/inbox" routerLinkActive="active-sub-link" class="sub-nav-item">
+          <mat-icon class="sub-icon">inbox</mat-icon>
+          <span class="sub-title">Inbox</span>
+        </a>
+        <a routerLink="/letters/actions" routerLinkActive="active-sub-link" class="sub-nav-item">
+          <mat-icon class="sub-icon">pending_actions</mat-icon>
+          <span class="sub-title">Actions</span>
+        </a>
+        <a routerLink="/letters/reports" routerLinkActive="active-sub-link" class="sub-nav-item">
+          <mat-icon class="sub-icon">summarize</mat-icon>
+          <span class="sub-title">Reports</span>
+        </a>
+        <a routerLink="/letters/audit" routerLinkActive="active-sub-link" class="sub-nav-item">
+          <mat-icon class="sub-icon">history</mat-icon>
+          <span class="sub-title">Audit</span>
+        </a>
+        <a routerLink="/letters/settings" routerLinkActive="active-sub-link" class="sub-nav-item">
+          <mat-icon class="sub-icon">tune</mat-icon>
+          <span class="sub-title">Settings</span>
+        </a>
+      </div>
+    </div>
     <a mat-list-item *ngIf="rbacService.canAccessModule('hr')" routerLink="/hr" routerLinkActive="active-link">
       <mat-icon matListItemIcon>badge</mat-icon>
       <span matListItemTitle>HR Directory</span>
