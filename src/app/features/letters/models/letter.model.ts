@@ -77,9 +77,10 @@ export interface LetterSettings {
   priorities: string[];
 
   // Reference Number Auto-Generation Format Settings
+  organization_code?: string;     // e.g. 'DS' or 'MINPUB' or 'ONM'
   ref_prefix?: string;            // Default prefix code, e.g. 'LET'
   ref_prefixes?: LetterRefPrefix[]; // Multiple configured prefix types
-  ref_format?: string;            // e.g. '{PREFIX}/{YYYY}/{MM}/{SEQ}' or '{PREFIX}/{YYYY}/{SEQ}'
+  ref_format?: string;            // e.g. '{ORGANIZATION}/{PREFIX}/{YYYY}/{MM}/{SEQ}'
   ref_seq_digits?: number;        // e.g. 3, 4, 5
   ref_next_seq?: number;          // Global sequential fallback counter
   ref_auto_generate?: boolean;    // e.g. true
@@ -103,9 +104,10 @@ export const DEFAULT_LETTER_SETTINGS: LetterSettings = {
   ],
   priorities: ['Normal', 'Urgent', 'Immediate'],
 
+  organization_code: 'DS',
   ref_prefix: 'LET',
   ref_prefixes: DEFAULT_LETTER_PREFIXES,
-  ref_format: '{PREFIX}/{YYYY}/{MM}/{SEQ}',
+  ref_format: '{ORGANIZATION}/{PREFIX}/{YYYY}/{MM}/{SEQ}',
   ref_seq_digits: 3,
   ref_next_seq: 1,
   ref_auto_generate: true
@@ -122,6 +124,7 @@ export function generateLetterRefNumber(
   const mm = String(now.getMonth() + 1).padStart(2, '0');
   const dd = String(now.getDate()).padStart(2, '0');
 
+  const org = (settings.organization_code || 'DS').trim();
   const prefix = (prefixOverride || settings.ref_prefix || 'LET').trim();
   const digits = settings.ref_seq_digits || 3;
 
@@ -132,8 +135,10 @@ export function generateLetterRefNumber(
   }
   const seqStr = String(seqNum).padStart(digits, '0');
 
-  let pattern = settings.ref_format || '{PREFIX}/{YYYY}/{MM}/{SEQ}';
+  let pattern = settings.ref_format || '{ORGANIZATION}/{PREFIX}/{YYYY}/{MM}/{SEQ}';
   return pattern
+    .replace(/\{ORGANIZATION\}/g, org)
+    .replace(/\{ORG\}/g, org)
     .replace(/\{PREFIX\}/g, prefix)
     .replace(/\{YYYY\}/g, yyyy)
     .replace(/\{YY\}/g, yy)

@@ -96,6 +96,11 @@ import {
           <!-- Configuration Fields -->
           <div class="ref-settings-grid">
             <mat-form-field appearance="outline" class="compact-field" subscriptSizing="dynamic">
+              <mat-label>Organization Code</mat-label>
+              <input matInput [(ngModel)]="settings.organization_code" placeholder="e.g. DS, MINPUB, ONM">
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="compact-field" subscriptSizing="dynamic">
               <mat-label>Default Prefix Code</mat-label>
               <mat-select [(ngModel)]="settings.ref_prefix" (selectionChange)="onDefaultPrefixChange($event.value)">
                 <mat-option *ngFor="let p of settings.ref_prefixes" [value]="p.code">
@@ -106,7 +111,7 @@ import {
 
             <mat-form-field appearance="outline" class="compact-field format-pattern-field" subscriptSizing="dynamic">
               <mat-label>Format Pattern</mat-label>
-              <input matInput [(ngModel)]="settings.ref_format" placeholder="e.g. {PREFIX}/{YYYY}/{MM}/{SEQ}">
+              <input matInput [(ngModel)]="settings.ref_format" placeholder="e.g. {ORGANIZATION}/{PREFIX}/{YYYY}/{MM}/{SEQ}">
             </mat-form-field>
 
             <mat-form-field appearance="outline" class="compact-field" subscriptSizing="dynamic">
@@ -130,6 +135,7 @@ import {
           <div class="token-helper-block">
             <span class="helper-title">Click token to append:</span>
             <div class="token-chips">
+              <button type="button" class="token-btn" (click)="insertToken('{ORGANIZATION}')">&#123;ORGANIZATION&#125;</button>
               <button type="button" class="token-btn" (click)="insertToken('{PREFIX}')">&#123;PREFIX&#125;</button>
               <button type="button" class="token-btn" (click)="insertToken('{YYYY}')">&#123;YYYY&#125;</button>
               <button type="button" class="token-btn" (click)="insertToken('{YY}')">&#123;YY&#125;</button>
@@ -143,17 +149,20 @@ import {
           <div class="preset-helper-block">
             <span class="helper-title">Format Presets:</span>
             <div class="preset-chips">
+              <button type="button" class="preset-btn" (click)="setFormat('{ORGANIZATION}/{PREFIX}/{YYYY}/{MM}/{SEQ}')">
+                Standard (&#123;ORGANIZATION&#125;/&#123;PREFIX&#125;/&#123;YYYY&#125;/&#123;MM&#125;/&#123;SEQ&#125;)
+              </button>
+              <button type="button" class="preset-btn" (click)="setFormat('{ORGANIZATION}/{PREFIX}/{YYYY}/{SEQ}')">
+                Annual (&#123;ORGANIZATION&#125;/&#123;PREFIX&#125;/&#123;YYYY&#125;/&#123;SEQ&#125;)
+              </button>
+              <button type="button" class="preset-btn" (click)="setFormat('{ORGANIZATION}/{PREFIX}/{YYYY}/{MM}-{SEQ}')">
+                Divisional (&#123;ORGANIZATION&#125;/&#123;PREFIX&#125;/&#123;YYYY&#125;/&#123;MM&#125;-&#123;SEQ&#125;)
+              </button>
+              <button type="button" class="preset-btn" (click)="setFormat('{ORGANIZATION}-{PREFIX}-{YYYY}{MM}-{SEQ}')">
+                Hyphenated (&#123;ORGANIZATION&#125;-&#123;PREFIX&#125;-&#123;YYYY&#125;&#123;MM&#125;-&#123;SEQ&#125;)
+              </button>
               <button type="button" class="preset-btn" (click)="setFormat('{PREFIX}/{YYYY}/{MM}/{SEQ}')">
-                Monthly (&#123;PREFIX&#125;/&#123;YYYY&#125;/&#123;MM&#125;/&#123;SEQ&#125;)
-              </button>
-              <button type="button" class="preset-btn" (click)="setFormat('{PREFIX}/{YYYY}/{SEQ}')">
-                Annual (&#123;PREFIX&#125;/&#123;YYYY&#125;/&#123;SEQ&#125;)
-              </button>
-              <button type="button" class="preset-btn" (click)="setFormat('{PREFIX}/{YYYY}/{MM}-{SEQ}')">
-                Divisional (&#123;PREFIX&#125;/&#123;YYYY&#125;/&#123;MM&#125;-&#123;SEQ&#125;)
-              </button>
-              <button type="button" class="preset-btn" (click)="setFormat('{PREFIX}-{YYYY}{MM}-{SEQ}')">
-                Hyphenated (&#123;PREFIX&#125;-&#123;YYYY&#125;&#123;MM&#125;-&#123;SEQ&#125;)
+                Prefix Only (&#123;PREFIX&#125;/&#123;YYYY&#125;/&#123;MM&#125;/&#123;SEQ&#125;)
               </button>
             </div>
           </div>
@@ -541,10 +550,10 @@ import {
 
     .ref-settings-grid {
       display: grid;
-      grid-template-columns: 200px 1fr 180px 160px;
+      grid-template-columns: 160px 180px 1fr 180px 160px;
       gap: 12px;
       margin-bottom: 14px;
-      @media (max-width: 900px) {
+      @media (max-width: 1024px) {
         grid-template-columns: 1fr 1fr;
       }
       @media (max-width: 600px) {
@@ -750,6 +759,7 @@ export class LetterSettingsComponent implements OnInit {
         this.settings = { 
           ...DEFAULT_LETTER_SETTINGS,
           ...s,
+          organization_code: s.organization_code ?? DEFAULT_LETTER_SETTINGS.organization_code,
           ref_prefix: s.ref_prefix ?? DEFAULT_LETTER_SETTINGS.ref_prefix,
           ref_prefixes: (s.ref_prefixes && s.ref_prefixes.length > 0) ? [...s.ref_prefixes] : [...DEFAULT_LETTER_PREFIXES],
           ref_format: s.ref_format ?? DEFAULT_LETTER_SETTINGS.ref_format,

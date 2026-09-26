@@ -808,6 +808,7 @@ export class LetterDialogComponent implements OnInit {
         const merged: LetterSettings = {
           ...DEFAULT_LETTER_SETTINGS,
           ...s,
+          organization_code: s.organization_code ?? DEFAULT_LETTER_SETTINGS.organization_code,
           ref_prefix: s.ref_prefix ?? DEFAULT_LETTER_SETTINGS.ref_prefix,
           ref_prefixes: (s.ref_prefixes && s.ref_prefixes.length > 0) ? s.ref_prefixes : DEFAULT_LETTER_PREFIXES,
           ref_format: s.ref_format ?? DEFAULT_LETTER_SETTINGS.ref_format,
