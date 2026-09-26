@@ -1,6 +1,7 @@
-import { Component, inject, Output, EventEmitter, signal, computed } from '@angular/core';
+import { Component, inject, Output, EventEmitter, signal, computed, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterModule, Router } from '@angular/router';
+import { RouterModule, Router, NavigationEnd } from '@angular/router';
+import { filter, Subscription } from 'rxjs';
 import { AuthService } from '../../auth/auth.service';
 import { RbacService } from '../../auth/rbac.service';
 import { WorkPlanService } from '../../features/work-plans/services/work-plan.service';
@@ -16,7 +17,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
   templateUrl: './sidebar.component.html',
   styleUrl: './sidebar.component.scss'
 })
-export class SidebarComponent {
+export class SidebarComponent implements OnInit, OnDestroy {
   @Output() toggleCollapse = new EventEmitter<void>();
 
   authService = inject(AuthService);
@@ -24,7 +25,37 @@ export class SidebarComponent {
   router = inject(Router);
   workPlanService = inject(WorkPlanService);
 
-  workPlansExpanded = signal<boolean>(true);
+  workPlansExpanded = signal<boolean>(false);
+  lettersExpanded = signal<boolean>(false);
+
+  private routerSub?: Subscription;
+
+  ngOnInit() {
+    this.syncExpansionWithRoute(this.router.url);
+    this.routerSub = this.router.events.pipe(
+      filter((e): e is NavigationEnd => e instanceof NavigationEnd)
+    ).subscribe((event) => {
+      this.syncExpansionWithRoute(event.urlAfterRedirects || event.url);
+    });
+  }
+
+  ngOnDestroy() {
+    this.routerSub?.unsubscribe();
+  }
+
+  private syncExpansionWithRoute(url: string) {
+    if (url.startsWith('/work-plans')) {
+      this.workPlansExpanded.set(true);
+      this.lettersExpanded.set(false);
+    } else if (url.startsWith('/letters')) {
+      this.lettersExpanded.set(true);
+      this.workPlansExpanded.set(false);
+    } else {
+      // In the root (/dashboard) or other root sections, keep toggle submenus closed
+      this.workPlansExpanded.set(false);
+      this.lettersExpanded.set(false);
+    }
+  }
 
   canAccessVerification = computed(() => {
     if (this.rbacService.isAdmin() || this.rbacService.isSuperAdmin() || this.rbacService.isDivisionalAdmin()) {
@@ -65,8 +96,6 @@ export class SidebarComponent {
   isWorkPlansActive(): boolean {
     return this.router.url.startsWith('/work-plans');
   }
-
-  lettersExpanded = signal<boolean>(true);
 
   toggleLetters(event?: MouseEvent) {
     if (event) {
