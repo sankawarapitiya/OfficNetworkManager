@@ -9,9 +9,16 @@ import { MatInputModule } from '@angular/material/input';
 import { MatRadioModule } from '@angular/material/radio';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatSlideToggleModule } from '@angular/material/slide-toggle';
+import { MatSelectModule } from '@angular/material/select';
 
 import { LetterService } from '../../services/letter.service';
-import { LetterSettings, DEFAULT_LETTER_SETTINGS, ALL_LETTER_STATUSES } from '../../models/letter.model';
+import { 
+  LetterSettings, 
+  DEFAULT_LETTER_SETTINGS, 
+  ALL_LETTER_STATUSES,
+  generateLetterRefNumber 
+} from '../../models/letter.model';
 
 @Component({
   selector: 'app-letter-settings',
@@ -26,7 +33,9 @@ import { LetterSettings, DEFAULT_LETTER_SETTINGS, ALL_LETTER_STATUSES } from '..
     MatInputModule,
     MatRadioModule,
     MatChipsModule,
-    MatTooltipModule
+    MatTooltipModule,
+    MatSlideToggleModule,
+    MatSelectModule
   ],
   template: `
     <div class="page-container max-w-5xl mx-auto p-4 md:p-6">
@@ -34,12 +43,104 @@ import { LetterSettings, DEFAULT_LETTER_SETTINGS, ALL_LETTER_STATUSES } from '..
       <div class="page-header">
         <div>
           <h1 class="page-title">Letter Management Settings</h1>
-          <p class="page-desc">Configure storage destinations, network shares, letter categories, and workflow rules.</p>
+          <p class="page-desc">Configure storage destinations, reference number auto-generation, categories, and workflow rules.</p>
         </div>
         <button mat-flat-button color="primary" [disabled]="isSaving()" (click)="saveSettings()">
           <mat-icon>save</mat-icon> {{ isSaving() ? 'Saving...' : 'Save Settings' }}
         </button>
       </div>
+
+      <!-- Section 1: Reference Number Auto-Generation Format -->
+      <mat-card class="settings-card">
+        <div class="card-header">
+          <mat-icon class="sec-icon">pin</mat-icon>
+          <div>
+            <h3>Official Reference Number Auto-Generation</h3>
+            <span class="sub">Define custom numbering pattern, prefix, sequence padding, and running counters</span>
+          </div>
+        </div>
+
+        <div class="card-body">
+          <!-- Live Preview Banner -->
+          <div class="preview-banner">
+            <div class="preview-info">
+              <span class="preview-label">Live Reference Number Preview:</span>
+              <span class="preview-value">{{ previewRefNumber() }}</span>
+            </div>
+            <span class="preview-badge" [class.enabled]="settings.ref_auto_generate" [class.disabled]="!settings.ref_auto_generate">
+              {{ settings.ref_auto_generate ? 'Auto-Generation Active' : 'Auto-Generation Disabled' }}
+            </span>
+          </div>
+
+          <!-- Enable Toggle -->
+          <div class="form-row-toggle">
+            <mat-slide-toggle [(ngModel)]="settings.ref_auto_generate" color="primary">
+              <span class="toggle-text">Automatically populate Reference No. on new inward letter registration</span>
+            </mat-slide-toggle>
+          </div>
+
+          <!-- Configuration Fields -->
+          <div class="ref-settings-grid">
+            <mat-form-field appearance="outline" class="compact-field" subscriptSizing="dynamic">
+              <mat-label>Prefix Code</mat-label>
+              <input matInput [(ngModel)]="settings.ref_prefix" placeholder="e.g. LET, ADM, DS/LW">
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="compact-field format-pattern-field" subscriptSizing="dynamic">
+              <mat-label>Format Pattern</mat-label>
+              <input matInput [(ngModel)]="settings.ref_format" placeholder="e.g. {PREFIX}/{YYYY}/{MM}/{SEQ}">
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="compact-field" subscriptSizing="dynamic">
+              <mat-label>Sequence Digits (Padding)</mat-label>
+              <mat-select [(ngModel)]="settings.ref_seq_digits">
+                <mat-option [value]="2">2 Digits (01, 02..)</mat-option>
+                <mat-option [value]="3">3 Digits (001, 002..)</mat-option>
+                <mat-option [value]="4">4 Digits (0001, 0002..)</mat-option>
+                <mat-option [value]="5">5 Digits (00001..)</mat-option>
+                <mat-option [value]="6">6 Digits (000001..)</mat-option>
+              </mat-select>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="compact-field" subscriptSizing="dynamic">
+              <mat-label>Next Sequence Number</mat-label>
+              <input matInput type="number" min="1" [(ngModel)]="settings.ref_next_seq">
+            </mat-form-field>
+          </div>
+
+          <!-- Available Tokens & Quick Insert -->
+          <div class="token-helper-block">
+            <span class="helper-title">Click token to append:</span>
+            <div class="token-chips">
+              <button type="button" class="token-btn" (click)="insertToken('{PREFIX}')">&#123;PREFIX&#125;</button>
+              <button type="button" class="token-btn" (click)="insertToken('{YYYY}')">&#123;YYYY&#125;</button>
+              <button type="button" class="token-btn" (click)="insertToken('{YY}')">&#123;YY&#125;</button>
+              <button type="button" class="token-btn" (click)="insertToken('{MM}')">&#123;MM&#125;</button>
+              <button type="button" class="token-btn" (click)="insertToken('{DD}')">&#123;DD&#125;</button>
+              <button type="button" class="token-btn" (click)="insertToken('{SEQ}')">&#123;SEQ&#125;</button>
+            </div>
+          </div>
+
+          <!-- Presets -->
+          <div class="preset-helper-block">
+            <span class="helper-title">Format Presets:</span>
+            <div class="preset-chips">
+              <button type="button" class="preset-btn" (click)="setFormat('{PREFIX}/{YYYY}/{MM}/{SEQ}')">
+                Monthly (&#123;PREFIX&#125;/&#123;YYYY&#125;/&#123;MM&#125;/&#123;SEQ&#125;)
+              </button>
+              <button type="button" class="preset-btn" (click)="setFormat('{PREFIX}/{YYYY}/{SEQ}')">
+                Annual (&#123;PREFIX&#125;/&#123;YYYY&#125;/&#123;SEQ&#125;)
+              </button>
+              <button type="button" class="preset-btn" (click)="setFormat('{PREFIX}/{YYYY}/{MM}-{SEQ}')">
+                Divisional (&#123;PREFIX&#125;/&#123;YYYY&#125;/&#123;MM&#125;-&#123;SEQ&#125;)
+              </button>
+              <button type="button" class="preset-btn" (click)="setFormat('{PREFIX}-{YYYY}{MM}-{SEQ}')">
+                Hyphenated (&#123;PREFIX&#125;-&#123;YYYY&#125;&#123;MM&#125;-&#123;SEQ&#125;)
+              </button>
+            </div>
+          </div>
+        </div>
+      </mat-card>
 
       <!-- Section 1: Storage Destination & Network Locations -->
       <mat-card class="settings-card">
@@ -265,6 +366,127 @@ import { LetterSettings, DEFAULT_LETTER_SETTINGS, ALL_LETTER_STATUSES } from '..
       &.dispatched { background: #e0e7ff; color: #4338ca; }
       &.archived { background: #f1f5f9; color: #64748b; }
     }
+
+    /* Reference Number Auto-Generation Settings Styles */
+    .preview-banner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+      background: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%);
+      border: 1.5px solid #a7f3d0;
+      border-radius: 8px;
+      padding: 12px 16px;
+      margin-bottom: 14px;
+      .preview-info {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+      .preview-label {
+        font-size: 11.5px;
+        font-weight: 600;
+        color: #065f46;
+      }
+      .preview-value {
+        font-family: monospace;
+        font-size: 15px;
+        font-weight: 700;
+        color: #047857;
+        background: #ffffff;
+        padding: 3px 10px;
+        border-radius: 6px;
+        border: 1px solid #6ee7b7;
+        letter-spacing: 0.05em;
+      }
+      .preview-badge {
+        font-size: 10.5px;
+        font-weight: 700;
+        padding: 3px 8px;
+        border-radius: 999px;
+        &.enabled { background: #dcfce7; color: #15803d; border: 1px solid #86efac; }
+        &.disabled { background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; }
+      }
+    }
+
+    .form-row-toggle {
+      margin-bottom: 14px;
+      .toggle-text {
+        font-size: 12px;
+        font-weight: 600;
+        color: #1e293b;
+      }
+    }
+
+    .ref-settings-grid {
+      display: grid;
+      grid-template-columns: 160px 1fr 180px 180px;
+      gap: 12px;
+      margin-bottom: 14px;
+      @media (max-width: 900px) {
+        grid-template-columns: 1fr 1fr;
+      }
+      @media (max-width: 600px) {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .token-helper-block, .preset-helper-block {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 10px;
+      .helper-title {
+        font-size: 11px;
+        font-weight: 700;
+        color: #64748b;
+        min-width: 130px;
+      }
+    }
+
+    .token-chips, .preset-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .token-btn {
+      background: #f1f5f9;
+      border: 1px solid #cbd5e1;
+      border-radius: 4px;
+      padding: 3px 8px;
+      font-size: 11px;
+      font-family: monospace;
+      font-weight: 600;
+      color: #334155;
+      cursor: pointer;
+      transition: all 0.15s;
+      &:hover {
+        background: #059669;
+        color: white;
+        border-color: #059669;
+      }
+    }
+
+    .preset-btn {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      padding: 4px 10px;
+      font-size: 11px;
+      font-weight: 600;
+      color: #475569;
+      cursor: pointer;
+      transition: all 0.15s;
+      &:hover {
+        background: #eff6ff;
+        color: #1d4ed8;
+        border-color: #93c5fd;
+      }
+    }
   `]
 })
 export class LetterSettingsComponent implements OnInit {
@@ -279,9 +501,33 @@ export class LetterSettingsComponent implements OnInit {
   ngOnInit() {
     this.letterService.getSettings().subscribe(s => {
       if (s) {
-        this.settings = { ...s };
+        this.settings = { 
+          ...DEFAULT_LETTER_SETTINGS,
+          ...s,
+          ref_prefix: s.ref_prefix ?? DEFAULT_LETTER_SETTINGS.ref_prefix,
+          ref_format: s.ref_format ?? DEFAULT_LETTER_SETTINGS.ref_format,
+          ref_seq_digits: s.ref_seq_digits ?? DEFAULT_LETTER_SETTINGS.ref_seq_digits,
+          ref_next_seq: s.ref_next_seq ?? DEFAULT_LETTER_SETTINGS.ref_next_seq,
+          ref_auto_generate: s.ref_auto_generate ?? DEFAULT_LETTER_SETTINGS.ref_auto_generate
+        };
       }
     });
+  }
+
+  previewRefNumber(): string {
+    return generateLetterRefNumber(this.settings, this.settings.ref_next_seq || 1);
+  }
+
+  insertToken(token: string) {
+    if (!this.settings.ref_format) {
+      this.settings.ref_format = token;
+    } else {
+      this.settings.ref_format += '/' + token;
+    }
+  }
+
+  setFormat(pattern: string) {
+    this.settings.ref_format = pattern;
   }
 
   addNetworkLocation() {

@@ -22,7 +22,8 @@ import {
   LetterStatus, 
   ALL_LETTER_STATUSES, 
   DEFAULT_LETTER_SETTINGS, 
-  LetterSettings 
+  LetterSettings,
+  generateLetterRefNumber
 } from '../../models/letter.model';
 import { LetterService } from '../../services/letter.service';
 import { SettingsService, Department } from '../../../settings/settings.service';
@@ -331,27 +332,37 @@ import { AppUser } from '../../../profile/profile.component';
     </mat-dialog-actions>
   `,
   styles: [`
+    :host {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      max-height: 92vh;
+      overflow: hidden;
+      box-sizing: border-box;
+    }
+
     .dialog-header {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 12px 20px;
+      padding: 14px 22px;
       border-bottom: 1px solid #e2e8f0;
       background: #f8fafc;
+      flex-shrink: 0;
       .title-wrap {
         display: flex;
         align-items: center;
         gap: 12px;
         .hdr-icon-box {
-          width: 36px;
-          height: 36px;
+          width: 38px;
+          height: 38px;
           border-radius: 8px;
           background: #ecfdf5;
           color: #059669;
           display: flex;
           align-items: center;
           justify-content: center;
-          mat-icon { font-size: 20px; width: 20px; height: 20px; }
+          mat-icon { font-size: 22px; width: 22px; height: 22px; }
         }
         .header-text-group {
           display: flex;
@@ -368,7 +379,7 @@ import { AppUser } from '../../../profile/profile.component';
         .dialog-title {
           margin: 0 !important;
           padding: 0 !important;
-          font-size: 15px;
+          font-size: 16px;
           font-weight: 700;
           color: #0f172a;
           line-height: 1.2;
@@ -385,9 +396,12 @@ import { AppUser } from '../../../profile/profile.component';
     }
 
     .dialog-body {
-      padding: 14px 20px;
-      max-height: 82vh;
+      padding: 16px 22px !important;
+      margin: 0 !important;
+      flex: 1 1 auto;
+      max-height: calc(92vh - 128px) !important;
       overflow-y: auto;
+      box-sizing: border-box;
     }
 
     .form-container {
@@ -649,10 +663,12 @@ import { AppUser } from '../../../profile/profile.component';
     }
 
     .dialog-actions {
-      padding: 10px 20px;
+      padding: 12px 22px !important;
+      margin: 0 !important;
       border-top: 1px solid #e2e8f0;
       background: #f8fafc;
-      gap: 8px;
+      flex-shrink: 0;
+      gap: 10px;
       .cancel-btn { height: 34px; font-size: 12px; color: #64748b; }
       .submit-btn {
         height: 34px;
@@ -682,6 +698,7 @@ export class LetterDialogComponent implements OnInit {
 
   linkRefSearch = signal<string>('');
 
+  letterSettings = signal<LetterSettings>(DEFAULT_LETTER_SETTINGS);
   storageType: 'firebase' | 'network' = 'firebase';
   selectedNetworkLocation: string = '';
   attachments = signal<LetterAttachment[]>([]);
@@ -751,11 +768,30 @@ export class LetterDialogComponent implements OnInit {
   loadSettings() {
     this.letterService.getSettings().subscribe(s => {
       if (s) {
-        this.categories.set(s.categories || DEFAULT_LETTER_SETTINGS.categories);
-        this.networkLocations.set(s.network_storage_locations || DEFAULT_LETTER_SETTINGS.network_storage_locations);
-        this.storageType = s.default_storage || 'firebase';
-        if (this.networkLocations().length > 0) {
+        const merged: LetterSettings = {
+          ...DEFAULT_LETTER_SETTINGS,
+          ...s,
+          ref_prefix: s.ref_prefix ?? DEFAULT_LETTER_SETTINGS.ref_prefix,
+          ref_format: s.ref_format ?? DEFAULT_LETTER_SETTINGS.ref_format,
+          ref_seq_digits: s.ref_seq_digits ?? DEFAULT_LETTER_SETTINGS.ref_seq_digits,
+          ref_next_seq: s.ref_next_seq ?? DEFAULT_LETTER_SETTINGS.ref_next_seq,
+          ref_auto_generate: s.ref_auto_generate ?? DEFAULT_LETTER_SETTINGS.ref_auto_generate
+        };
+        this.letterSettings.set(merged);
+        this.categories.set(merged.categories || DEFAULT_LETTER_SETTINGS.categories);
+        this.networkLocations.set(merged.network_storage_locations || DEFAULT_LETTER_SETTINGS.network_storage_locations);
+        this.storageType = merged.default_storage || 'firebase';
+        if (this.networkLocations().length > 0 && !this.selectedNetworkLocation) {
           this.selectedNetworkLocation = this.networkLocations()[0];
+        }
+
+        // If this is a new letter registration and auto-generation is enabled and ref_number is blank, populate it
+        if (!this.data?.letter) {
+          const currentRef = this.form.get('ref_number')?.value;
+          if (!currentRef && merged.ref_auto_generate !== false) {
+            const generated = generateLetterRefNumber(merged, merged.ref_next_seq || 1);
+            this.form.patchValue({ ref_number: generated });
+          }
         }
       }
     });
@@ -778,12 +814,9 @@ export class LetterDialogComponent implements OnInit {
   }
 
   generateRefNumber() {
-    const now = new Date();
-    const y = now.getFullYear();
-    const m = String(now.getMonth() + 1).padStart(2, '0');
-    const rnd = Math.floor(1000 + Math.random() * 9000);
-    const ref = 'LET/' + y + '/' + m + '/' + rnd;
-    this.form.patchValue({ ref_number: ref });
+    const s = this.letterSettings();
+    const generated = generateLetterRefNumber(s, s.ref_next_seq || 1);
+    this.form.patchValue({ ref_number: generated });
   }
 
   async onFileSelected(event: any) {
@@ -884,6 +917,15 @@ export class LetterDialogComponent implements OnInit {
         await this.letterService.updateLetter(this.data.letter.id, payload, 'Updated letter properties via form');
       } else {
         await this.letterService.addLetter(payload as Omit<Letter, 'id'>);
+        // Increment next sequence counter in settings if auto-generation is enabled
+        const s = this.letterSettings();
+        if (s.ref_auto_generate !== false) {
+          const nextSeq = (s.ref_next_seq || 1) + 1;
+          this.letterService.saveSettings({
+            ...s,
+            ref_next_seq: nextSeq
+          }).catch(err => console.warn('Could not increment reference sequence number:', err));
+        }
       }
       this.dialogRef.close(true);
     } catch (err) {
