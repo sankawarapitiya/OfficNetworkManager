@@ -117,6 +117,100 @@
 
   </div>
 
+  <!-- User Mail / Inward Official Letters Notification Card -->
+  <mat-card class="mail-notification-card">
+    <div class="mail-card-header">
+      <div class="mail-header-info">
+        <div class="mail-icon-badge" [class.has-pending]="userPendingLettersCount() > 0">
+          <mat-icon>mail</mat-icon>
+          <span class="ping-dot" *ngIf="userPendingLettersCount() > 0"></span>
+        </div>
+        <div class="mail-header-text">
+          <div class="mail-title-row">
+            <h2>My Inward Official Letters & Directives</h2>
+            <span class="count-pill" *ngIf="userPendingLettersCount() > 0">
+              {{ userPendingLettersCount() }} Pending
+            </span>
+            <span class="urgent-pill" *ngIf="userUrgentLettersCount() > 0">
+              <mat-icon>priority_high</mat-icon> {{ userUrgentLettersCount() }} Urgent
+            </span>
+            <span class="dept-pill" *ngIf="userDepartment()">
+              <mat-icon>business</mat-icon> {{ userDepartment() }}
+            </span>
+          </div>
+          <p class="mail-subtitle">
+            Incoming official mail and directives routed to your department or assigned directly to your officer profile
+          </p>
+        </div>
+      </div>
+
+      <div class="mail-header-actions">
+        <button mat-stroked-button color="primary" routerLink="/letters/inbox">
+          <mat-icon>mark_email_unread</mat-icon> View All Inbox
+        </button>
+        <button mat-flat-button color="primary" routerLink="/letters/inward">
+          <mat-icon>add</mat-icon> Register Inward
+        </button>
+      </div>
+    </div>
+
+    <!-- Letter Items Grid / Empty State -->
+    <div class="mail-content-area">
+      <div class="letters-preview-grid" *ngIf="userRecentLetters().length > 0; else noLettersTemplate">
+        <div class="letter-preview-card" *ngFor="let letter of userRecentLetters()" [routerLink]="['/letters/inbox']">
+          <div class="letter-card-top">
+            <span class="letter-ref-badge">{{ letter.ref_number }}</span>
+            <div class="card-pills">
+              <span class="priority-pill" [ngClass]="getPriorityBadgeClass(letter.priority)">
+                {{ letter.priority || 'Normal' }}
+              </span>
+              <span class="assigned-type-badge" [class.direct]="isDirectlyAssigned(letter)">
+                <mat-icon>{{ isDirectlyAssigned(letter) ? 'person' : 'apartment' }}</mat-icon>
+                {{ isDirectlyAssigned(letter) ? 'Assigned to You' : (userDepartment() || 'Department') }}
+              </span>
+            </div>
+          </div>
+
+          <h4 class="letter-title" [matTooltip]="letter.title">{{ letter.title }}</h4>
+
+          <div class="letter-meta-row">
+            <span class="meta-item sender" [matTooltip]="letter.received_from || 'Sender'">
+              <mat-icon>domain</mat-icon> {{ letter.received_from || 'Official Sender' }}
+            </span>
+            <span class="meta-item date" *ngIf="letter.received_date">
+              <mat-icon>schedule</mat-icon> {{ letter.received_date }}
+            </span>
+          </div>
+
+          <div class="letter-card-footer">
+            <span class="letter-status-pill" [ngClass]="getStatusBadgeClass(letter.status)">
+              {{ letter.status }}
+            </span>
+            <span class="view-link">
+              Open Letter <mat-icon>arrow_forward</mat-icon>
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Empty State -->
+      <ng-template #noLettersTemplate>
+        <div class="empty-mail-state">
+          <div class="empty-icon-wrap">
+            <mat-icon>drafts</mat-icon>
+          </div>
+          <div class="empty-text">
+            <h3>No Pending Inward Letters</h3>
+            <p>You have no pending official letters requiring attention assigned to you or {{ userDepartment() ? 'the ' + userDepartment() + ' department' : 'your department' }}.</p>
+          </div>
+          <button mat-stroked-button routerLink="/letters/inbox">
+            <mat-icon>folder_open</mat-icon> Open Letter Registry
+          </button>
+        </div>
+      </ng-template>
+    </div>
+  </mat-card>
+
   <!-- Central Split Grid: Recent Activity & Data Table -->
   <div class="dashboard-grid-content">
     

@@ -1,4 +1,4 @@
-﻿import { Injectable, inject } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { Observable, from, of } from 'rxjs';
 import { map, catchError } from 'rxjs/operators';
 import { Storage, ref, uploadBytes, getDownloadURL } from '@angular/fire/storage';
@@ -57,6 +57,49 @@ export class LetterService {
    */
   getLetterById(id: string): Observable<Letter | undefined> {
     return this.firestoreService.getDocument<Letter>(`${this.lettersCollection}/${id}`);
+  }
+
+  /**
+   * Filter letters that belong to a specific user (assigned officer or target department)
+   */
+  filterLettersForUser(
+    letters: Letter[], 
+    user: { uid?: string | null; email?: string | null; displayName?: string | null } | null | undefined, 
+    department?: string | null
+  ): Letter[] {
+    if (!user && !department) return [];
+
+    const uid = user?.uid?.toLowerCase().trim();
+    const email = user?.email?.toLowerCase().trim();
+    const name = user?.displayName?.toLowerCase().trim();
+    const dept = department?.toLowerCase().trim();
+
+    return letters.filter(l => {
+      // 1. Direct assignment to officer
+      if (l.assigned_to && l.assigned_to.length > 0) {
+        const assignedMatch = l.assigned_to.some(a => {
+          const val = a.toLowerCase().trim();
+          return (uid && val === uid) || (email && val === email) || (name && val === name);
+        });
+        if (assignedMatch) return true;
+      }
+
+      if (l.assigned_user_names && l.assigned_user_names.length > 0 && name) {
+        const nameMatch = l.assigned_user_names.some(uName => uName.toLowerCase().trim() === name);
+        if (nameMatch) return true;
+      }
+
+      // 2. Department assignment
+      if (dept && l.send_to && l.send_to.length > 0) {
+        const deptMatch = l.send_to.some(targetDept => {
+          const t = targetDept.toLowerCase().trim();
+          return t === dept || t.includes(dept) || dept.includes(t);
+        });
+        if (deptMatch) return true;
+      }
+
+      return false;
+    });
   }
 
   /**

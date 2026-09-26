@@ -21,6 +21,60 @@
 
   <div class="divider-vertical"></div>
 
+  <!-- Letter / Official Mail Notifications with Badge -->
+  <button mat-icon-button [matMenuTriggerFor]="lettersMenu" class="action-icon-btn letter-notif-btn" matTooltip="Official Letters & Inward Mails">
+    <mat-icon [matBadge]="userPendingCount()" [matBadgeHidden]="userPendingCount() === 0" matBadgeColor="warn" [class.has-letters]="userPendingCount() > 0">
+      mail
+    </mat-icon>
+  </button>
+
+  <mat-menu #lettersMenu="matMenu" class="letters-menu notifications-menu" xPosition="before">
+    <div class="notifications-header">
+      <div class="notif-title-group">
+        <h3>Inward Official Letters</h3>
+        <span class="notif-count letter-count" [class.has-pending]="userPendingCount() > 0">
+          {{ userPendingCount() }} pending for you
+        </span>
+      </div>
+      <a routerLink="/letters/inbox" class="view-all-link">View Registry</a>
+    </div>
+    <mat-divider></mat-divider>
+    
+    <div *ngIf="userLetters().length === 0" class="no-logs">
+      <mat-icon>mark_email_read</mat-icon>
+      <p>No official letters assigned to you or your department.</p>
+    </div>
+
+    <div class="logs-scroll-area" *ngIf="userLetters().length > 0">
+      <a *ngFor="let l of userLetters().slice(0, 8)" 
+         class="letter-menu-item" 
+         [routerLink]="['/letters/inbox']" 
+         [queryParams]="{ search: l.ref_number }">
+        <div class="letter-item-content">
+          <div class="letter-item-top">
+            <span class="letter-ref-badge">{{ l.ref_number }}</span>
+            <span class="priority-pill" [ngClass]="l.priority.toLowerCase()">{{ l.priority }}</span>
+            <span class="status-pill" [ngClass]="l.status.toLowerCase().replace(' ', '-')">{{ l.status }}</span>
+          </div>
+          <p class="letter-item-title">{{ l.title }}</p>
+          <div class="letter-item-meta">
+            <span class="meta-from"><mat-icon>business</mat-icon> {{ l.received_from }}</span>
+            <span class="meta-date">{{ l.received_date }}</span>
+          </div>
+        </div>
+      </a>
+    </div>
+
+    <mat-divider *ngIf="userLetters().length > 0"></mat-divider>
+    <div class="letter-menu-footer" *ngIf="userLetters().length > 0">
+      <a mat-button color="primary" routerLink="/letters/inbox" class="footer-link-btn">
+        <mat-icon>inbox</mat-icon> Open Letter Management Inbox
+      </a>
+    </div>
+  </mat-menu>
+
+  <div class="divider-vertical"></div>
+
   <!-- Notifications Bell with Menu -->
   <button mat-icon-button [matMenuTriggerFor]="notificationsMenu" (click)="markRead()" class="action-icon-btn" matTooltip="Notifications & Event Logs">
     <mat-icon [class.has-unread]="hasUnread()">notifications_none</mat-icon>

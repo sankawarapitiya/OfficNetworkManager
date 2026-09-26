@@ -8,10 +8,14 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatTableModule } from '@angular/material/table';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatBadgeModule } from '@angular/material/badge';
 import { AuthService } from '../../auth/auth.service';
+import { RbacService } from '../../auth/rbac.service';
 import { EventLogService, EventLog } from '../../core/services/event-log.service';
 import { WorkPlanService, WorkPlan } from '../work-plans/services/work-plan.service';
 import { CustomerService, Customer } from '../customers/services/customer.service';
+import { LetterService } from '../letters/services/letter.service';
+import { Letter } from '../letters/models/letter.model';
 
 export interface ProjectItem {
   id: string;
@@ -37,20 +41,24 @@ export interface ProjectItem {
     MatButtonModule,
     MatTableModule,
     MatMenuModule,
-    MatTooltipModule
+    MatTooltipModule,
+    MatBadgeModule
   ],
   templateUrl: './dashboard.component.html',
   styleUrl: './dashboard.component.scss'
 })
 export class DashboardComponent implements OnInit {
   authService = inject(AuthService);
+  private rbacService = inject(RbacService);
   private eventLogService = inject(EventLogService);
   private workPlanService = inject(WorkPlanService);
   private customerService = inject(CustomerService);
+  private letterService = inject(LetterService);
 
   recentActivity = signal<EventLog[]>([]);
   workPlans = signal<WorkPlan[]>([]);
   customers = signal<Customer[]>([]);
+  allLetters = signal<Letter[]>([]);
 
   displayedColumns: string[] = ['name', 'category', 'owner', 'status', 'progress', 'dueDate', 'actions'];
 
@@ -107,6 +115,31 @@ export class DashboardComponent implements OnInit {
     return list;
   });
 
+  // User Letter Notifications
+  userDepartment = computed(() => this.rbacService.userDepartment() || '');
+
+  userLetters = computed(() => {
+    const user = this.authService.currentUser();
+    const dept = this.userDepartment();
+    return this.letterService.filterLettersForUser(this.allLetters(), user, dept);
+  });
+
+  userPendingLetters = computed(() => {
+    return this.userLetters().filter(l => 
+      l.status !== 'Completed' && l.status !== 'Archived' && l.status !== 'Dispatched'
+    );
+  });
+
+  userPendingLettersCount = computed(() => this.userPendingLetters().length);
+
+  userUrgentLettersCount = computed(() => {
+    return this.userPendingLetters().filter(l => l.priority === 'Urgent' || l.priority === 'Immediate').length;
+  });
+
+  userRecentLetters = computed(() => {
+    return this.userPendingLetters().slice(0, 4);
+  });
+
   ngOnInit() {
     this.eventLogService.getAllLogs().subscribe({
       next: (logs) => {
@@ -123,6 +156,11 @@ export class DashboardComponent implements OnInit {
     this.customerService.getCustomers().subscribe({
       next: (custs) => this.customers.set(custs || []),
       error: () => this.customers.set([])
+    });
+
+    this.letterService.getLetters().subscribe({
+      next: (letters) => this.allLetters.set(letters || []),
+      error: () => this.allLetters.set([])
     });
   }
 
@@ -141,5 +179,45 @@ export class DashboardComponent implements OnInit {
 
   setFilter(status: string) {
     this.selectedFilter.set(status);
+  }
+
+  isDirectlyAssigned(letter: Letter): boolean {
+    const user = this.authService.currentUser();
+    if (!user) return false;
+    const uid = user.uid?.toLowerCase().trim();
+    const email = user.email?.toLowerCase().trim();
+    const name = user.displayName?.toLowerCase().trim();
+
+    if (letter.assigned_to && letter.assigned_to.length > 0) {
+      const match = letter.assigned_to.some(a => {
+        const val = a.toLowerCase().trim();
+        return (uid && val === uid) || (email && val === email) || (name && val === name);
+      });
+      if (match) return true;
+    }
+
+    if (letter.assigned_user_names && letter.assigned_user_names.length > 0 && name) {
+      if (letter.assigned_user_names.some(uName => uName.toLowerCase().trim() === name)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  getPriorityBadgeClass(priority: string | undefined): string {
+    const p = (priority || '').toLowerCase();
+    if (p === 'immediate' || p === 'urgent') return 'priority-urgent';
+    if (p === 'normal' || p === 'medium') return 'priority-normal';
+    return 'priority-low';
+  }
+
+  getStatusBadgeClass(status: string | undefined): string {
+    const s = (status || '').toLowerCase();
+    if (s.includes('action') || s.includes('urgent')) return 'status-action';
+    if (s.includes('review') || s.includes('progress')) return 'status-progress';
+    if (s.includes('received')) return 'status-received';
+    if (s.includes('complete') || s.includes('closed')) return 'status-completed';
+    return 'status-default';
   }
 }
