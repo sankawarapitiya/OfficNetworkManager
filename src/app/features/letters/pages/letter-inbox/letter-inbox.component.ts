@@ -1071,9 +1071,9 @@ export class LetterInboxComponent implements OnInit {
 
   openEditDialog(letter: Letter) {
     this.dialog.open(LetterDialogComponent, {
-      width: '840px',
-      maxWidth: '95vw',
-      maxHeight: '92vh',
+      width: letter.attachments?.length ? '1440px' : '840px',
+      maxWidth: '96vw',
+      maxHeight: '94vh',
       panelClass: 'letter-dialog-overlay',
       autoFocus: false,
       data: { letter }
@@ -1082,8 +1082,10 @@ export class LetterInboxComponent implements OnInit {
 
   openDetail(letter: Letter) {
     this.dialog.open(LetterDetailDialogComponent, {
-      width: '800px',
+      width: letter.attachments?.length ? '1440px' : '780px',
       maxWidth: '96vw',
+      maxHeight: '94vh',
+      panelClass: 'letter-detail-dialog-overlay',
       data: { letter }
     });
   }

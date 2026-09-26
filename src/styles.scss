@@ -494,7 +494,8 @@ html, body {
 /* ==========================================================================
    Letter Dialog Overlay Window Page Alignment
    ========================================================================== */
-.letter-dialog-overlay {
+.letter-dialog-overlay,
+.letter-detail-dialog-overlay {
   .mat-mdc-dialog-container {
     --mdc-dialog-container-shape: 14px;
     padding: 0 !important;
@@ -504,8 +505,9 @@ html, body {
       overflow: hidden !important;
       display: flex !important;
       flex-direction: column !important;
-      max-height: 92vh !important;
+      max-height: 94vh !important;
       box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.15), 0 10px 10px -5px rgba(0, 0, 0, 0.05) !important;
     }
   }
 }
+

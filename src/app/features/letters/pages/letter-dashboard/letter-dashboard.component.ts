@@ -508,8 +508,10 @@ export class LetterDashboardComponent implements OnInit {
 
   openDetail(letter: Letter) {
     this.dialog.open(LetterDetailDialogComponent, {
-      width: '800px',
+      width: letter.attachments?.length ? '1440px' : '780px',
       maxWidth: '96vw',
+      maxHeight: '94vh',
+      panelClass: 'letter-detail-dialog-overlay',
       data: { letter }
     });
   }

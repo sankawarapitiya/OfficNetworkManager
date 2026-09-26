@@ -1,5 +1,6 @@
 import { Component, Inject, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule, FormsModule } from '@angular/forms';
 import { MAT_DIALOG_DATA, MatDialogRef, MatDialogModule } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -64,13 +65,28 @@ import { AppUser } from '../../../profile/profile.component';
           <h2 mat-dialog-title class="dialog-title">{{ data.letter ? 'Edit Official Letter' : 'Register Inward Official Letter' }}</h2>
         </div>
       </div>
-      <button mat-icon-button mat-dialog-close class="close-btn" matTooltip="Close dialog">
-        <mat-icon>close</mat-icon>
-      </button>
+      <div class="hdr-actions">
+        <button *ngIf="attachments().length > 0"
+                mat-stroked-button
+                type="button"
+                class="side-toggle-btn"
+                [class.active]="showSidePreview()"
+                (click)="toggleSidePreview()"
+                matTooltip="Toggle side document viewer">
+          <mat-icon>{{ showSidePreview() ? 'visibility_off' : 'dock_to_right' }}</mat-icon>
+          <span>{{ showSidePreview() ? 'Hide Document' : 'View Document (' + attachments().length + ')' }}</span>
+        </button>
+
+        <button mat-icon-button mat-dialog-close class="close-btn" matTooltip="Close dialog">
+          <mat-icon>close</mat-icon>
+        </button>
+      </div>
     </div>
 
-    <mat-dialog-content class="dialog-body">
-      <form [formGroup]="form" class="form-container">
+    <div class="dialog-split-wrapper" [class.has-side-viewer]="showSidePreview() && selectedAttachment()">
+      <div class="form-scroll-pane">
+        <mat-dialog-content class="dialog-body">
+          <form [formGroup]="form" class="form-container">
 
         <!-- SECTION 1: Identification & Subject -->
         <div class="section-block">
@@ -320,8 +336,18 @@ import { AppUser } from '../../../profile/profile.component';
                   </div>
                 </div>
                 <div class="att-actions">
-                  <a *ngIf="att.storage_url" [href]="att.storage_url" target="_blank" mat-icon-button color="primary" matTooltip="Download / View" class="icon-btn-xs">
-                    <mat-icon>visibility</mat-icon>
+                  <button *ngIf="att.storage_url" 
+                          type="button" 
+                          mat-icon-button 
+                          color="primary" 
+                          (click)="previewAttachmentOnSide(att, i)" 
+                          matTooltip="View document on side of window" 
+                          class="icon-btn-xs"
+                          [class.btn-active]="showSidePreview() && selectedAttachment() === att">
+                    <mat-icon>dock_to_right</mat-icon>
+                  </button>
+                  <a *ngIf="att.storage_url" [href]="att.storage_url" target="_blank" mat-icon-button color="primary" matTooltip="Download / Open in separate tab" class="icon-btn-xs">
+                    <mat-icon>open_in_new</mat-icon>
                   </a>
                   <button mat-icon-button color="warn" type="button" (click)="removeAttachment(i)" matTooltip="Remove" class="icon-btn-xs">
                     <mat-icon>delete</mat-icon>
@@ -343,6 +369,110 @@ import { AppUser } from '../../../profile/profile.component';
         <span>{{ isSaving() ? 'Saving...' : (data.letter ? 'Save Changes' : 'Register Official Letter') }}</span>
       </button>
     </mat-dialog-actions>
+  </div>
+
+  <!-- Right side: Document Side Viewer -->
+  <div class="doc-side-viewer" *ngIf="showSidePreview() && selectedAttachment()">
+    <div class="side-viewer-header">
+      <div class="viewer-file-info">
+        <mat-icon class="file-badge-icon" [ngClass]="selectedAttachment()?.storage_destination">
+          {{ isPdf(selectedAttachment()) ? 'picture_as_pdf' : (isImage(selectedAttachment()) ? 'image' : 'description') }}
+        </mat-icon>
+        <div class="file-text-wrap">
+          <span class="file-name" [matTooltip]="selectedAttachment()?.name || ''">{{ selectedAttachment()?.name }}</span>
+          <span class="file-details">
+            {{ ((selectedAttachment()?.size || 0) / 1024).toFixed(1) }} KB • 
+            {{ selectedAttachment()?.storage_destination === 'firebase' ? 'Cloud File' : 'Network File' }}
+          </span>
+        </div>
+      </div>
+
+      <div class="file-tabs-bar" *ngIf="attachments().length > 1">
+        <button *ngFor="let att of attachments(); let i = index"
+                type="button"
+                class="file-tab-chip"
+                [class.active]="selectedAttachment() === att"
+                (click)="previewAttachmentOnSide(att, i)"
+                [matTooltip]="att.name">
+          Doc {{ i + 1 }}
+        </button>
+      </div>
+
+      <div class="viewer-actions">
+        <ng-container *ngIf="isImage(selectedAttachment())">
+          <button mat-icon-button type="button" (click)="zoomOut()" matTooltip="Zoom Out" class="ctrl-btn">
+            <mat-icon>zoom_out</mat-icon>
+          </button>
+          <span class="zoom-pct">{{ zoomLevel() }}%</span>
+          <button mat-icon-button type="button" (click)="zoomIn()" matTooltip="Zoom In" class="ctrl-btn">
+            <mat-icon>zoom_in</mat-icon>
+          </button>
+          <button mat-icon-button type="button" (click)="resetZoom()" matTooltip="Reset Zoom" class="ctrl-btn">
+            <mat-icon>restart_alt</mat-icon>
+          </button>
+        </ng-container>
+
+        <a *ngIf="selectedAttachment()?.storage_url" 
+           [href]="selectedAttachment()?.storage_url" 
+           target="_blank" 
+           mat-icon-button 
+           matTooltip="Open in separate tab" 
+           class="ctrl-btn">
+          <mat-icon>open_in_new</mat-icon>
+        </a>
+
+        <button mat-icon-button type="button" (click)="toggleSidePreview()" matTooltip="Close document side view" class="ctrl-btn close-side-btn">
+          <mat-icon>chevron_right</mat-icon>
+        </button>
+      </div>
+    </div>
+
+    <div class="side-viewer-canvas">
+      <!-- 1. PDF Viewer with embedded iframe -->
+      <div *ngIf="isPdf(selectedAttachment()) && selectedAttachment()?.storage_url" class="pdf-viewer-wrap">
+        <iframe [src]="safeDocUrl()" class="pdf-iframe" title="PDF Document Viewer"></iframe>
+      </div>
+
+      <!-- 2. Image Viewer -->
+      <div *ngIf="isImage(selectedAttachment()) && selectedAttachment()?.storage_url" class="image-viewer-wrap">
+        <div class="image-container" [style.transform]="'scale(' + (zoomLevel() / 100) + ')'">
+          <img [src]="selectedAttachment()?.storage_url" [alt]="selectedAttachment()?.name" class="preview-img">
+        </div>
+      </div>
+
+      <!-- 3. Network Share File -->
+      <div *ngIf="selectedAttachment()?.storage_destination === 'network'" class="network-file-card">
+        <div class="net-icon-box">
+          <mat-icon>folder_shared</mat-icon>
+        </div>
+        <h3>Network Shared Document</h3>
+        <p class="net-desc">Stored on internal office network storage.</p>
+        <div class="net-path-box">
+          <code>{{ selectedAttachment()?.network_path || 'No network path' }}</code>
+          <button mat-icon-button type="button" (click)="copyNetworkPath(selectedAttachment()?.network_path)" [matTooltip]="copiedPath() ? 'Copied!' : 'Copy path'">
+            <mat-icon>{{ copiedPath() ? 'check' : 'content_copy' }}</mat-icon>
+          </button>
+        </div>
+        <span class="copied-indicator" *ngIf="copiedPath()">Network path copied!</span>
+      </div>
+
+      <!-- 4. Generic File -->
+      <div *ngIf="!isPdf(selectedAttachment()) && !isImage(selectedAttachment()) && selectedAttachment()?.storage_destination !== 'network'" class="generic-file-card">
+        <div class="generic-icon-box">
+          <mat-icon>description</mat-icon>
+        </div>
+        <h3>{{ selectedAttachment()?.name }}</h3>
+        <p class="file-size-sub">{{ ((selectedAttachment()?.size || 0) / 1024).toFixed(1) }} KB</p>
+        <div class="generic-btn-row">
+          <a *ngIf="selectedAttachment()?.storage_url" [href]="selectedAttachment()?.storage_url" target="_blank" mat-flat-button color="primary">
+            <mat-icon>download</mat-icon> Download Document
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
   `,
   styles: [`
     :host {
@@ -398,6 +528,26 @@ import { AppUser } from '../../../profile/profile.component';
           line-height: 1.2;
         }
       }
+      .hdr-actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .side-toggle-btn {
+        height: 32px;
+        line-height: 32px;
+        font-size: 11.5px;
+        font-weight: 600;
+        padding: 0 10px;
+        border-radius: 6px;
+        border-color: #cbd5e1;
+        color: #334155;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        mat-icon { font-size: 16px; width: 16px; height: 16px; color: #4f46e5; }
+        &.active { background: #eef2ff; border-color: #818cf8; color: #4338ca; }
+      }
       .close-btn {
         width: 32px;
         height: 32px;
@@ -408,12 +558,64 @@ import { AppUser } from '../../../profile/profile.component';
       }
     }
 
+    .dialog-split-wrapper {
+      display: flex;
+      flex-direction: row;
+      height: 100%;
+      max-height: calc(92vh - 66px);
+      overflow: hidden;
+
+      &.has-side-viewer {
+        .form-scroll-pane {
+          flex: 0 0 50%;
+          max-width: 50%;
+          border-right: 1px solid #e2e8f0;
+        }
+        .doc-side-viewer {
+          flex: 1 1 50%;
+          min-width: 0;
+        }
+      }
+
+      &:not(.has-side-viewer) {
+        .form-scroll-pane {
+          flex: 1 1 100%;
+          max-width: 100%;
+        }
+      }
+
+      @media (max-width: 900px) {
+        flex-direction: column;
+        &.has-side-viewer {
+          .form-scroll-pane {
+            flex: 0 0 auto;
+            max-width: 100%;
+            height: 48vh;
+            border-right: none;
+            border-bottom: 1px solid #e2e8f0;
+          }
+          .doc-side-viewer {
+            flex: 1 1 auto;
+            height: 44vh;
+          }
+        }
+      }
+    }
+
+    .form-scroll-pane {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      overflow: hidden;
+      background: white;
+    }
+
     .dialog-body {
       padding: 16px 22px !important;
       margin: 0 !important;
       flex: 1 1 auto;
-      max-height: calc(92vh - 128px) !important;
-      overflow-y: auto;
+      max-height: none !important;
+      overflow-y: auto !important;
       box-sizing: border-box;
     }
 
@@ -700,6 +902,296 @@ import { AppUser } from '../../../profile/profile.component';
       }
     }
     .text-muted { color: #94a3b8; font-size: 11px; }
+
+    /* RIGHT PANEL: Document Side Viewer */
+    .doc-side-viewer {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      background: #0f172a;
+      overflow: hidden;
+      border-left: 1px solid #1e293b;
+    }
+
+    .side-viewer-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 16px;
+      background: #1e293b;
+      border-bottom: 1px solid #334155;
+      gap: 12px;
+      flex-shrink: 0;
+      min-height: 48px;
+
+      .viewer-file-info {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-width: 0;
+        flex: 1;
+
+        .file-badge-icon {
+          font-size: 20px;
+          width: 20px;
+          height: 20px;
+          color: #38bdf8;
+          &.network { color: #fbbf24; }
+          &.firebase { color: #38bdf8; }
+        }
+
+        .file-text-wrap {
+          display: flex;
+          flex-direction: column;
+          min-width: 0;
+
+          .file-name {
+            font-size: 12.5px;
+            font-weight: 600;
+            color: #f8fafc;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+          }
+
+          .file-details {
+            font-size: 10px;
+            color: #94a3b8;
+          }
+        }
+      }
+
+      .file-tabs-bar {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        background: #0f172a;
+        padding: 2px 4px;
+        border-radius: 6px;
+        border: 1px solid #334155;
+
+        .file-tab-chip {
+          background: transparent;
+          border: none;
+          color: #94a3b8;
+          font-size: 10.5px;
+          font-weight: 600;
+          padding: 3px 8px;
+          border-radius: 4px;
+          cursor: pointer;
+          transition: all 0.15s ease;
+
+          &:hover {
+            color: white;
+            background: rgba(255, 255, 255, 0.08);
+          }
+
+          &.active {
+            background: #4f46e5;
+            color: white;
+          }
+        }
+      }
+
+      .viewer-actions {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+
+        .ctrl-btn {
+          width: 32px;
+          height: 32px;
+          line-height: 32px;
+          color: #cbd5e1;
+
+          mat-icon {
+            font-size: 18px;
+            width: 18px;
+            height: 18px;
+          }
+
+          &:hover {
+            color: white;
+            background: rgba(255, 255, 255, 0.1);
+          }
+        }
+
+        .close-side-btn {
+          color: #f43f5e;
+          &:hover {
+            background: rgba(244, 63, 94, 0.15);
+          }
+        }
+
+        .zoom-pct {
+          font-size: 11px;
+          font-weight: 600;
+          color: #94a3b8;
+          min-width: 38px;
+          text-align: center;
+        }
+      }
+    }
+
+    .side-viewer-canvas {
+      flex: 1 1 auto;
+      height: calc(100% - 48px);
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* PDF Viewer */
+    .pdf-viewer-wrap {
+      width: 100%;
+      height: 100%;
+      position: relative;
+
+      .pdf-iframe {
+        width: 100%;
+        height: 100%;
+        border: none;
+        background: #1e293b;
+      }
+    }
+
+    /* Image Viewer */
+    .image-viewer-wrap {
+      width: 100%;
+      height: 100%;
+      overflow: auto;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      box-sizing: border-box;
+
+      .image-container {
+        transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+        transform-origin: center center;
+        display: flex;
+        justify-content: center;
+
+        .preview-img {
+          max-width: 100%;
+          max-height: 80vh;
+          object-fit: contain;
+          border-radius: 6px;
+          box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        }
+      }
+    }
+
+    /* Network File Card */
+    .network-file-card {
+      margin: auto;
+      max-width: 440px;
+      padding: 28px 20px;
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      color: #f8fafc;
+
+      .net-icon-box {
+        width: 50px;
+        height: 50px;
+        border-radius: 10px;
+        background: rgba(245, 158, 11, 0.12);
+        color: #f59e0b;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        mat-icon { font-size: 28px; width: 28px; height: 28px; }
+      }
+
+      h3 { margin: 0; font-size: 15px; font-weight: 700; color: white; }
+      .net-desc { margin: 0; font-size: 11.5px; color: #94a3b8; line-height: 1.4; }
+
+      .net-path-box {
+        width: 100%;
+        background: #0f172a;
+        border: 1px solid #334155;
+        border-radius: 6px;
+        padding: 6px 10px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        box-sizing: border-box;
+
+        code {
+          font-family: monospace;
+          font-size: 11px;
+          color: #38bdf8;
+          word-break: break-all;
+          text-align: left;
+        }
+
+        button {
+          color: #cbd5e1;
+          width: 28px;
+          height: 28px;
+          line-height: 28px;
+          mat-icon { font-size: 15px; width: 15px; height: 15px; }
+          &:hover { color: white; background: rgba(255, 255, 255, 0.1); }
+        }
+      }
+
+      .copied-indicator {
+        font-size: 10.5px;
+        color: #34d399;
+        font-weight: 600;
+      }
+    }
+
+    /* Generic File Card */
+    .generic-file-card {
+      margin: auto;
+      max-width: 420px;
+      padding: 28px 20px;
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      color: #f8fafc;
+
+      .generic-icon-box {
+        width: 50px;
+        height: 50px;
+        border-radius: 10px;
+        background: rgba(99, 102, 241, 0.15);
+        color: #818cf8;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        mat-icon { font-size: 28px; width: 28px; height: 28px; }
+      }
+
+      h3 { margin: 0; font-size: 14px; font-weight: 700; color: white; word-break: break-all; }
+      .file-size-sub { margin: 0; font-size: 11px; color: #94a3b8; }
+
+      .generic-btn-row {
+        margin-top: 6px;
+        a {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          font-size: 12px;
+          font-weight: 600;
+          mat-icon { font-size: 16px; width: 16px; height: 16px; }
+        }
+      }
+    }
   `]
 })
 export class LetterDialogComponent implements OnInit {
@@ -707,6 +1199,23 @@ export class LetterDialogComponent implements OnInit {
   private letterService = inject(LetterService);
   private settingsService = inject(SettingsService);
   private firestoreService = inject(FirestoreService);
+  private sanitizer = inject(DomSanitizer);
+
+  showSidePreview = signal<boolean>(false);
+  selectedAttachment = signal<LetterAttachment | null>(null);
+  selectedAttachmentIndex = signal<number>(0);
+  zoomLevel = signal<number>(100);
+  copiedPath = signal<boolean>(false);
+
+  safeDocUrl = computed<SafeResourceUrl | null>(() => {
+    const att = this.selectedAttachment();
+    if (!att || !att.storage_url) return null;
+    let url = att.storage_url;
+    if (this.isPdf(att) && !url.includes('#')) {
+      url += '#view=FitH';
+    }
+    return this.sanitizer.bypassSecurityTrustResourceUrl(url);
+  });
 
   form: FormGroup;
   statuses = ALL_LETTER_STATUSES;
@@ -794,6 +1303,69 @@ export class LetterDialogComponent implements OnInit {
         }
       }
     });
+
+    if (this.data?.letter?.attachments && this.data.letter.attachments.length > 0) {
+      this.selectedAttachment.set(this.data.letter.attachments[0]);
+      this.selectedAttachmentIndex.set(0);
+      this.showSidePreview.set(true);
+      this.dialogRef.updateSize('1440px', '92vh');
+    }
+  }
+
+  previewAttachmentOnSide(att: LetterAttachment, index: number) {
+    this.selectedAttachment.set(att);
+    this.selectedAttachmentIndex.set(index);
+    this.zoomLevel.set(100);
+    this.showSidePreview.set(true);
+    this.dialogRef.updateSize('1440px', '92vh');
+  }
+
+  toggleSidePreview() {
+    const next = !this.showSidePreview();
+    this.showSidePreview.set(next);
+    if (next) {
+      if (!this.selectedAttachment() && this.attachments().length > 0) {
+        this.selectedAttachment.set(this.attachments()[0]);
+        this.selectedAttachmentIndex.set(0);
+      }
+      this.dialogRef.updateSize('1440px', '92vh');
+    } else {
+      this.dialogRef.updateSize('840px', '92vh');
+    }
+  }
+
+  isPdf(att: LetterAttachment | null): boolean {
+    if (!att) return false;
+    if (att.type === 'application/pdf') return true;
+    return (att.name || '').toLowerCase().endsWith('.pdf');
+  }
+
+  isImage(att: LetterAttachment | null): boolean {
+    if (!att) return false;
+    if (att.type?.startsWith('image/')) return true;
+    return /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(att.name || '');
+  }
+
+  zoomIn() {
+    this.zoomLevel.update(z => Math.min(z + 25, 300));
+  }
+
+  zoomOut() {
+    this.zoomLevel.update(z => Math.max(z - 25, 25));
+  }
+
+  resetZoom() {
+    this.zoomLevel.set(100);
+  }
+
+  copyNetworkPath(path?: string) {
+    if (!path) return;
+    if (navigator?.clipboard) {
+      navigator.clipboard.writeText(path).then(() => {
+        this.copiedPath.set(true);
+        setTimeout(() => this.copiedPath.set(false), 2500);
+      });
+    }
   }
 
   loadExistingLetters() {
@@ -903,6 +1475,12 @@ export class LetterDialogComponent implements OnInit {
         };
 
         this.attachments.update(list => [...list, newAtt]);
+        if (newAtt.storage_url) {
+          this.selectedAttachment.set(newAtt);
+          this.selectedAttachmentIndex.set(this.attachments().length - 1);
+          this.showSidePreview.set(true);
+          this.dialogRef.updateSize('1440px', '92vh');
+        }
       }
     } catch (err) {
       console.error('File upload error:', err);
@@ -913,7 +1491,20 @@ export class LetterDialogComponent implements OnInit {
   }
 
   removeAttachment(index: number) {
-    this.attachments.update(list => list.filter((_, i) => i !== index));
+    this.attachments.update(list => {
+      const updated = list.filter((_, i) => i !== index);
+      if (this.selectedAttachmentIndex() === index) {
+        if (updated.length > 0) {
+          this.selectedAttachment.set(updated[0]);
+          this.selectedAttachmentIndex.set(0);
+        } else {
+          this.selectedAttachment.set(null);
+          this.showSidePreview.set(false);
+          this.dialogRef.updateSize('840px', '92vh');
+        }
+      }
+      return updated;
+    });
   }
 
   resolveUserNames(userIds: string[]): string[] {
