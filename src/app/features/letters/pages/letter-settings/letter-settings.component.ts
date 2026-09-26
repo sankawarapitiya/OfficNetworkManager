@@ -17,6 +17,8 @@ import {
   LetterSettings, 
   DEFAULT_LETTER_SETTINGS, 
   ALL_LETTER_STATUSES,
+  LetterRefPrefix,
+  DEFAULT_LETTER_PREFIXES,
   generateLetterRefNumber 
 } from '../../models/letter.model';
 
@@ -61,11 +63,23 @@ import {
         </div>
 
         <div class="card-body">
-          <!-- Live Preview Banner -->
+          <!-- Live Preview Banner with Prefix Test Selector -->
           <div class="preview-banner">
             <div class="preview-info">
-              <span class="preview-label">Live Reference Number Preview:</span>
-              <span class="preview-value">{{ previewRefNumber() }}</span>
+              <div class="preview-line">
+                <span class="preview-label">Live Reference Number Preview:</span>
+                <span class="preview-value">{{ previewRefNumber() }}</span>
+              </div>
+              <div class="preview-prefix-pills" *ngIf="settings.ref_prefixes && settings.ref_prefixes.length > 0">
+                <span class="test-prefix-lbl">Test Prefix Series:</span>
+                <button *ngFor="let p of settings.ref_prefixes" 
+                        type="button"
+                        class="preview-pill"
+                        [class.active]="selectedPreviewPrefix === p.code"
+                        (click)="selectPreviewPrefix(p.code)">
+                  {{ p.code }} <span class="pill-seq">(#{{ p.next_seq || 1 }})</span>
+                </button>
+              </div>
             </div>
             <span class="preview-badge" [class.enabled]="settings.ref_auto_generate" [class.disabled]="!settings.ref_auto_generate">
               {{ settings.ref_auto_generate ? 'Auto-Generation Active' : 'Auto-Generation Disabled' }}
@@ -82,8 +96,12 @@ import {
           <!-- Configuration Fields -->
           <div class="ref-settings-grid">
             <mat-form-field appearance="outline" class="compact-field" subscriptSizing="dynamic">
-              <mat-label>Prefix Code</mat-label>
-              <input matInput [(ngModel)]="settings.ref_prefix" placeholder="e.g. LET, ADM, DS/LW">
+              <mat-label>Default Prefix Code</mat-label>
+              <mat-select [(ngModel)]="settings.ref_prefix" (selectionChange)="onDefaultPrefixChange($event.value)">
+                <mat-option *ngFor="let p of settings.ref_prefixes" [value]="p.code">
+                  <strong>{{ p.code }}</strong> - {{ p.label }}
+                </mat-option>
+              </mat-select>
             </mat-form-field>
 
             <mat-form-field appearance="outline" class="compact-field format-pattern-field" subscriptSizing="dynamic">
@@ -103,7 +121,7 @@ import {
             </mat-form-field>
 
             <mat-form-field appearance="outline" class="compact-field" subscriptSizing="dynamic">
-              <mat-label>Next Sequence Number</mat-label>
+              <mat-label>Fallback Sequence No.</mat-label>
               <input matInput type="number" min="1" [(ngModel)]="settings.ref_next_seq">
             </mat-form-field>
           </div>
@@ -136,6 +154,70 @@ import {
               </button>
               <button type="button" class="preset-btn" (click)="setFormat('{PREFIX}-{YYYY}{MM}-{SEQ}')">
                 Hyphenated (&#123;PREFIX&#125;-&#123;YYYY&#125;&#123;MM&#125;-&#123;SEQ&#125;)
+              </button>
+            </div>
+          </div>
+
+          <!-- SUBSECTION: Configured Prefix Types & Series -->
+          <div class="prefixes-section">
+            <div class="prefixes-header">
+              <div>
+                <h4 class="sub-heading">Configured Prefix Types & Departmental Series</h4>
+                <p class="tip-text">Define distinct prefix codes for different departments, branches, or document types with independent running sequential counters.</p>
+              </div>
+            </div>
+
+            <!-- Prefix Cards Grid -->
+            <div class="prefixes-grid">
+              <div *ngFor="let p of settings.ref_prefixes; let i = index" class="prefix-card" [class.is-default]="p.code === settings.ref_prefix">
+                <div class="prefix-card-top">
+                  <span class="prefix-code-badge">{{ p.code }}</span>
+                  <div class="prefix-actions">
+                    <span *ngIf="p.code === settings.ref_prefix" class="default-badge">
+                      <mat-icon>verified</mat-icon> Default
+                    </span>
+                    <button *ngIf="p.code !== settings.ref_prefix" 
+                            mat-button 
+                            class="set-default-btn" 
+                            (click)="setDefaultPrefix(p.code)"
+                            matTooltip="Make this the default prefix">
+                      Set Default
+                    </button>
+                    <button mat-icon-button color="warn" (click)="removePrefix(i)" class="sm-del-btn" matTooltip="Remove prefix" [disabled]="settings.ref_prefixes && settings.ref_prefixes.length <= 1">
+                      <mat-icon>delete</mat-icon>
+                    </button>
+                  </div>
+                </div>
+
+                <div class="prefix-details">
+                  <span class="prefix-label">{{ p.label }}</span>
+                  <div class="prefix-seq-row">
+                    <span class="seq-lbl">Next Seq No:</span>
+                    <input type="number" min="1" [(ngModel)]="p.next_seq" class="inline-seq-input" matTooltip="Next running sequential number for this prefix">
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Add New Prefix Type Row -->
+            <div class="add-prefix-row">
+              <mat-form-field appearance="outline" class="pfx-input compact-field" subscriptSizing="dynamic">
+                <mat-label>New Prefix Code</mat-label>
+                <input matInput [(ngModel)]="newPrefixCode" placeholder="e.g. TECH, HR, AUD">
+              </mat-form-field>
+
+              <mat-form-field appearance="outline" class="pfx-label-input compact-field" subscriptSizing="dynamic">
+                <mat-label>Classification / Department</mat-label>
+                <input matInput [(ngModel)]="newPrefixLabel" placeholder="e.g. Technical Services">
+              </mat-form-field>
+
+              <mat-form-field appearance="outline" class="pfx-seq-input compact-field" subscriptSizing="dynamic">
+                <mat-label>Start Seq No.</mat-label>
+                <input matInput type="number" min="1" [(ngModel)]="newPrefixSeq">
+              </mat-form-field>
+
+              <button mat-stroked-button color="primary" [disabled]="!newPrefixCode.trim()" (click)="addPrefix()" class="add-btn">
+                <mat-icon>add</mat-icon> Add Prefix Type
               </button>
             </div>
           </div>
@@ -381,6 +463,11 @@ import {
       margin-bottom: 14px;
       .preview-info {
         display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .preview-line {
+        display: flex;
         align-items: center;
         gap: 10px;
         flex-wrap: wrap;
@@ -400,6 +487,38 @@ import {
         border-radius: 6px;
         border: 1px solid #6ee7b7;
         letter-spacing: 0.05em;
+      }
+      .preview-prefix-pills {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex-wrap: wrap;
+        .test-prefix-lbl {
+          font-size: 10.5px;
+          font-weight: 600;
+          color: #047857;
+        }
+        .preview-pill {
+          background: white;
+          border: 1px solid #a7f3d0;
+          color: #065f46;
+          border-radius: 4px;
+          padding: 2px 7px;
+          font-size: 10.5px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.15s;
+          .pill-seq { font-size: 9.5px; opacity: 0.75; }
+          &:hover {
+            border-color: #059669;
+            color: #059669;
+          }
+          &.active {
+            background: #059669;
+            color: white;
+            border-color: #059669;
+          }
+        }
       }
       .preview-badge {
         font-size: 10.5px;
@@ -422,7 +541,7 @@ import {
 
     .ref-settings-grid {
       display: grid;
-      grid-template-columns: 160px 1fr 180px 180px;
+      grid-template-columns: 200px 1fr 180px 160px;
       gap: 12px;
       margin-bottom: 14px;
       @media (max-width: 900px) {
@@ -487,16 +606,143 @@ import {
         border-color: #93c5fd;
       }
     }
+
+    /* Configured Prefix Types Section Styles */
+    .prefixes-section {
+      margin-top: 18px;
+      padding-top: 14px;
+      border-top: 1px dashed #e2e8f0;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .prefixes-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 10px;
+    }
+
+    .prefix-card {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      padding: 8px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      transition: all 0.15s;
+      &.is-default {
+        background: #f0fdf4;
+        border-color: #86efac;
+      }
+      .prefix-card-top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .prefix-code-badge {
+        font-family: monospace;
+        font-size: 13px;
+        font-weight: 700;
+        color: #0f172a;
+        background: #ffffff;
+        border: 1px solid #cbd5e1;
+        padding: 2px 7px;
+        border-radius: 4px;
+      }
+      .prefix-actions {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
+      .default-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 3px;
+        font-size: 10.5px;
+        font-weight: 700;
+        color: #15803d;
+        background: #dcfce7;
+        padding: 1px 6px;
+        border-radius: 999px;
+        mat-icon { font-size: 13px; width: 13px; height: 13px; }
+      }
+      .set-default-btn {
+        font-size: 10.5px;
+        height: 24px;
+        line-height: 24px;
+        padding: 0 6px;
+        color: #0284c7;
+      }
+      .sm-del-btn {
+        width: 24px;
+        height: 24px;
+        line-height: 24px;
+        mat-icon { font-size: 15px; width: 15px; height: 15px; }
+      }
+      .prefix-details {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .prefix-label {
+        font-size: 11px;
+        font-weight: 600;
+        color: #334155;
+      }
+      .prefix-seq-row {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 11px;
+        color: #64748b;
+      }
+      .inline-seq-input {
+        width: 65px;
+        padding: 2px 6px;
+        font-size: 11px;
+        font-weight: 600;
+        border: 1px solid #cbd5e1;
+        border-radius: 4px;
+        background: #ffffff;
+        text-align: center;
+        &:focus {
+          outline: none;
+          border-color: #059669;
+        }
+      }
+    }
+
+    .add-prefix-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 6px;
+      .pfx-input { width: 130px; }
+      .pfx-label-input { flex: 1; min-width: 180px; }
+      .pfx-seq-input { width: 120px; }
+      .add-btn { height: 36px; font-size: 12px; }
+    }
   `]
 })
 export class LetterSettingsComponent implements OnInit {
   private letterService = inject(LetterService);
 
-  settings: LetterSettings = { ...DEFAULT_LETTER_SETTINGS };
+  settings: LetterSettings = { 
+    ...DEFAULT_LETTER_SETTINGS,
+    ref_prefixes: [...DEFAULT_LETTER_PREFIXES]
+  };
   statuses = ALL_LETTER_STATUSES;
   newNetworkLocation: string = '';
   newCategory: string = '';
   isSaving = signal<boolean>(false);
+
+  selectedPreviewPrefix: string = 'LET';
+  newPrefixCode: string = '';
+  newPrefixLabel: string = '';
+  newPrefixSeq: number = 1;
 
   ngOnInit() {
     this.letterService.getSettings().subscribe(s => {
@@ -505,17 +751,74 @@ export class LetterSettingsComponent implements OnInit {
           ...DEFAULT_LETTER_SETTINGS,
           ...s,
           ref_prefix: s.ref_prefix ?? DEFAULT_LETTER_SETTINGS.ref_prefix,
+          ref_prefixes: (s.ref_prefixes && s.ref_prefixes.length > 0) ? [...s.ref_prefixes] : [...DEFAULT_LETTER_PREFIXES],
           ref_format: s.ref_format ?? DEFAULT_LETTER_SETTINGS.ref_format,
           ref_seq_digits: s.ref_seq_digits ?? DEFAULT_LETTER_SETTINGS.ref_seq_digits,
           ref_next_seq: s.ref_next_seq ?? DEFAULT_LETTER_SETTINGS.ref_next_seq,
           ref_auto_generate: s.ref_auto_generate ?? DEFAULT_LETTER_SETTINGS.ref_auto_generate
         };
+        if (!this.selectedPreviewPrefix) {
+          this.selectedPreviewPrefix = this.settings.ref_prefix || 'LET';
+        }
       }
     });
   }
 
+  selectPreviewPrefix(code: string) {
+    this.selectedPreviewPrefix = code;
+  }
+
   previewRefNumber(): string {
-    return generateLetterRefNumber(this.settings, this.settings.ref_next_seq || 1);
+    return generateLetterRefNumber(this.settings, undefined, this.selectedPreviewPrefix);
+  }
+
+  onDefaultPrefixChange(code: string) {
+    this.selectedPreviewPrefix = code;
+  }
+
+  setDefaultPrefix(code: string) {
+    this.settings.ref_prefix = code;
+    this.selectedPreviewPrefix = code;
+  }
+
+  addPrefix() {
+    const code = this.newPrefixCode.trim().toUpperCase();
+    const label = this.newPrefixLabel.trim() || code;
+    const seq = Number(this.newPrefixSeq) || 1;
+    if (!code) return;
+
+    if (!this.settings.ref_prefixes) {
+      this.settings.ref_prefixes = [];
+    }
+
+    const existing = this.settings.ref_prefixes.find(p => p.code.toUpperCase() === code);
+    if (existing) {
+      existing.label = label;
+      existing.next_seq = seq;
+    } else {
+      this.settings.ref_prefixes.push({
+        code,
+        label,
+        next_seq: seq
+      });
+    }
+
+    this.newPrefixCode = '';
+    this.newPrefixLabel = '';
+    this.newPrefixSeq = 1;
+    this.selectedPreviewPrefix = code;
+  }
+
+  removePrefix(index: number) {
+    if (!this.settings.ref_prefixes) return;
+    const removed = this.settings.ref_prefixes[index];
+    this.settings.ref_prefixes.splice(index, 1);
+    if (removed && removed.code === this.settings.ref_prefix) {
+      this.settings.ref_prefix = this.settings.ref_prefixes[0]?.code || 'LET';
+    }
+    if (this.selectedPreviewPrefix === removed?.code) {
+      this.selectedPreviewPrefix = this.settings.ref_prefixes[0]?.code || 'LET';
+    }
   }
 
   insertToken(token: string) {

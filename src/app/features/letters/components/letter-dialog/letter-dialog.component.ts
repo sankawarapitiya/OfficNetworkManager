@@ -23,6 +23,8 @@ import {
   ALL_LETTER_STATUSES, 
   DEFAULT_LETTER_SETTINGS, 
   LetterSettings,
+  LetterRefPrefix,
+  DEFAULT_LETTER_PREFIXES,
   generateLetterRefNumber
 } from '../../models/letter.model';
 import { LetterService } from '../../services/letter.service';
@@ -84,9 +86,20 @@ import { AppUser } from '../../../profile/profile.component';
             <mat-icon matSuffix>title</mat-icon>
           </mat-form-field>
 
-          <div class="grid-2">
+          <div class="ref-row-grid">
+            <!-- Prefix Series Selector -->
+            <mat-form-field appearance="outline" class="w-full compact-field prefix-selector-field" subscriptSizing="dynamic">
+              <mat-label>Prefix Series</mat-label>
+              <mat-select [(ngModel)]="selectedPrefixCode" [ngModelOptions]="{standalone: true}" (selectionChange)="onPrefixChange($event.value)">
+                <mat-option *ngFor="let p of availablePrefixes()" [value]="p.code">
+                  <strong>{{ p.code }}</strong> - {{ p.label }}
+                </mat-option>
+              </mat-select>
+              <mat-icon matSuffix>sell</mat-icon>
+            </mat-form-field>
+
             <!-- Ref Number with Auto-generate -->
-            <mat-form-field appearance="outline" class="w-full compact-field" subscriptSizing="dynamic">
+            <mat-form-field appearance="outline" class="w-full compact-field ref-number-field" subscriptSizing="dynamic">
               <mat-label>Official Reference No.</mat-label>
               <input matInput formControlName="ref_number" placeholder="e.g. LET/2026/09/014" required>
               <button mat-icon-button matSuffix type="button" (click)="generateRefNumber()" matTooltip="Auto-generate tracking reference" class="sm-btn">
@@ -95,7 +108,7 @@ import { AppUser } from '../../../profile/profile.component';
             </mat-form-field>
 
             <!-- Linked Ref with Typeahead Autocomplete -->
-            <mat-form-field appearance="outline" class="w-full compact-field" subscriptSizing="dynamic">
+            <mat-form-field appearance="outline" class="w-full compact-field link-ref-field" subscriptSizing="dynamic">
               <mat-label>Linked Reference (Link Ref)</mat-label>
               <input matInput 
                      formControlName="link_ref" 
@@ -440,6 +453,13 @@ import { AppUser } from '../../../profile/profile.component';
 
     .w-full { width: 100%; }
 
+    .ref-row-grid {
+      display: grid;
+      grid-template-columns: 210px 1.25fr 1fr;
+      gap: 10px;
+      @media (max-width: 768px) { grid-template-columns: 1fr; }
+    }
+
     .grid-2 {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -699,6 +719,8 @@ export class LetterDialogComponent implements OnInit {
   linkRefSearch = signal<string>('');
 
   letterSettings = signal<LetterSettings>(DEFAULT_LETTER_SETTINGS);
+  availablePrefixes = signal<LetterRefPrefix[]>(DEFAULT_LETTER_PREFIXES);
+  selectedPrefixCode: string = 'LET';
   storageType: 'firebase' | 'network' = 'firebase';
   selectedNetworkLocation: string = '';
   attachments = signal<LetterAttachment[]>([]);
@@ -757,6 +779,21 @@ export class LetterDialogComponent implements OnInit {
     this.form.get('link_ref')?.valueChanges.subscribe(v => {
       this.linkRefSearch.set(v || '');
     });
+
+    // Auto-select matching prefix series when category changes (for new registrations)
+    this.form.get('category')?.valueChanges.subscribe(cat => {
+      if (!this.data?.letter && cat) {
+        const prefixes = this.availablePrefixes();
+        const matched = prefixes.find(p => 
+          p.label.toLowerCase().includes(cat.toLowerCase()) || 
+          cat.toLowerCase().includes(p.label.toLowerCase()) ||
+          cat.toLowerCase().includes(p.code.toLowerCase())
+        );
+        if (matched && matched.code !== this.selectedPrefixCode) {
+          this.onPrefixChange(matched.code);
+        }
+      }
+    });
   }
 
   loadExistingLetters() {
@@ -772,12 +809,15 @@ export class LetterDialogComponent implements OnInit {
           ...DEFAULT_LETTER_SETTINGS,
           ...s,
           ref_prefix: s.ref_prefix ?? DEFAULT_LETTER_SETTINGS.ref_prefix,
+          ref_prefixes: (s.ref_prefixes && s.ref_prefixes.length > 0) ? s.ref_prefixes : DEFAULT_LETTER_PREFIXES,
           ref_format: s.ref_format ?? DEFAULT_LETTER_SETTINGS.ref_format,
           ref_seq_digits: s.ref_seq_digits ?? DEFAULT_LETTER_SETTINGS.ref_seq_digits,
           ref_next_seq: s.ref_next_seq ?? DEFAULT_LETTER_SETTINGS.ref_next_seq,
           ref_auto_generate: s.ref_auto_generate ?? DEFAULT_LETTER_SETTINGS.ref_auto_generate
         };
         this.letterSettings.set(merged);
+        const prefixes = (merged.ref_prefixes && merged.ref_prefixes.length > 0) ? merged.ref_prefixes : DEFAULT_LETTER_PREFIXES;
+        this.availablePrefixes.set(prefixes);
         this.categories.set(merged.categories || DEFAULT_LETTER_SETTINGS.categories);
         this.networkLocations.set(merged.network_storage_locations || DEFAULT_LETTER_SETTINGS.network_storage_locations);
         this.storageType = merged.default_storage || 'firebase';
@@ -789,8 +829,16 @@ export class LetterDialogComponent implements OnInit {
         if (!this.data?.letter) {
           const currentRef = this.form.get('ref_number')?.value;
           if (!currentRef && merged.ref_auto_generate !== false) {
-            const generated = generateLetterRefNumber(merged, merged.ref_next_seq || 1);
+            this.selectedPrefixCode = merged.ref_prefix || prefixes[0]?.code || 'LET';
+            const generated = generateLetterRefNumber(merged, undefined, this.selectedPrefixCode);
             this.form.patchValue({ ref_number: generated });
+          }
+        } else if (this.data?.letter?.ref_number) {
+          // If editing existing letter, match prefix series
+          const existingRef = this.data.letter.ref_number;
+          const match = prefixes.find(p => existingRef.startsWith(p.code));
+          if (match) {
+            this.selectedPrefixCode = match.code;
           }
         }
       }
@@ -813,9 +861,15 @@ export class LetterDialogComponent implements OnInit {
     this.linkRefSearch.set(event.target.value || '');
   }
 
+  onPrefixChange(code: string) {
+    this.selectedPrefixCode = code;
+    const generated = generateLetterRefNumber(this.letterSettings(), undefined, code);
+    this.form.patchValue({ ref_number: generated });
+  }
+
   generateRefNumber() {
     const s = this.letterSettings();
-    const generated = generateLetterRefNumber(s, s.ref_next_seq || 1);
+    const generated = generateLetterRefNumber(s, undefined, this.selectedPrefixCode);
     this.form.patchValue({ ref_number: generated });
   }
 
@@ -917,13 +971,19 @@ export class LetterDialogComponent implements OnInit {
         await this.letterService.updateLetter(this.data.letter.id, payload, 'Updated letter properties via form');
       } else {
         await this.letterService.addLetter(payload as Omit<Letter, 'id'>);
-        // Increment next sequence counter in settings if auto-generation is enabled
+        // Increment next sequence counter in settings for selected prefix
         const s = this.letterSettings();
         if (s.ref_auto_generate !== false) {
-          const nextSeq = (s.ref_next_seq || 1) + 1;
+          const updatedPrefixes = (s.ref_prefixes || DEFAULT_LETTER_PREFIXES).map(p => {
+            if (p.code.toUpperCase() === this.selectedPrefixCode.toUpperCase()) {
+              return { ...p, next_seq: (p.next_seq || 1) + 1 };
+            }
+            return p;
+          });
           this.letterService.saveSettings({
             ...s,
-            ref_next_seq: nextSeq
+            ref_prefixes: updatedPrefixes,
+            ref_next_seq: (s.ref_next_seq || 1) + 1
           }).catch(err => console.warn('Could not increment reference sequence number:', err));
         }
       }
