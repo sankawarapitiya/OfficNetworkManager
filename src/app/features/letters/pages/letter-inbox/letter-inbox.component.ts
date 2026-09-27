@@ -54,6 +54,9 @@ import { AppUser } from '../../../profile/profile.component';
           <div class="title-row">
             <mat-icon class="title-icon">inbox</mat-icon>
             <h1 class="page-title">Inward Letters Registry (Inbox)</h1>
+            <span class="today-inward-badge" matTooltip="Official letters received today">
+              <mat-icon>today</mat-icon> {{ todayCount() }} Today
+            </span>
           </div>
           <p class="page-desc">Official incoming correspondence, ministerial directives, and citizen submissions.</p>
         </div>
@@ -208,6 +211,7 @@ import { AppUser } from '../../../profile/profile.component';
           <div class="date-chips-row">
             <span class="chips-label">Date Presets:</span>
             <button type="button" class="quick-chip" (click)="setDatePreset('today')">Today</button>
+            <button type="button" class="quick-chip" (click)="setDatePreset('yesterday')">Yesterday</button>
             <button type="button" class="quick-chip" (click)="setDatePreset('week')">This Week</button>
             <button type="button" class="quick-chip" (click)="setDatePreset('month')">This Month</button>
             <button type="button" class="quick-chip" (click)="setDatePreset('30d')">Last 30 Days</button>
@@ -406,7 +410,7 @@ import { AppUser } from '../../../profile/profile.component';
         <mat-paginator [length]="filteredLetters().length"
                        [pageSize]="pageSize()"
                        [pageIndex]="pageIndex()"
-                       [pageSizeOptions]="[5, 10, 25, 50, 100]"
+                       [pageSizeOptions]="[20, 40, 50, 100, 200]"
                        (page)="onPageChange($event)"
                        showFirstLastButtons
                        class="inbox-paginator">
@@ -428,8 +432,22 @@ import { AppUser } from '../../../profile/profile.component';
           display: flex;
           align-items: center;
           gap: 8px;
+          flex-wrap: wrap;
           .title-icon { color: #0284c7; font-size: 24px; width: 24px; height: 24px; }
           .page-title { font-size: 20px; font-weight: 700; color: #0f172a; margin: 0; }
+          .today-inward-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            background: #ecfdf5;
+            color: #059669;
+            border: 1px solid #a7f3d0;
+            padding: 2px 10px;
+            border-radius: 9999px;
+            font-size: 11.5px;
+            font-weight: 700;
+            mat-icon { font-size: 15px; width: 15px; height: 15px; }
+          }
         }
         .page-desc { font-size: 12.5px; color: #64748b; margin: 3px 0 0 0; }
       }
@@ -787,9 +805,14 @@ export class LetterInboxComponent implements OnInit {
   storageFilter = signal<string>('ALL');    // 'ALL' | 'firebase' | 'network'
   sortBy = signal<string>('date_desc');     // 'date_desc' | 'date_asc' | 'priority' | 'ref_asc'
 
-  // Pagination Signals
-  pageSize = signal<number>(10);
+  // Pagination Signals for High Volume (40+ letters/day)
+  pageSize = signal<number>(40);
   pageIndex = signal<number>(0);
+
+  todayCount = computed(() => {
+    const today = this.formatDate(new Date());
+    return this.allLetters().filter(l => l.received_date === today).length;
+  });
 
   displayedColumns = [
     'ref',
@@ -999,12 +1022,18 @@ export class LetterInboxComponent implements OnInit {
     this.onFilterChange();
   }
 
-  setDatePreset(preset: 'today' | 'week' | 'month' | '30d') {
+  setDatePreset(preset: 'today' | 'yesterday' | 'week' | 'month' | '30d') {
     const today = new Date();
     const format = (d: Date) => this.formatDate(d);
 
     if (preset === 'today') {
       const str = format(today);
+      this.dateFrom.set(str);
+      this.dateTo.set(str);
+    } else if ((preset as string) === 'yesterday') {
+      const yest = new Date(today);
+      yest.setDate(today.getDate() - 1);
+      const str = format(yest);
       this.dateFrom.set(str);
       this.dateTo.set(str);
     } else if (preset === 'week') {

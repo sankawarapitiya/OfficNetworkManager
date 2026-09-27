@@ -10,6 +10,7 @@ import { MatChipsModule } from '@angular/material/chips';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatTableModule } from '@angular/material/table';
+import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
@@ -27,6 +28,8 @@ import { SettingsService, Department } from '../../../settings/settings.service'
 
 export type ActionSegment = 'ALL_OPEN' | 'MINE' | 'DEPT' | 'URGENT' | 'ACTION_REQ' | 'IN_PROGRESS';
 export type ViewMode = 'grid' | 'kanban' | 'table';
+export type DateFilter = 'ALL' | 'TODAY' | 'YESTERDAY' | 'WEEK';
+export type DensityMode = 'comfortable' | 'compact';
 
 @Component({
   selector: 'app-letter-actions',
@@ -43,6 +46,7 @@ export type ViewMode = 'grid' | 'kanban' | 'table';
     MatButtonToggleModule,
     MatTooltipModule,
     MatTableModule,
+    MatPaginatorModule,
     MatFormFieldModule,
     MatInputModule,
     MatSelectModule,
@@ -66,6 +70,13 @@ export class LetterActionsComponent implements OnInit {
   departments = signal<Department[]>([]);
   activeSegment = signal<ActionSegment>('ALL_OPEN');
   viewMode = signal<ViewMode>('grid');
+  dateFilter = signal<DateFilter>('ALL');
+  densityMode = signal<DensityMode>('compact');
+
+  // Pagination for high volume (40+ letters/day)
+  pageSize = signal<number>(40);
+  pageIndex = signal<number>(0);
+  pageSizeOptions = [20, 40, 50, 100, 200];
 
   searchQuery = signal<string>('');
   selectedDepartment = signal<string>('ALL');
@@ -143,7 +154,53 @@ export class LetterActionsComponent implements OnInit {
     return this.allOpenActions().filter(l => l.status === 'In Progress' || l.status === 'In Review');
   });
 
-  // Final Filtered List based on Segment, Search & Dropdowns
+  // Date String Helpers for High-Volume (40+/day) Processing
+  todayStr = computed(() => {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  });
+
+  yesterdayStr = computed(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 1);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  });
+
+  weekStartStr = computed(() => {
+    const d = new Date();
+    const day = d.getDay();
+    const diff = (day === 0 ? -6 : 1) - day;
+    const mon = new Date(d);
+    mon.setDate(d.getDate() + diff);
+    const y = mon.getFullYear();
+    const m = String(mon.getMonth() + 1).padStart(2, '0');
+    const dd = String(mon.getDate()).padStart(2, '0');
+    return `${y}-${m}-${dd}`;
+  });
+
+  // Volume Counts by Date
+  todayActionsCount = computed(() => {
+    const today = this.todayStr();
+    return this.allOpenActions().filter(l => l.received_date === today).length;
+  });
+
+  yesterdayActionsCount = computed(() => {
+    const yest = this.yesterdayStr();
+    return this.allOpenActions().filter(l => l.received_date === yest).length;
+  });
+
+  thisWeekActionsCount = computed(() => {
+    const start = this.weekStartStr();
+    return this.allOpenActions().filter(l => (l.received_date || '') >= start).length;
+  });
+
+  // Final Filtered List based on Segment, Date, Search & Dropdowns
   filteredLetters = computed(() => {
     let list = this.allOpenActions();
 
@@ -168,7 +225,20 @@ export class LetterActionsComponent implements OnInit {
       list = list.filter(l => l.priority === pFilter);
     }
 
-    // 4. Full-text Search
+    // 4. Date Presets (Today, Yesterday, This Week)
+    const df = this.dateFilter();
+    if (df === 'TODAY') {
+      const today = this.todayStr();
+      list = list.filter(l => l.received_date === today);
+    } else if (df === 'YESTERDAY') {
+      const yest = this.yesterdayStr();
+      list = list.filter(l => l.received_date === yest);
+    } else if (df === 'WEEK') {
+      const start = this.weekStartStr();
+      list = list.filter(l => (l.received_date || '') >= start);
+    }
+
+    // 5. Full-text Search
     const q = this.searchQuery().toLowerCase().trim();
     if (q) {
       list = list.filter(l => 
@@ -182,7 +252,22 @@ export class LetterActionsComponent implements OnInit {
       );
     }
 
+    // Sort: Newest received first, with Urgent/Immediate highlighted
+    list = [...list].sort((a, b) => {
+      const dateCmp = (b.received_date || '').localeCompare(a.received_date || '');
+      if (dateCmp !== 0) return dateCmp;
+      const pWeights: Record<string, number> = { 'Immediate': 3, 'Urgent': 2, 'Normal': 1 };
+      return (pWeights[b.priority] || 0) - (pWeights[a.priority] || 0);
+    });
+
     return list;
+  });
+
+  // Paginated View Slice for Grid and Dense Table
+  paginatedLetters = computed(() => {
+    const list = this.filteredLetters();
+    const start = this.pageIndex() * this.pageSize();
+    return list.slice(start, start + this.pageSize());
   });
 
   // Kanban Stage Columns
@@ -327,10 +412,26 @@ export class LetterActionsComponent implements OnInit {
     });
   }
 
+  setDateFilter(f: DateFilter) {
+    this.dateFilter.set(f);
+    this.pageIndex.set(0);
+  }
+
+  setDensityMode(d: DensityMode) {
+    this.densityMode.set(d);
+  }
+
+  onPageChange(event: PageEvent) {
+    this.pageSize.set(event.pageSize);
+    this.pageIndex.set(event.pageIndex);
+  }
+
   clearFilters() {
     this.searchQuery.set('');
     this.selectedDepartment.set('ALL');
     this.selectedPriority.set('ALL');
     this.activeSegment.set('ALL_OPEN');
+    this.dateFilter.set('ALL');
+    this.pageIndex.set(0);
   }
 }

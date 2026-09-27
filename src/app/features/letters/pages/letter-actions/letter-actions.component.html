@@ -7,7 +7,12 @@
         <span class="pulse-dot"></span>
         <span>Directives Pipeline · Active Stream</span>
       </div>
-      <h1 class="hero-title">Directives & Pending Actions</h1>
+      <div class="hero-title-row">
+        <h1 class="hero-title">Directives & Pending Actions</h1>
+        <span class="today-volume-chip" [matTooltip]="todayActionsCount() + ' inward letters received today'">
+          <mat-icon>today</mat-icon> {{ todayActionsCount() }} Inward Today
+        </span>
+      </div>
       <p class="hero-subtitle">
         Track, prioritize, and execute official correspondence requiring officer turnaround or ministerial action.
       </p>
@@ -111,7 +116,7 @@
         </button>
       </div>
 
-      <!-- Controls: View Mode & Dropdown Filters -->
+      <!-- Controls: Density Mode, View Mode & Dropdown Filters -->
       <div class="filter-right-controls">
         <!-- Priority Dropdown -->
         <mat-form-field appearance="outline" class="filter-select-field" subscriptSizing="dynamic">
@@ -132,6 +137,24 @@
             <mat-option *ngFor="let d of departments()" [value]="d.name">{{ d.name }}</mat-option>
           </mat-select>
         </mat-form-field>
+
+        <!-- High Volume Density Toggle -->
+        <div class="density-toggle" matTooltip="Display density (High-Volume friendly)">
+          <button type="button" 
+                  class="density-btn" 
+                  [class.active]="densityMode() === 'compact'" 
+                  (click)="setDensityMode('compact')" 
+                  matTooltip="Compact Mode (Recommended for 40+ letters/day)">
+            <mat-icon>density_small</mat-icon>
+          </button>
+          <button type="button" 
+                  class="density-btn" 
+                  [class.active]="densityMode() === 'comfortable'" 
+                  (click)="setDensityMode('comfortable')" 
+                  matTooltip="Comfortable Mode">
+            <mat-icon>density_medium</mat-icon>
+          </button>
+        </div>
 
         <!-- View Mode Toggle -->
         <div class="view-mode-toggle">
@@ -160,9 +183,10 @@
       </div>
     </div>
 
-    <!-- Segment Filter Pills -->
+    <!-- Segment & Daily Batch Filter Pills -->
     <div class="filter-pills-row">
       <div class="pills-scroll-list">
+        <!-- Segments -->
         <button class="segment-pill-btn" 
                 [class.active]="activeSegment() === 'ALL_OPEN'" 
                 (click)="setSegment('ALL_OPEN')">
@@ -210,10 +234,38 @@
           <span>In Progress & Review</span>
           <span class="pill-counter">{{ inProgressActions().length }}</span>
         </button>
+
+        <!-- Divider -->
+        <div class="pill-separator"></div>
+
+        <!-- Daily Batch Presets for High Volume -->
+        <button class="segment-pill-btn date-pill-btn" 
+                [class.active]="dateFilter() === 'TODAY'" 
+                (click)="setDateFilter(dateFilter() === 'TODAY' ? 'ALL' : 'TODAY')">
+          <mat-icon class="pill-ico">today</mat-icon>
+          <span>Today</span>
+          <span class="pill-counter" [class.highlight-today]="todayActionsCount() > 0">{{ todayActionsCount() }}</span>
+        </button>
+
+        <button class="segment-pill-btn date-pill-btn" 
+                [class.active]="dateFilter() === 'YESTERDAY'" 
+                (click)="setDateFilter(dateFilter() === 'YESTERDAY' ? 'ALL' : 'YESTERDAY')">
+          <mat-icon class="pill-ico">event_repeat</mat-icon>
+          <span>Yesterday</span>
+          <span class="pill-counter">{{ yesterdayActionsCount() }}</span>
+        </button>
+
+        <button class="segment-pill-btn date-pill-btn" 
+                [class.active]="dateFilter() === 'WEEK'" 
+                (click)="setDateFilter(dateFilter() === 'WEEK' ? 'ALL' : 'WEEK')">
+          <mat-icon class="pill-ico">date_range</mat-icon>
+          <span>This Week</span>
+          <span class="pill-counter">{{ thisWeekActionsCount() }}</span>
+        </button>
       </div>
 
       <!-- Active Filter Reset -->
-      <button *ngIf="searchQuery() || selectedDepartment() !== 'ALL' || selectedPriority() !== 'ALL' || activeSegment() !== 'ALL_OPEN'" 
+      <button *ngIf="searchQuery() || selectedDepartment() !== 'ALL' || selectedPriority() !== 'ALL' || activeSegment() !== 'ALL_OPEN' || dateFilter() !== 'ALL'" 
               mat-button 
               color="warn" 
               class="reset-filters-btn" 
@@ -226,7 +278,7 @@
   <!-- 4. Content Area Based on Selected View Mode -->
   
   <!-- VIEW A: KANBAN WORKFLOW BOARD -->
-  <div class="kanban-board-container" *ngIf="viewMode() === 'kanban'">
+  <div class="kanban-board-container" *ngIf="viewMode() === 'kanban'" [class.compact-kanban]="densityMode() === 'compact'">
     <div class="kanban-column" *ngFor="let col of kanbanColumns" [ngClass]="col.colorClass">
       
       <!-- Column Header -->
@@ -269,7 +321,7 @@
             </span>
           </div>
 
-          <div class="k-dept-tag" *ngIf="letter.send_to?.length">
+          <div class="k-dept-tag" *ngIf="letter.send_to?.length && densityMode() !== 'compact'">
             <mat-icon>apartment</mat-icon> {{ letter.send_to.join(', ') }}
           </div>
 
@@ -334,142 +386,158 @@
   </div>
 
   <!-- VIEW B: INTERACTIVE GRID VIEW -->
-  <div class="actions-grid-container" *ngIf="viewMode() === 'grid'">
+  <div class="grid-view-wrapper" *ngIf="viewMode() === 'grid'">
     
-    <div class="action-directive-card" 
-         *ngFor="let letter of filteredLetters()"
-         [class.card-urgent]="letter.priority === 'Urgent' || letter.priority === 'Immediate'"
-         [class.card-action-required]="letter.status === 'Action Required'">
+    <div class="actions-grid-container" [class.compact-grid]="densityMode() === 'compact'">
       
-      <!-- Card Top Bar -->
-      <div class="card-header-bar">
-        <div class="header-bar-left">
-          <span class="ref-badge">{{ letter.ref_number }}</span>
-          <span class="priority-pill" [ngClass]="getPriorityClass(letter.priority)">
-            {{ letter.priority }}
-          </span>
-          <span class="status-pill" [ngClass]="getStatusClass(letter.status)">
-            {{ letter.status }}
-          </span>
-        </div>
+      <div class="action-directive-card" 
+           *ngFor="let letter of paginatedLetters()"
+           [class.card-urgent]="letter.priority === 'Urgent' || letter.priority === 'Immediate'"
+           [class.card-action-required]="letter.status === 'Action Required'">
+        
+        <!-- Card Top Bar -->
+        <div class="card-header-bar">
+          <div class="header-bar-left">
+            <span class="ref-badge">{{ letter.ref_number }}</span>
+            <span class="priority-pill" [ngClass]="getPriorityClass(letter.priority)">
+              {{ letter.priority }}
+            </span>
+            <span class="status-pill" [ngClass]="getStatusClass(letter.status)">
+              {{ letter.status }}
+            </span>
+          </div>
 
-        <div class="header-bar-right">
-          <!-- Direct Assignment Badge -->
-          <span class="assignment-badge" [class.is-mine]="isDirectlyAssigned(letter)">
-            <mat-icon>{{ isDirectlyAssigned(letter) ? 'person' : 'domain' }}</mat-icon>
-            {{ isDirectlyAssigned(letter) ? 'Assigned to You' : (userDept() || 'Department') }}
-          </span>
+          <div class="header-bar-right">
+            <!-- Direct Assignment Badge -->
+            <span class="assignment-badge" [class.is-mine]="isDirectlyAssigned(letter)">
+              <mat-icon>{{ isDirectlyAssigned(letter) ? 'person' : 'domain' }}</mat-icon>
+              {{ isDirectlyAssigned(letter) ? 'Assigned to You' : (userDept() || 'Department') }}
+            </span>
 
-          <!-- Attachments Badge (opens side document viewer) -->
-          <span class="att-badge-link" 
-                *ngIf="letter.attachments?.length" 
-                (click)="openDetail(letter)" 
-                matTooltip="Click to inspect attached document on side">
-            <mat-icon>attach_file</mat-icon> {{ letter.attachments?.length }}
-          </span>
-        </div>
-      </div>
-
-      <!-- Card Title & Subject -->
-      <h3 class="directive-title" (click)="openDetail(letter)">{{ letter.title }}</h3>
-
-      <!-- Meta Grid Details -->
-      <div class="directive-meta-grid">
-        <div class="meta-field">
-          <mat-icon class="meta-ico">domain</mat-icon>
-          <div class="meta-info">
-            <span class="meta-label">Received From</span>
-            <span class="meta-val font-semibold">{{ letter.received_from }}</span>
+            <!-- Attachments Badge (opens side document viewer) -->
+            <span class="att-badge-link" 
+                  *ngIf="letter.attachments?.length" 
+                  (click)="openDetail(letter)" 
+                  matTooltip="Click to inspect attached document on side">
+              <mat-icon>attach_file</mat-icon> {{ letter.attachments?.length }}
+            </span>
           </div>
         </div>
 
-        <div class="meta-field">
-          <mat-icon class="meta-ico">schedule</mat-icon>
-          <div class="meta-info">
-            <span class="meta-label">Received Date</span>
-            <span class="meta-val">{{ letter.received_date }} ({{ getTimeAgo(letter.received_date) }})</span>
-          </div>
-        </div>
+        <!-- Card Title & Subject -->
+        <h3 class="directive-title" (click)="openDetail(letter)">{{ letter.title }}</h3>
 
-        <div class="meta-field" *ngIf="letter.send_to?.length">
-          <mat-icon class="meta-ico">apartment</mat-icon>
-          <div class="meta-info">
-            <span class="meta-label">Routed Department</span>
-            <span class="meta-val">{{ letter.send_to.join(', ') }}</span>
-          </div>
-        </div>
-
-        <div class="meta-field" *ngIf="letter.link_ref">
-          <mat-icon class="meta-ico">link</mat-icon>
-          <div class="meta-info">
-            <span class="meta-label">Linked Reference</span>
-            <span class="meta-val link-val">{{ letter.link_ref }}</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Description / Directive Callout -->
-      <div class="directive-desc-box" *ngIf="letter.description">
-        <mat-icon class="desc-quote-icon">format_quote</mat-icon>
-        <p class="desc-paragraph">{{ letter.description }}</p>
-      </div>
-
-      <!-- Latest Officer Action Note -->
-      <div class="latest-action-strip" *ngIf="getLastLog(letter) as lastLog">
-        <mat-icon class="history-ico">history</mat-icon>
-        <div class="action-strip-content">
-          <span class="officer-name">{{ lastLog.officer_name }}</span>
-          <span class="log-text">"{{ lastLog.remarks }}"</span>
-          <span class="log-time">{{ lastLog.timestamp | date:'shortTime' }}</span>
-        </div>
-      </div>
-
-      <!-- Card Footer -->
-      <div class="directive-card-footer">
-        <!-- Assignees with Initials -->
-        <div class="assignees-group">
-          <span class="assignee-label">Officers:</span>
-          <div class="avatar-stack">
-            <div class="officer-avatar" 
-                 *ngFor="let u of (letter.assigned_user_names || letter.assigned_to)" 
-                 [matTooltip]="u">
-              {{ getInitials(u) }}
+        <!-- Meta Grid Details -->
+        <div class="directive-meta-grid">
+          <div class="meta-field">
+            <mat-icon class="meta-ico">domain</mat-icon>
+            <div class="meta-info">
+              <span class="meta-label">Received From</span>
+              <span class="meta-val font-semibold">{{ letter.received_from }}</span>
             </div>
-            <span *ngIf="!letter.assigned_to?.length" class="unassigned-chip">Unassigned</span>
+          </div>
+
+          <div class="meta-field">
+            <mat-icon class="meta-ico">schedule</mat-icon>
+            <div class="meta-info">
+              <span class="meta-label">Received Date</span>
+              <span class="meta-val">{{ letter.received_date }} ({{ getTimeAgo(letter.received_date) }})</span>
+            </div>
+          </div>
+
+          <div class="meta-field" *ngIf="letter.send_to?.length">
+            <mat-icon class="meta-ico">apartment</mat-icon>
+            <div class="meta-info">
+              <span class="meta-label">Routed Department</span>
+              <span class="meta-val">{{ letter.send_to.join(', ') }}</span>
+            </div>
+          </div>
+
+          <div class="meta-field" *ngIf="letter.link_ref">
+            <mat-icon class="meta-ico">link</mat-icon>
+            <div class="meta-info">
+              <span class="meta-label">Linked Reference</span>
+              <span class="meta-val link-val">{{ letter.link_ref }}</span>
+            </div>
           </div>
         </div>
 
-        <!-- Action Buttons -->
-        <div class="footer-action-buttons">
-          <button mat-stroked-button color="primary" class="dossier-btn" (click)="openDetail(letter)">
-            <mat-icon>dock_to_right</mat-icon> Dossier & Document
-          </button>
-          <button mat-flat-button color="primary" class="update-btn" (click)="openUpdateStatus(letter)">
-            <mat-icon>update</mat-icon> Update Status
-          </button>
+        <!-- Description / Directive Callout (shown in comfortable mode) -->
+        <div class="directive-desc-box" *ngIf="letter.description && densityMode() !== 'compact'">
+          <mat-icon class="desc-quote-icon">format_quote</mat-icon>
+          <p class="desc-paragraph">{{ letter.description }}</p>
         </div>
+
+        <!-- Latest Officer Action Note (shown in comfortable mode) -->
+        <div class="latest-action-strip" *ngIf="getLastLog(letter) as lastLog">
+          <mat-icon class="history-ico">history</mat-icon>
+          <div class="action-strip-content">
+            <span class="officer-name">{{ lastLog.officer_name }}</span>
+            <span class="log-text">"{{ lastLog.remarks }}"</span>
+            <span class="log-time">{{ lastLog.timestamp | date:'shortTime' }}</span>
+          </div>
+        </div>
+
+        <!-- Card Footer -->
+        <div class="directive-card-footer">
+          <!-- Assignees with Initials -->
+          <div class="assignees-group">
+            <span class="assignee-label">Officers:</span>
+            <div class="avatar-stack">
+              <div class="officer-avatar" 
+                   *ngFor="let u of (letter.assigned_user_names || letter.assigned_to)" 
+                   [matTooltip]="u">
+                {{ getInitials(u) }}
+              </div>
+              <span *ngIf="!letter.assigned_to?.length" class="unassigned-chip">Unassigned</span>
+            </div>
+          </div>
+
+          <!-- Action Buttons -->
+          <div class="footer-action-buttons">
+            <button mat-stroked-button color="primary" class="dossier-btn" (click)="openDetail(letter)">
+              <mat-icon>dock_to_right</mat-icon> Dossier & Document
+            </button>
+            <button mat-flat-button color="primary" class="update-btn" (click)="openUpdateStatus(letter)">
+              <mat-icon>update</mat-icon> Update Status
+            </button>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Empty State for Grid -->
+      <div class="grid-empty-state" *ngIf="filteredLetters().length === 0">
+        <div class="empty-icon-wrap">
+          <mat-icon>task_alt</mat-icon>
+        </div>
+        <h3>No Pending Directives in this View</h3>
+        <p>All official letters matching your selected filter criteria have been addressed or resolved.</p>
+        <button mat-stroked-button (click)="clearFilters()">
+          <mat-icon>filter_alt_off</mat-icon> Reset View Filters
+        </button>
       </div>
 
     </div>
 
-    <!-- Empty State for Grid -->
-    <div class="grid-empty-state" *ngIf="filteredLetters().length === 0">
-      <div class="empty-icon-wrap">
-        <mat-icon>task_alt</mat-icon>
-      </div>
-      <h3>No Pending Directives in this View</h3>
-      <p>All official letters matching your selected filter criteria have been addressed or resolved.</p>
-      <button mat-stroked-button (click)="clearFilters()">
-        <mat-icon>filter_alt_off</mat-icon> Reset View Filters
-      </button>
-    </div>
+    <!-- Paginator for Grid View -->
+    <mat-card class="pagination-footer-card" *ngIf="filteredLetters().length > 0">
+      <mat-paginator [length]="filteredLetters().length"
+                     [pageSize]="pageSize()"
+                     [pageIndex]="pageIndex()"
+                     [pageSizeOptions]="pageSizeOptions"
+                     (page)="onPageChange($event)"
+                     showFirstLastButtons
+                     class="actions-paginator">
+      </mat-paginator>
+    </mat-card>
 
   </div>
 
   <!-- VIEW C: DENSE TABLE VIEW -->
   <mat-card class="table-view-card" *ngIf="viewMode() === 'table'">
     <div class="table-responsive-container">
-      <table mat-table [dataSource]="filteredLetters()" class="dense-directives-table">
+      <table mat-table [dataSource]="paginatedLetters()" class="dense-directives-table" [class.compact-table]="densityMode() === 'compact'">
         
         <!-- Ref Number Column -->
         <ng-container matColumnDef="ref_number">
@@ -515,7 +583,7 @@
           <th mat-header-cell *matHeaderCellDef> Date Received </th>
           <td mat-cell *matCellDef="let l">
             <div class="date-stacked">
-              <span>{{ l.received_date }}</span>
+              <span class="r-date-txt" [class.is-today]="l.received_date === todayStr()">{{ l.received_date }}</span>
               <span class="time-ago">{{ getTimeAgo(l.received_date) }}</span>
             </div>
           </td>
@@ -580,6 +648,16 @@
         </tr>
       </table>
     </div>
+
+    <!-- Paginator for Table View -->
+    <mat-paginator [length]="filteredLetters().length"
+                   [pageSize]="pageSize()"
+                   [pageIndex]="pageIndex()"
+                   [pageSizeOptions]="pageSizeOptions"
+                   (page)="onPageChange($event)"
+                   showFirstLastButtons
+                   class="actions-paginator">
+    </mat-paginator>
   </mat-card>
 
 </div>
