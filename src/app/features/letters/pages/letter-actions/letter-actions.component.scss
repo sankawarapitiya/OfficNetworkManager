@@ -1,10 +1,11 @@
 .actions-page-container {
-  padding: 1.5rem 2rem 3rem;
-  max-width: 1680px;
-  margin: 0 auto;
+  width: 100%;
+  margin: 0;
+  padding: 0 0 2.5rem 0;
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
+  box-sizing: border-box;
 }
 
 /* 1. Hero Header Banner */
@@ -19,6 +20,8 @@
   box-shadow: 0 10px 25px -5px rgba(30, 27, 75, 0.25), 0 8px 10px -6px rgba(30, 27, 75, 0.2);
   position: relative;
   overflow: hidden;
+  width: 100%;
+  box-sizing: border-box;
 
   &::before {
     content: '';
@@ -134,6 +137,8 @@
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 1.25rem;
+  width: 100%;
+  box-sizing: border-box;
 
   .kpi-stat-card {
     background: #ffffff;
@@ -148,6 +153,7 @@
     transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
     position: relative;
     user-select: none;
+    box-sizing: border-box;
 
     &:hover {
       box-shadow: var(--card-shadow-hover, 0 6px 18px rgba(0,0,0,0.08));
@@ -220,6 +226,7 @@
       display: flex;
       flex-direction: column;
       flex-grow: 1;
+      min-width: 0;
 
       .kpi-label {
         font-size: 0.8rem;
@@ -227,6 +234,9 @@
         text-transform: uppercase;
         letter-spacing: 0.03em;
         color: var(--text-muted, #64748b);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
       }
 
       .kpi-num {
@@ -268,11 +278,13 @@
   background: #ffffff;
   border-radius: var(--radius-container, 14px);
   border: 1px solid var(--border-subtle, #e2e8f0);
-  padding: 1.25rem 1.5rem;
+  padding: 1.25rem 1.5rem !important;
   box-shadow: var(--card-shadow, 0 1px 3px rgba(0,0,0,0.04));
   display: flex;
   flex-direction: column;
   gap: 1rem;
+  width: 100%;
+  box-sizing: border-box;
 
   .filter-top-row {
     display: flex;
@@ -280,12 +292,16 @@
     justify-content: space-between;
     gap: 1.25rem;
     flex-wrap: wrap;
+    width: 100%;
 
     .search-input-wrap {
-      flex: 1 1 320px;
+      flex: 1 1 340px;
+      min-width: 260px;
+      height: 44px;
       position: relative;
       display: flex;
       align-items: center;
+      box-sizing: border-box;
 
       .search-icon {
         position: absolute;
@@ -299,12 +315,14 @@
 
       input {
         width: 100%;
-        padding: 0.65rem 2.5rem 0.65rem 2.6rem;
+        height: 44px;
+        padding: 0 2.5rem 0 2.6rem;
         border-radius: 10px;
         border: 1px solid #cbd5e1;
         background: #f8fafc;
         font-size: 0.9rem;
         color: var(--text-primary);
+        box-sizing: border-box;
         transition: all 0.2s ease;
 
         &:focus {
@@ -342,10 +360,10 @@
       flex-wrap: wrap;
 
       .filter-select-field {
-        width: 160px;
+        width: 165px;
 
         &.dept-select {
-          width: 190px;
+          width: 195px;
         }
 
         ::ng-deep .mat-mdc-form-field-subscript-wrapper {
@@ -353,18 +371,20 @@
         }
 
         ::ng-deep .mat-mdc-text-field-wrapper {
-          padding-top: 0;
-          padding-bottom: 0;
-          height: 42px;
+          height: 44px;
+          border-radius: 10px;
+          background-color: #f8fafc;
         }
 
         ::ng-deep .mat-mdc-form-field-flex {
-          height: 42px;
+          height: 44px;
           align-items: center;
         }
 
         ::ng-deep .mat-mdc-select-value {
           font-size: 0.875rem;
+          color: #1e293b;
+          font-weight: 500;
         }
       }
 
@@ -374,12 +394,16 @@
         border-radius: 10px;
         padding: 3px;
         border: 1px solid #e2e8f0;
+        height: 44px;
+        box-sizing: border-box;
+        align-items: center;
 
         .view-mode-btn {
           background: transparent;
           border: none;
           border-radius: 7px;
-          padding: 6px 10px;
+          padding: 6px 12px;
+          height: 36px;
           cursor: pointer;
           display: flex;
           align-items: center;
@@ -415,6 +439,7 @@
     padding-top: 0.75rem;
     border-top: 1px solid #f1f5f9;
     flex-wrap: wrap;
+    width: 100%;
 
     .pills-scroll-list {
       display: flex;
@@ -422,6 +447,7 @@
       gap: 0.5rem;
       overflow-x: auto;
       padding-bottom: 2px;
+      max-width: 100%;
 
       &::-webkit-scrollbar {
         height: 3px;
@@ -623,6 +649,7 @@
   border: 2px solid #ffffff;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   text-transform: uppercase;
+  flex-shrink: 0;
 
   &.sm {
     width: 24px;
@@ -660,6 +687,8 @@
   grid-template-columns: repeat(4, 1fr);
   gap: 1.25rem;
   align-items: start;
+  width: 100%;
+  box-sizing: border-box;
 
   .kanban-column {
     background: #f8fafc;
@@ -667,8 +696,10 @@
     border: 1px solid #e2e8f0;
     display: flex;
     flex-direction: column;
-    max-height: calc(100vh - 310px);
     min-height: 480px;
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
 
     .kanban-column-header {
       padding: 1rem 1.15rem;
@@ -679,22 +710,28 @@
       background: #ffffff;
       border-top-left-radius: 13px;
       border-top-right-radius: 13px;
+      flex-shrink: 0;
 
       .col-title-wrap {
         display: flex;
         align-items: center;
         gap: 0.55rem;
+        min-width: 0;
 
         .col-icon {
           font-size: 20px;
           width: 20px;
           height: 20px;
+          flex-shrink: 0;
         }
 
         .col-name {
           font-size: 0.9rem;
           font-weight: 700;
           color: #1e293b;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
         }
       }
 
@@ -705,6 +742,7 @@
         color: #334155;
         padding: 0.15rem 0.55rem;
         border-radius: 9999px;
+        flex-shrink: 0;
       }
     }
 
@@ -757,6 +795,8 @@
         box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
         transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
         position: relative;
+        min-width: 0;
+        box-sizing: border-box;
 
         &:hover {
           border-color: #cbd5e1;
@@ -782,12 +822,14 @@
             background: #f1f5f9;
             padding: 0.15rem 0.45rem;
             border-radius: 4px;
+            white-space: nowrap;
           }
 
           .k-pills {
             display: flex;
             align-items: center;
             gap: 0.4rem;
+            flex-shrink: 0;
 
             .att-indicator {
               display: inline-flex;
@@ -819,6 +861,7 @@
           line-clamp: 2;
           -webkit-box-orient: vertical;
           overflow: hidden;
+          word-break: break-word;
 
           &:hover {
             color: #4f46e5;
@@ -831,6 +874,7 @@
           justify-content: space-between;
           font-size: 0.775rem;
           color: #64748b;
+          gap: 0.5rem;
 
           .k-meta-item {
             display: inline-flex;
@@ -839,19 +883,23 @@
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
-            max-width: 65%;
+            min-width: 0;
+            flex: 1;
 
             mat-icon {
               font-size: 14px;
               width: 14px;
               height: 14px;
               color: #94a3b8;
+              flex-shrink: 0;
             }
           }
 
           .k-age-tag {
             font-size: 0.725rem;
             color: #94a3b8;
+            white-space: nowrap;
+            flex-shrink: 0;
           }
         }
 
@@ -864,13 +912,18 @@
           display: inline-flex;
           align-items: center;
           gap: 4px;
-          width: fit-content;
+          max-width: 100%;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          box-sizing: border-box;
 
           mat-icon {
             font-size: 13px;
             width: 13px;
             height: 13px;
             color: #64748b;
+            flex-shrink: 0;
           }
         }
 
@@ -954,8 +1007,10 @@
 ======================================================== */
 .actions-grid-container {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
   gap: 1.25rem;
+  width: 100%;
+  box-sizing: border-box;
 
   .action-directive-card {
     background: #ffffff;
@@ -968,6 +1023,8 @@
     box-shadow: var(--card-shadow, 0 1px 3px rgba(0,0,0,0.04));
     transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
     position: relative;
+    box-sizing: border-box;
+    min-width: 0;
 
     &:hover {
       box-shadow: var(--card-shadow-hover, 0 8px 20px rgba(0,0,0,0.08));
@@ -1060,6 +1117,7 @@
       line-height: 1.4;
       margin: 0;
       cursor: pointer;
+      word-break: break-word;
       transition: color 0.2s ease;
 
       &:hover {
@@ -1080,6 +1138,7 @@
         display: flex;
         align-items: flex-start;
         gap: 0.5rem;
+        min-width: 0;
 
         .meta-ico {
           font-size: 18px;
@@ -1087,11 +1146,13 @@
           height: 18px;
           color: #94a3b8;
           margin-top: 2px;
+          flex-shrink: 0;
         }
 
         .meta-info {
           display: flex;
           flex-direction: column;
+          min-width: 0;
 
           .meta-label {
             font-size: 0.7rem;
@@ -1105,6 +1166,7 @@
             font-size: 0.825rem;
             color: #334155;
             font-weight: 500;
+            word-break: break-word;
 
             &.font-semibold {
               font-weight: 600;
@@ -1148,6 +1210,7 @@
         line-clamp: 2;
         -webkit-box-orient: vertical;
         overflow: hidden;
+        word-break: break-word;
       }
     }
 
@@ -1176,10 +1239,12 @@
         overflow: hidden;
         white-space: nowrap;
         text-overflow: ellipsis;
+        min-width: 0;
 
         .officer-name {
           font-weight: 600;
           color: #166534;
+          flex-shrink: 0;
         }
 
         .log-text {
@@ -1192,6 +1257,7 @@
         .log-time {
           color: #86efac;
           font-size: 0.7rem;
+          flex-shrink: 0;
         }
       }
     }
@@ -1316,9 +1382,13 @@
   border: 1px solid var(--border-subtle, #e2e8f0);
   overflow: hidden;
   box-shadow: var(--card-shadow, 0 1px 3px rgba(0,0,0,0.04));
+  padding: 0 !important;
+  width: 100%;
+  box-sizing: border-box;
 
   .table-responsive-container {
     overflow-x: auto;
+    width: 100%;
 
     .dense-directives-table {
       width: 100%;
@@ -1464,7 +1534,6 @@
 
 @media (max-width: 768px) {
   .actions-page-container {
-    padding: 1rem;
     gap: 1rem;
   }
 

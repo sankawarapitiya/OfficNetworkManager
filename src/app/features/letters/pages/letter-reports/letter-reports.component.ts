@@ -61,7 +61,7 @@ interface DeptMatrixRow {
     MatNativeDateModule
   ],
   template: `
-    <div class="page-container max-w-7xl mx-auto p-4 md:p-6">
+    <div class="page-container w-full">
 
       <!-- Header & Export / Print Actions -->
       <div class="page-header no-print">

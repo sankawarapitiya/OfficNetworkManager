@@ -40,7 +40,7 @@ import {
     MatSelectModule
   ],
   template: `
-    <div class="page-container max-w-5xl mx-auto p-4 md:p-6">
+    <div class="page-container w-full">
       <!-- Header -->
       <div class="page-header">
         <div>

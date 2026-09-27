@@ -194,12 +194,16 @@ export class LetterActionsComponent implements OnInit {
   ];
 
   ngOnInit() {
-    this.letterService.getLetters().subscribe(letters => {
-      this.allLetters.set(letters || []);
-    });
+    this.loadData();
 
     this.settingsService.getDepartments().subscribe(depts => {
       this.departments.set(depts || []);
+    });
+  }
+
+  loadData() {
+    this.letterService.getLetters().subscribe(letters => {
+      this.allLetters.set(letters || []);
     });
   }
 
@@ -296,6 +300,8 @@ export class LetterActionsComponent implements OnInit {
       panelClass: 'letter-dialog-overlay',
       autoFocus: false,
       data: {}
+    }).afterClosed().subscribe(res => {
+      if (res) this.loadData();
     });
   }
 
@@ -306,13 +312,18 @@ export class LetterActionsComponent implements OnInit {
       maxHeight: '94vh',
       panelClass: 'letter-detail-dialog-overlay',
       data: { letter }
+    }).afterClosed().subscribe(() => {
+      this.loadData();
     });
   }
 
   openUpdateStatus(letter: Letter) {
     this.dialog.open(LetterStatusDialogComponent, {
       width: '520px',
+      panelClass: 'letter-dialog-overlay',
       data: { letter }
+    }).afterClosed().subscribe(res => {
+      if (res) this.loadData();
     });
   }
 
