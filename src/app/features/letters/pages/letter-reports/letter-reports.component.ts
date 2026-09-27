@@ -14,11 +14,18 @@ import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatNativeDateModule } from '@angular/material/core';
 
 import { LetterService } from '../../services/letter.service';
-import { Letter, LetterStatus, ALL_LETTER_STATUSES } from '../../models/letter.model';
+import { Letter, LetterStatus, ALL_LETTER_STATUSES, LetterPriority, DEFAULT_LETTER_SETTINGS, LetterSettings } from '../../models/letter.model';
 import { SettingsService, Department } from '../../../settings/settings.service';
 
 export type TimeframeMode = 'daily' | 'weekly' | 'monthly' | 'custom';
-export type ReportViewTab = 'status-report' | 'ledger' | 'combined';
+export type ReportViewType = 
+  | 'daily-register'      // Daily Inward Letters Register & Dispatch Sheet (Optimized for daily volume)
+  | 'status-matrix'       // Department Workflow Distribution Matrix & Status Analytics
+  | 'urgent-directives'   // Urgent Directives & Action Required Audit
+  | 'category-report'     // Classification & Subject Category Breakdown
+  | 'dept-workload'       // Department Workload & Performance Summary
+  | 'ledger'              // Master Correspondence Ledger Register
+  | 'executive-combined'; // Executive Master Brief (Combined Full Report)
 
 interface StatusItem {
   status: LetterStatus;
@@ -42,6 +49,16 @@ interface DeptMatrixRow {
   turnaroundRate: string;
 }
 
+interface CategorySummaryRow {
+  category: string;
+  total: number;
+  percent: number;
+  urgent: number;
+  pending: number;
+  completed: number;
+  turnaroundRate: string;
+}
+
 @Component({
   selector: 'app-letter-reports',
   standalone: true,
@@ -61,18 +78,42 @@ interface DeptMatrixRow {
     MatNativeDateModule
   ],
   template: `
-    <div class="page-container w-full">
+    <div class="page-container w-full" [class.compact-density]="densityMode() === 'compact'">
 
-      <!-- Header & Export / Print Actions -->
+      <!-- ============================================================== -->
+      <!-- TOP HEADER & EXPORT / PRINT ACTIONS (No Print) -->
+      <!-- ============================================================== -->
       <div class="page-header no-print">
         <div class="header-titles">
           <div class="title-row">
-            <mat-icon class="title-icon">analytics</mat-icon>
-            <h1 class="page-title">Correspondence Reports & Status Register</h1>
+            <div class="icon-avatar">
+              <mat-icon>assessment</mat-icon>
+            </div>
+            <div>
+              <div class="breadcrumb-text">Official Correspondence & Inward Workflow</div>
+              <h1 class="page-title">Reports & Correspondence Analytics</h1>
+            </div>
           </div>
-          <p class="page-desc">Generate periodic status audits, department cross-tabulation, and official dispatch registers.</p>
+          <p class="page-desc">Generate official daily inward logs, department distribution matrices, priority directives audits, and executive registers.</p>
         </div>
+
         <div class="actions-group">
+          <!-- Density Toggle -->
+          <div class="density-pill-group" matTooltip="Toggle row density for high-volume scanning (40+ letters/day)">
+            <button type="button" 
+                    class="density-btn" 
+                    [class.active]="densityMode() === 'standard'" 
+                    (click)="densityMode.set('standard')">
+              <mat-icon>view_headline</mat-icon> Standard
+            </button>
+            <button type="button" 
+                    class="density-btn" 
+                    [class.active]="densityMode() === 'compact'" 
+                    (click)="densityMode.set('compact')">
+              <mat-icon>density_small</mat-icon> Compact (40+)
+            </button>
+          </div>
+
           <!-- Paper Size Pill Selector -->
           <div class="paper-size-pill-group">
             <span class="paper-label">Paper:</span>
@@ -81,50 +122,209 @@ interface DeptMatrixRow {
                     [class.active]="paperSize() === 'A4'" 
                     (click)="setPaperSize('A4')"
                     matTooltip="A4 Horizontal Landscape (297 × 210 mm)">
-              <mat-icon>aspect_ratio</mat-icon> A4 Horizontal
+              <mat-icon>aspect_ratio</mat-icon> A4 Landscape
             </button>
             <button type="button" 
                     class="paper-btn" 
                     [class.active]="paperSize() === 'legal'" 
                     (click)="setPaperSize('legal')"
                     matTooltip="Legal Horizontal Landscape (356 × 216 mm)">
-              <mat-icon>view_compact_alt</mat-icon> Legal Horizontal
+              <mat-icon>view_compact_alt</mat-icon> Legal Landscape
             </button>
           </div>
 
           <!-- Print Action with Format Dropdown -->
           <button mat-stroked-button [matMenuTriggerFor]="printMenu" class="action-btn">
-            <mat-icon>print</mat-icon> Print Horizontal ({{ paperSize() === 'A4' ? 'A4' : 'Legal' }}) <mat-icon>arrow_drop_down</mat-icon>
+            <mat-icon>print</mat-icon> Print Report ({{ paperSize() === 'A4' ? 'A4' : 'Legal' }}) <mat-icon>arrow_drop_down</mat-icon>
           </button>
           <mat-menu #printMenu="matMenu">
             <button mat-menu-item (click)="printReport('A4')">
-              <mat-icon>description</mat-icon> Print A4 Horizontal (297 × 210 mm)
+              <mat-icon>description</mat-icon> Print A4 Horizontal Landscape (297 × 210 mm)
             </button>
             <button mat-menu-item (click)="printReport('legal')">
-              <mat-icon>article</mat-icon> Print Legal Horizontal (356 × 216 mm)
+              <mat-icon>article</mat-icon> Print Legal Horizontal Landscape (356 × 216 mm)
             </button>
           </mat-menu>
 
+          <!-- Export Action Dropdown -->
           <button mat-flat-button color="primary" [matMenuTriggerFor]="exportMenu" class="action-btn">
             <mat-icon>download</mat-icon> Export Data <mat-icon>arrow_drop_down</mat-icon>
           </button>
           <mat-menu #exportMenu="matMenu">
+            <button mat-menu-item (click)="exportDailyInwardCSV()">
+              <mat-icon>today</mat-icon> Export Daily Inward Register (CSV)
+            </button>
             <button mat-menu-item (click)="exportLettersCSV()">
-              <mat-icon>table_chart</mat-icon> Export Letters Register (CSV)
+              <mat-icon>table_chart</mat-icon> Export Filtered Correspondence (CSV)
             </button>
             <button mat-menu-item (click)="exportStatusMatrixCSV()">
-              <mat-icon>view_list</mat-icon> Export Status Matrix (CSV)
+              <mat-icon>view_list</mat-icon> Export Department Status Matrix (CSV)
+            </button>
+            <button mat-menu-item (click)="exportCategorySummaryCSV()">
+              <mat-icon>category</mat-icon> Export Classification Summary (CSV)
             </button>
           </mat-menu>
         </div>
       </div>
 
-      <!-- TIMEFRAME PRESETS & DATE RANGE PICKER (No Print) -->
+      <!-- ============================================================== -->
+      <!-- DEDICATED DAILY INWARD QUICK SHORTCUT BANNER (No Print) -->
+      <!-- ============================================================== -->
+      <div class="daily-inward-quick-banner no-print">
+        <div class="banner-left">
+          <div class="daily-badge-icon">
+            <mat-icon>mark_email_unread</mat-icon>
+          </div>
+          <div class="banner-text">
+            <div class="banner-title">
+              <strong>Daily Inward Correspondence Optimization</strong>
+              <span class="daily-count-chip">{{ todayInwardCount() }} Registered Today</span>
+            </div>
+            <div class="banner-sub">One-click quick filters for official daily inward registers and delivery handover sheets.</div>
+          </div>
+        </div>
+
+        <div class="banner-shortcuts">
+          <button type="button" 
+                  class="quick-daily-btn"
+                  [class.active]="timeframeMode() === 'daily' && isTodayDaily() && activeReportType() === 'daily-register'"
+                  (click)="switchToTodayDailyRegister()">
+            <mat-icon>today</mat-icon>
+            <span>Today's Daily Register</span>
+          </button>
+
+          <button type="button" 
+                  class="quick-daily-btn"
+                  [class.active]="timeframeMode() === 'daily' && isYesterdayDaily() && activeReportType() === 'daily-register'"
+                  (click)="switchToYesterdayDailyRegister()">
+            <mat-icon>history</mat-icon>
+            <span>Yesterday's Inward Log</span>
+          </button>
+
+          <button type="button" 
+                  class="quick-daily-btn highlight"
+                  [class.active]="activeReportType() === 'daily-register'"
+                  (click)="activeReportType.set('daily-register')">
+            <mat-icon>assignment</mat-icon>
+            <span>Daily Dispatch & Handover Sheet</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- ============================================================== -->
+      <!-- REPORT TYPE SELECTOR CARDS (No Print) -->
+      <!-- ============================================================== -->
+      <div class="report-types-ribbon no-print">
+        <div class="ribbon-label">Select Report Type:</div>
+        <div class="report-type-cards">
+          <!-- 1. Daily Inward Register -->
+          <div class="rtype-card" 
+               [class.active]="activeReportType() === 'daily-register'"
+               (click)="selectReportType('daily-register')">
+            <div class="rtype-icon-wrap emerald">
+              <mat-icon>today</mat-icon>
+            </div>
+            <div class="rtype-info">
+              <span class="rtype-title">Daily Inward Register</span>
+              <span class="rtype-sub">Daily mail log with handover signatures</span>
+            </div>
+            <span *ngIf="timeframeMode() === 'daily'" class="rtype-badge">{{ filteredLetters().length }} Letters</span>
+          </div>
+
+          <!-- 2. Status & Department Matrix -->
+          <div class="rtype-card" 
+               [class.active]="activeReportType() === 'status-matrix'"
+               (click)="selectReportType('status-matrix')">
+            <div class="rtype-icon-wrap blue">
+              <mat-icon>grid_on</mat-icon>
+            </div>
+            <div class="rtype-info">
+              <span class="rtype-title">Status Matrix & Audit</span>
+              <span class="rtype-sub">Cross-tabulation of departments vs workflow</span>
+            </div>
+            <span class="rtype-badge">{{ departmentMatrix().length }} Depts</span>
+          </div>
+
+          <!-- 3. Urgent Directives -->
+          <div class="rtype-card" 
+               [class.active]="activeReportType() === 'urgent-directives'"
+               (click)="selectReportType('urgent-directives')">
+            <div class="rtype-icon-wrap rose">
+              <mat-icon>notification_important</mat-icon>
+            </div>
+            <div class="rtype-info">
+              <span class="rtype-title">Urgent Directives</span>
+              <span class="rtype-sub">Immediate / Urgent pending action items</span>
+            </div>
+            <span class="rtype-badge red-badge">{{ urgentDirectivesCount() }} Items</span>
+          </div>
+
+          <!-- 4. Category Breakdown -->
+          <div class="rtype-card" 
+               [class.active]="activeReportType() === 'category-report'"
+               (click)="selectReportType('category-report')">
+            <div class="rtype-icon-wrap amber">
+              <mat-icon>category</mat-icon>
+            </div>
+            <div class="rtype-info">
+              <span class="rtype-title">Category Breakdown</span>
+              <span class="rtype-sub">Financial, Legal, Circulars, Petitions</span>
+            </div>
+            <span class="rtype-badge">{{ categorySummary().length }} Types</span>
+          </div>
+
+          <!-- 5. Department Workload -->
+          <div class="rtype-card" 
+               [class.active]="activeReportType() === 'dept-workload'"
+               (click)="selectReportType('dept-workload')">
+            <div class="rtype-icon-wrap indigo">
+              <mat-icon>business</mat-icon>
+            </div>
+            <div class="rtype-info">
+              <span class="rtype-title">Department Workload</span>
+              <span class="rtype-sub">Throughput, turnaround and backlog</span>
+            </div>
+            <span class="rtype-badge">{{ resolutionRate() }} Rate</span>
+          </div>
+
+          <!-- 6. Master Ledger -->
+          <div class="rtype-card" 
+               [class.active]="activeReportType() === 'ledger'"
+               (click)="selectReportType('ledger')">
+            <div class="rtype-icon-wrap slate">
+              <mat-icon>receipt_long</mat-icon>
+            </div>
+            <div class="rtype-info">
+              <span class="rtype-title">Master Ledger</span>
+              <span class="rtype-sub">Complete chronological tracking register</span>
+            </div>
+            <span class="rtype-badge">{{ filteredLetters().length }} Records</span>
+          </div>
+
+          <!-- 7. Executive Master Brief -->
+          <div class="rtype-card" 
+               [class.active]="activeReportType() === 'executive-combined'"
+               (click)="selectReportType('executive-combined')">
+            <div class="rtype-icon-wrap purple">
+              <mat-icon>auto_stories</mat-icon>
+            </div>
+            <div class="rtype-info">
+              <span class="rtype-title">Executive Master Brief</span>
+              <span class="rtype-sub">All-in-one comprehensive dossier</span>
+            </div>
+            <span class="rtype-badge purple-badge">Full Brief</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============================================================== -->
+      <!-- TIMEFRAME PRESETS & MULTI-FILTER BAR (No Print) -->
+      <!-- ============================================================== -->
       <mat-card class="filter-card no-print">
         <div class="timeframe-header-row">
           <!-- Preset Mode Segmented Control -->
           <div class="timeframe-segmented">
-            <span class="ctrl-label">Period Mode:</span>
+            <span class="ctrl-label">Timeframe:</span>
             <div class="pill-group">
               <button type="button" 
                       class="pill-btn" 
@@ -148,23 +348,57 @@ interface DeptMatrixRow {
                       class="pill-btn" 
                       [class.active]="timeframeMode() === 'custom'" 
                       (click)="setTimeframeMode('custom')">
-                <mat-icon>date_range</mat-icon> Date Range
+                <mat-icon>date_range</mat-icon> Custom Range
               </button>
             </div>
           </div>
 
-          <!-- Department & Status Dropdown Filters -->
+          <!-- Instant Search Box for 40+ letters -->
+          <div class="search-box-wrap">
+            <mat-icon class="search-icon">search</mat-icon>
+            <input type="text" 
+                   [(ngModel)]="searchQuery" 
+                   placeholder="Search Ref, Title, Sender, or Officer..." 
+                   class="search-input">
+            <button *ngIf="searchQuery" mat-icon-button (click)="searchQuery = ''" class="clear-search-btn">
+              <mat-icon>close</mat-icon>
+            </button>
+          </div>
+
+          <!-- Dropdown Filters: Department, Category, Status, Priority -->
           <div class="dropdown-filters">
+            <!-- Department Filter -->
             <mat-form-field appearance="outline" class="compact-field filter-select" subscriptSizing="dynamic">
-              <mat-label>Department Filter</mat-label>
+              <mat-label>Department</mat-label>
               <mat-select [(ngModel)]="selectedDept">
                 <mat-option value="ALL">All Departments</mat-option>
                 <mat-option *ngFor="let d of departments()" [value]="d.name">{{ d.name }}</mat-option>
               </mat-select>
             </mat-form-field>
 
+            <!-- Category Filter -->
             <mat-form-field appearance="outline" class="compact-field filter-select" subscriptSizing="dynamic">
-              <mat-label>Status Filter</mat-label>
+              <mat-label>Category</mat-label>
+              <mat-select [(ngModel)]="selectedCategory">
+                <mat-option value="ALL">All Categories</mat-option>
+                <mat-option *ngFor="let cat of availableCategories()" [value]="cat">{{ cat }}</mat-option>
+              </mat-select>
+            </mat-form-field>
+
+            <!-- Priority Filter -->
+            <mat-form-field appearance="outline" class="compact-field filter-select sm-select" subscriptSizing="dynamic">
+              <mat-label>Priority</mat-label>
+              <mat-select [(ngModel)]="selectedPriority">
+                <mat-option value="ALL">All</mat-option>
+                <mat-option value="Normal">Normal</mat-option>
+                <mat-option value="Urgent">Urgent</mat-option>
+                <mat-option value="Immediate">Immediate</mat-option>
+              </mat-select>
+            </mat-form-field>
+
+            <!-- Status Filter -->
+            <mat-form-field appearance="outline" class="compact-field filter-select" subscriptSizing="dynamic">
+              <mat-label>Status</mat-label>
               <mat-select [(ngModel)]="selectedStatus">
                 <mat-option value="ALL">All Statuses</mat-option>
                 <mat-option *ngFor="let s of statuses" [value]="s">{{ s }}</mat-option>
@@ -177,7 +411,7 @@ interface DeptMatrixRow {
           </div>
         </div>
 
-        <!-- Dynamic Date Controls based on Active Mode -->
+        <!-- Dynamic Date Subcontrols based on Active Mode -->
         <div class="timeframe-subcontrols">
           <!-- DAILY CONTROLS -->
           <div *ngIf="timeframeMode() === 'daily'" class="subcontrol-row">
@@ -185,22 +419,34 @@ interface DeptMatrixRow {
               <button mat-icon-button (click)="prevDay()" matTooltip="Previous Day" class="nav-arr-btn">
                 <mat-icon>chevron_left</mat-icon>
               </button>
-              <button mat-stroked-button (click)="setToday()" class="preset-btn">Today</button>
+              <button mat-stroked-button (click)="setToday()" class="preset-btn" [class.active-preset]="isTodayDaily()">Today</button>
+              <button mat-stroked-button (click)="setYesterday()" class="preset-btn" [class.active-preset]="isYesterdayDaily()">Yesterday</button>
               <button mat-icon-button (click)="nextDay()" matTooltip="Next Day" class="nav-arr-btn">
                 <mat-icon>chevron_right</mat-icon>
               </button>
             </div>
+
             <div class="date-input-wrap">
               <mat-form-field appearance="outline" class="compact-field" subscriptSizing="dynamic">
-                <mat-label>Selected Date</mat-label>
+                <mat-label>Selected Inward Date</mat-label>
                 <input matInput [matDatepicker]="dailyPicker" [ngModel]="dailyDateObj()" (ngModelChange)="onDailyDatePicked($event)" (click)="dailyPicker.open()" placeholder="Select date">
                 <mat-datepicker-toggle matIconSuffix [for]="dailyPicker"></mat-datepicker-toggle>
                 <mat-datepicker #dailyPicker></mat-datepicker>
               </mat-form-field>
             </div>
+
             <span class="active-badge daily">
               <mat-icon>event</mat-icon> {{ reportPeriodLabel() }}
             </span>
+
+            <div class="daily-batch-pills" *ngIf="timeframeMode() === 'daily'">
+              <span class="batch-chip total"><strong>{{ filteredLetters().length }}</strong> Inward Letters</span>
+              <span class="batch-chip urgent" *ngIf="priorityCounts().urgent + priorityCounts().immediate > 0">
+                <strong>{{ priorityCounts().urgent + priorityCounts().immediate }}</strong> Urgent Directives
+              </span>
+              <span class="batch-chip pending"><strong>{{ pendingCount() }}</strong> Pending Action</span>
+              <span class="batch-chip resolved"><strong>{{ resolvedCount() }}</strong> Resolved / Dispatched</span>
+            </div>
           </div>
 
           <!-- WEEKLY CONTROLS -->
@@ -241,7 +487,7 @@ interface DeptMatrixRow {
             </span>
           </div>
 
-          <!-- CUSTOM DATE RANGE CONTROLS -->
+          <!-- CUSTOM RANGE CONTROLS -->
           <div *ngIf="timeframeMode() === 'custom'" class="subcontrol-row custom-range-row">
             <div class="range-inputs">
               <mat-form-field appearance="outline" class="compact-field date-field" subscriptSizing="dynamic">
@@ -272,7 +518,9 @@ interface DeptMatrixRow {
         </div>
       </mat-card>
 
-      <!-- EXECUTIVE KPI CARDS -->
+      <!-- ============================================================== -->
+      <!-- EXECUTIVE KPI SUMMARY CARDS (No Print) -->
+      <!-- ============================================================== -->
       <div class="kpi-grid no-print">
         <mat-card class="stat-card">
           <div class="stat-top">
@@ -285,10 +533,19 @@ interface DeptMatrixRow {
 
         <mat-card class="stat-card">
           <div class="stat-top">
-            <span class="stat-label">Action Pending</span>
-            <mat-icon class="stat-icon red">pending_actions</mat-icon>
+            <span class="stat-label">Urgent Directives</span>
+            <mat-icon class="stat-icon rose">notification_important</mat-icon>
           </div>
-          <span class="stat-val text-red">{{ pendingCount() }}</span>
+          <span class="stat-val text-red">{{ priorityCounts().urgent + priorityCounts().immediate }}</span>
+          <span class="stat-sub">{{ priorityCounts().immediate }} Immediate • {{ priorityCounts().urgent }} Urgent</span>
+        </mat-card>
+
+        <mat-card class="stat-card">
+          <div class="stat-top">
+            <span class="stat-label">Action Pending</span>
+            <mat-icon class="stat-icon orange">pending_actions</mat-icon>
+          </div>
+          <span class="stat-val text-orange">{{ pendingCount() }}</span>
           <span class="stat-sub">Received / Review / Action</span>
         </mat-card>
 
@@ -311,60 +568,143 @@ interface DeptMatrixRow {
         </mat-card>
       </div>
 
-      <!-- REPORT VIEW SWITCHER TABS (No Print) -->
-      <div class="view-switcher-bar no-print">
-        <div class="tab-pill-group">
-          <button type="button" 
-                  class="view-tab-btn" 
-                  [class.active]="activeTab() === 'status-report'" 
-                  (click)="activeTab.set('status-report')">
-            <mat-icon>pie_chart</mat-icon> Status Analytics & Department Matrix
-          </button>
-          <button type="button" 
-                  class="view-tab-btn" 
-                  [class.active]="activeTab() === 'ledger'" 
-                  (click)="activeTab.set('ledger')">
-            <mat-icon>format_list_bulleted</mat-icon> Official Correspondence Ledger
-          </button>
-          <button type="button" 
-                  class="view-tab-btn" 
-                  [class.active]="activeTab() === 'combined'" 
-                  (click)="activeTab.set('combined')">
-            <mat-icon>auto_stories</mat-icon> Full Comprehensive Report (Both)
-          </button>
+      <!-- ============================================================== -->
+      <!-- REPORT TYPE 1: DAILY INWARD REGISTER & DISPATCH SHEET -->
+      <!-- ============================================================== -->
+      <div *ngIf="activeReportType() === 'daily-register' || activeReportType() === 'executive-combined'" class="report-section print-area">
+        
+        <!-- Official Printable Header -->
+        <div class="official-print-header">
+          <div class="ministry-title">GOVERNMENT / CORPORATE OFFICIAL CORRESPONDENCE SYSTEM</div>
+          <h2 class="office-name">DAILY INWARD CORRESPONDENCE REGISTER & DISPATCH SHEET</h2>
+          <div class="meta-row">
+            <span><strong>Inward Date / Period:</strong> {{ reportPeriodLabel() }}</span>
+            <span><strong>Department Scope:</strong> {{ selectedDept === 'ALL' ? 'All Departments' : selectedDept }}</span>
+            <span><strong>Total Inward Letters:</strong> {{ filteredLetters().length }}</span>
+            <span><strong>Urgent Items:</strong> {{ priorityCounts().urgent + priorityCounts().immediate }}</span>
+            <span><strong>Paper Format:</strong> {{ paperSize() === 'A4' ? 'A4 Landscape' : 'Legal Landscape' }}</span>
+            <span><strong>Printed At:</strong> {{ today | date:'medium' }}</span>
+          </div>
         </div>
 
-        <div class="priority-pills">
-          <span class="p-pill normal">Normal: <strong>{{ priorityCounts().normal }}</strong></span>
-          <span class="p-pill urgent">Urgent: <strong>{{ priorityCounts().urgent }}</strong></span>
-          <span class="p-pill immediate">Immediate: <strong>{{ priorityCounts().immediate }}</strong></span>
+        <div class="section-heading-bar no-print">
+          <div class="sh-left">
+            <mat-icon class="sec-icon emerald-icon">today</mat-icon>
+            <div>
+              <h3>Daily Inward Correspondence Register & Dispatch Sheet</h3>
+              <span class="heading-sub">Official daily mail receipt log with departmental handover and acknowledgement signature columns</span>
+            </div>
+          </div>
+          <div class="sh-right">
+            <span class="count-pill">{{ filteredLetters().length }} letters in this daily batch</span>
+            <button mat-stroked-button class="sm-btn" (click)="exportDailyInwardCSV()">
+              <mat-icon>download</mat-icon> Export Daily Sheet
+            </button>
+          </div>
+        </div>
+
+        <!-- High Volume Daily Inward Table -->
+        <div class="table-outer-card">
+          <table class="report-table daily-register-table">
+            <thead>
+              <tr>
+                <th style="width: 36px;" class="text-center">#</th>
+                <th style="width: 140px;">Reference No.</th>
+                <th style="width: 90px;">Inward Date</th>
+                <th>Letter Title & Subject</th>
+                <th style="width: 150px;">Received From (Sender)</th>
+                <th style="width: 110px;">Category</th>
+                <th style="width: 130px;">Send To (Dept)</th>
+                <th style="width: 130px;">Assigned Officer</th>
+                <th style="width: 80px;" class="text-center">Priority</th>
+                <th style="width: 100px;" class="text-center">Status</th>
+                <th style="width: 170px;" class="ack-header">Receiving Acknowledgement / Sign</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let l of filteredLetters(); let i = index" class="data-row" [class.urgent-row]="l.priority === 'Immediate' || l.priority === 'Urgent'">
+                <td class="text-center row-num">{{ i + 1 }}</td>
+                <td>
+                  <span class="ref-mono">{{ l.ref_number }}</span>
+                  <div *ngIf="l.link_ref" class="link-ref-sub">Link: {{ l.link_ref }}</div>
+                </td>
+                <td class="date-cell">{{ l.received_date }}</td>
+                <td class="subject-cell">
+                  <div class="letter-title-text">{{ l.title }}</div>
+                  <div *ngIf="l.description" class="letter-desc-snippet">{{ l.description }}</div>
+                </td>
+                <td class="sender-cell">{{ l.received_from }}</td>
+                <td>
+                  <span class="cat-chip">{{ l.category || 'General' }}</span>
+                </td>
+                <td class="dept-cell">
+                  <span class="dept-name">{{ (l.send_to && l.send_to.length) ? l.send_to.join(', ') : 'Unassigned' }}</span>
+                </td>
+                <td class="officer-cell">
+                  {{ l.assigned_user_names?.join(', ') || l.assigned_to.join(', ') || 'Pending' }}
+                </td>
+                <td class="text-center">
+                  <span class="priority-tag" [ngClass]="(l.priority || 'Normal').toLowerCase()">
+                    {{ l.priority || 'Normal' }}
+                  </span>
+                </td>
+                <td class="text-center">
+                  <span class="status-tag" [ngClass]="getStatusClass(l.status)">{{ l.status }}</span>
+                </td>
+                <!-- Physical Acknowledgement / Delivery Column -->
+                <td class="ack-cell">
+                  <div class="ack-sign-line">
+                    <span class="ack-sub">Sign: ........................</span>
+                    <span class="ack-sub">Date: ........................</span>
+                  </div>
+                </td>
+              </tr>
+              <tr *ngIf="filteredLetters().length === 0">
+                <td colspan="11" class="text-center p-8 text-gray-500">
+                  <div class="empty-wrap">
+                    <mat-icon class="empty-icon">mail_outline</mat-icon>
+                    <p class="empty-title">No inward letters found for {{ reportPeriodLabel() }}</p>
+                    <p class="empty-sub">Adjust the date picker or reset filters to view registered letters.</p>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </div>
 
       <!-- ============================================================== -->
-      <!-- SECTION 1: STATUS REPORT & MATRIX (Visible in status-report & combined) -->
+      <!-- REPORT TYPE 2: STATUS & DEPARTMENT DISTRIBUTION MATRIX -->
       <!-- ============================================================== -->
-      <div *ngIf="activeTab() === 'status-report' || activeTab() === 'combined'" class="report-section print-area">
+      <div *ngIf="activeReportType() === 'status-matrix' || activeReportType() === 'executive-combined'" class="report-section print-area mt-4">
         
-        <!-- Official Print Header (Only shown during print or at top of print-area) -->
-        <div class="official-print-header">
-          <h2 class="office-name">OFFICIAL CORRESPONDENCE WORKFLOW & STATUS REPORT</h2>
+        <div class="official-print-header" *ngIf="activeReportType() === 'status-matrix'">
+          <div class="ministry-title">OFFICIAL CORRESPONDENCE WORKFLOW MANAGEMENT</div>
+          <h2 class="office-name">DEPARTMENT WORKFLOW & STATUS CROSS-TABULATION MATRIX</h2>
           <div class="meta-row">
-            <span><strong>Reporting Period:</strong> {{ reportPeriodLabel() }}</span>
+            <span><strong>Period:</strong> {{ reportPeriodLabel() }}</span>
             <span><strong>Department Scope:</strong> {{ selectedDept === 'ALL' ? 'All Departments' : selectedDept }}</span>
             <span><strong>Status Filter:</strong> {{ selectedStatus === 'ALL' ? 'All Statuses' : selectedStatus }}</span>
-            <span><strong>Paper Format:</strong> {{ paperSize() === 'A4' ? 'A4 Horizontal Landscape (297×210 mm)' : 'Legal Horizontal Landscape (356×216 mm)' }}</span>
-            <span><strong>Generated Date:</strong> {{ today | date:'medium' }}</span>
+            <span><strong>Paper Format:</strong> {{ paperSize() === 'A4' ? 'A4 Landscape' : 'Legal Landscape' }}</span>
+            <span><strong>Generated:</strong> {{ today | date:'medium' }}</span>
           </div>
         </div>
 
-        <!-- STATUS BREAKDOWN GRID -->
-        <div class="section-heading-bar">
-          <mat-icon class="sec-icon">bar_chart</mat-icon>
-          <h3>Status Breakdown & Distribution (Click card to filter ledger)</h3>
+        <div class="section-heading-bar no-print">
+          <div class="sh-left">
+            <mat-icon class="sec-icon blue-icon">grid_on</mat-icon>
+            <div>
+              <h3>Workflow Status Distribution & Department Cross-Tabulation Matrix</h3>
+              <span class="heading-sub">Cross-tabulation of active correspondence by assigned department and resolution rate</span>
+            </div>
+          </div>
+          <button mat-stroked-button class="sm-btn" (click)="exportStatusMatrixCSV()">
+            <mat-icon>download</mat-icon> Export Matrix CSV
+          </button>
         </div>
 
-        <div class="status-cards-grid">
+        <!-- 7 Interactive Status Cards (Click to filter) -->
+        <div class="status-cards-grid no-print">
           <div *ngFor="let s of statusBreakdown()" 
                class="status-summary-card" 
                [ngClass]="[s.cssClass, selectedStatus === s.status ? 'selected-card' : '']"
@@ -382,14 +722,8 @@ interface DeptMatrixRow {
           </div>
         </div>
 
-        <!-- DEPARTMENT STATUS CROSS-TABULATION MATRIX -->
-        <div class="section-heading-bar mt-6">
-          <mat-icon class="sec-icon">grid_on</mat-icon>
-          <h3>Department Workflow Distribution Matrix</h3>
-          <span class="heading-sub">Cross-tabulation of active correspondence by assigned department</span>
-        </div>
-
-        <div class="matrix-card">
+        <!-- Cross-Tabulation Matrix Table -->
+        <div class="table-outer-card">
           <table class="report-table matrix-table">
             <thead>
               <tr>
@@ -401,7 +735,7 @@ interface DeptMatrixRow {
                 <th class="stat-col text-center">Completed</th>
                 <th class="stat-col text-center">Dispatched</th>
                 <th class="stat-col text-center">Archived</th>
-                <th class="stat-col text-center total-header">Total</th>
+                <th class="stat-col text-center total-header">Total Letters</th>
                 <th class="stat-col text-center turnaround-header">Resolution Rate</th>
               </tr>
             </thead>
@@ -431,7 +765,7 @@ interface DeptMatrixRow {
             </tbody>
             <tfoot>
               <tr class="matrix-footer-row" *ngIf="departmentMatrix().length > 0">
-                <td><strong>Summary Total</strong></td>
+                <td><strong>SUMMARY TOTAL</strong></td>
                 <td class="text-center">{{ matrixTotals().received }}</td>
                 <td class="text-center">{{ matrixTotals().inReview }}</td>
                 <td class="text-center text-red">{{ matrixTotals().actionRequired }}</td>
@@ -452,52 +786,294 @@ interface DeptMatrixRow {
       </div>
 
       <!-- ============================================================== -->
-      <!-- SECTION 2: OFFICIAL CORRESPONDENCE LEDGER (Visible in ledger & combined) -->
+      <!-- REPORT TYPE 3: URGENT DIRECTIVES & PENDING ACTIONS AUDIT -->
       <!-- ============================================================== -->
-      <div *ngIf="activeTab() === 'ledger' || activeTab() === 'combined'" class="report-section print-area mt-4">
+      <div *ngIf="activeReportType() === 'urgent-directives' || activeReportType() === 'executive-combined'" class="report-section print-area mt-4">
         
-        <div class="official-print-header" *ngIf="activeTab() === 'ledger'">
-          <h2 class="office-name">OFFICIAL INWARD CORRESPONDENCE REGISTER</h2>
+        <div class="official-print-header" *ngIf="activeReportType() === 'urgent-directives'">
+          <div class="ministry-title">PRIORITY AUDIT & EXECUTIVE MONITORING</div>
+          <h2 class="office-name">URGENT DIRECTIVES & PENDING ACTIONS REGISTER</h2>
           <div class="meta-row">
             <span><strong>Period:</strong> {{ reportPeriodLabel() }}</span>
-            <span><strong>Department:</strong> {{ selectedDept === 'ALL' ? 'All Departments' : selectedDept }}</span>
-            <span><strong>Paper Format:</strong> {{ paperSize() === 'A4' ? 'A4 Horizontal Landscape (297×210 mm)' : 'Legal Horizontal Landscape (356×216 mm)' }}</span>
+            <span><strong>Scope:</strong> Immediate & Urgent Correspondence / Action Required</span>
+            <span><strong>Total Items:</strong> {{ urgentDirectivesLetters().length }}</span>
             <span><strong>Generated:</strong> {{ today | date:'medium' }}</span>
           </div>
         </div>
 
-        <div class="section-heading-bar">
-          <mat-icon class="sec-icon">receipt_long</mat-icon>
-          <h3>Official Correspondence Ledger Register</h3>
-          <span class="heading-sub">Total: {{ filteredLetters().length }} registered letters in timeframe</span>
+        <div class="section-heading-bar no-print">
+          <div class="sh-left">
+            <mat-icon class="sec-icon rose-icon">notification_important</mat-icon>
+            <div>
+              <h3>Urgent Directives & Pending Action Items</h3>
+              <span class="heading-sub">High-priority correspondence requiring prompt official decision, directive reply, or immediate action</span>
+            </div>
+          </div>
+          <div class="sh-right">
+            <span class="count-pill red-pill">{{ urgentDirectivesLetters().length }} items requiring attention</span>
+          </div>
         </div>
 
-        <div class="ledger-container">
-          <table class="report-table ledger-table">
+        <div class="table-outer-card">
+          <table class="report-table urgent-table">
             <thead>
               <tr>
-                <th style="width: 40px;" class="text-center">#</th>
+                <th style="width: 36px;" class="text-center">#</th>
                 <th style="width: 140px;">Reference No.</th>
-                <th style="width: 95px;">Date Rec'd</th>
-                <th>Letter Title & Subject</th>
-                <th style="width: 160px;">Received From</th>
-                <th style="width: 130px;">Send To (Dept)</th>
+                <th style="width: 90px;">Date Rec'd</th>
+                <th>Directive Title & Subject</th>
+                <th style="width: 150px;">Received From</th>
+                <th style="width: 120px;">Category</th>
+                <th style="width: 130px;">Target Department</th>
                 <th style="width: 130px;">Assigned Officer</th>
-                <th style="width: 85px;" class="text-center">Priority</th>
+                <th style="width: 90px;" class="text-center">Priority</th>
                 <th style="width: 110px;" class="text-center">Status</th>
               </tr>
             </thead>
             <tbody>
-              <tr *ngFor="let l of filteredLetters(); let i = index">
+              <tr *ngFor="let l of urgentDirectivesLetters(); let i = index" class="urgent-item-row">
+                <td class="text-center font-bold">{{ i + 1 }}</td>
+                <td>
+                  <span class="ref-mono font-bold">{{ l.ref_number }}</span>
+                  <div *ngIf="l.link_ref" class="link-ref-sub">Link: {{ l.link_ref }}</div>
+                </td>
+                <td>{{ l.received_date }}</td>
+                <td>
+                  <strong class="text-rose-900">{{ l.title }}</strong>
+                  <div *ngIf="l.description" class="sub-link-meta italic mt-1">{{ l.description }}</div>
+                </td>
+                <td>{{ l.received_from }}</td>
+                <td><span class="cat-chip">{{ l.category }}</span></td>
+                <td><strong>{{ (l.send_to && l.send_to.length) ? l.send_to.join(', ') : 'Unassigned' }}</strong></td>
+                <td>{{ l.assigned_user_names?.join(', ') || l.assigned_to.join(', ') || 'Unassigned' }}</td>
+                <td class="text-center">
+                  <span class="priority-tag" [ngClass]="(l.priority || 'Normal').toLowerCase()">
+                    {{ l.priority }}
+                  </span>
+                </td>
+                <td class="text-center">
+                  <span class="status-tag" [ngClass]="getStatusClass(l.status)">{{ l.status }}</span>
+                </td>
+              </tr>
+              <tr *ngIf="urgentDirectivesLetters().length === 0">
+                <td colspan="10" class="text-center p-8 text-green-700 bg-green-50">
+                  <div class="empty-wrap">
+                    <mat-icon class="text-green-600" style="font-size: 32px; width: 32px; height: 32px;">verified</mat-icon>
+                    <p class="font-bold mt-2">Zero Urgent Directives Pending</p>
+                    <p class="text-xs text-gray-500">All high-priority correspondence in this timeframe has been cleared or resolved.</p>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ============================================================== -->
+      <!-- REPORT TYPE 4: CLASSIFICATION & SUBJECT CATEGORY REPORT -->
+      <!-- ============================================================== -->
+      <div *ngIf="activeReportType() === 'category-report' || activeReportType() === 'executive-combined'" class="report-section print-area mt-4">
+        
+        <div class="official-print-header" *ngIf="activeReportType() === 'category-report'">
+          <div class="ministry-title">CLASSIFICATION & ARCHIVAL REGISTRY</div>
+          <h2 class="office-name">CORRESPONDENCE CLASSIFICATION & CATEGORY AUDIT</h2>
+          <div class="meta-row">
+            <span><strong>Period:</strong> {{ reportPeriodLabel() }}</span>
+            <span><strong>Categories:</strong> {{ categorySummary().length }} active classifications</span>
+            <span><strong>Total Volume:</strong> {{ filteredLetters().length }} letters</span>
+            <span><strong>Generated:</strong> {{ today | date:'medium' }}</span>
+          </div>
+        </div>
+
+        <div class="section-heading-bar no-print">
+          <div class="sh-left">
+            <mat-icon class="sec-icon amber-icon">category</mat-icon>
+            <div>
+              <h3>Correspondence Classification & Category Breakdown</h3>
+              <span class="heading-sub">Analysis of correspondence volume, urgency, and resolution rate by official classification</span>
+            </div>
+          </div>
+          <button mat-stroked-button class="sm-btn" (click)="exportCategorySummaryCSV()">
+            <mat-icon>download</mat-icon> Export Category CSV
+          </button>
+        </div>
+
+        <!-- Category Metric Cards -->
+        <div class="category-cards-grid no-print">
+          <div *ngFor="let cat of categorySummary()" 
+               class="cat-summary-card"
+               [class.selected-cat]="selectedCategory === cat.category"
+               (click)="toggleCategoryFilter(cat.category)">
+            <div class="cat-card-top">
+              <span class="cat-name">{{ cat.category }}</span>
+              <span class="cat-count-badge">{{ cat.total }}</span>
+            </div>
+            <div class="cat-progress-wrap">
+              <mat-progress-bar mode="determinate" [value]="cat.percent" class="cat-progress"></mat-progress-bar>
+              <span class="cat-pct-label">{{ cat.percent }}% of volume</span>
+            </div>
+            <div class="cat-meta-footer">
+              <span class="cat-urgent-text" *ngIf="cat.urgent > 0">⚡ {{ cat.urgent }} Urgent</span>
+              <span class="cat-rate-text">Rate: {{ cat.turnaroundRate }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Category Summary Table -->
+        <div class="table-outer-card">
+          <table class="report-table category-table">
+            <thead>
+              <tr>
+                <th style="width: 40px;" class="text-center">#</th>
+                <th>Classification / Subject Category</th>
+                <th style="width: 120px;" class="text-center">Total Letters</th>
+                <th style="width: 120px;" class="text-center">Volume Share</th>
+                <th style="width: 120px;" class="text-center">Urgent Items</th>
+                <th style="width: 130px;" class="text-center">Action Pending</th>
+                <th style="width: 130px;" class="text-center">Resolved / Done</th>
+                <th style="width: 130px;" class="text-center">Turnaround Rate</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let c of categorySummary(); let i = index">
                 <td class="text-center">{{ i + 1 }}</td>
-                <td><span class="ref-mono">{{ l.ref_number }}</span></td>
+                <td><strong>{{ c.category }}</strong></td>
+                <td class="text-center font-bold">{{ c.total }}</td>
+                <td class="text-center">{{ c.percent }}%</td>
+                <td class="text-center" [class.text-red]="c.urgent > 0">{{ c.urgent }}</td>
+                <td class="text-center" [class.text-orange]="c.pending > 0">{{ c.pending }}</td>
+                <td class="text-center text-green font-bold">{{ c.completed }}</td>
+                <td class="text-center">
+                  <span class="rate-badge" [ngClass]="getRateClass(c.turnaroundRate)">{{ c.turnaroundRate }}</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ============================================================== -->
+      <!-- REPORT TYPE 5: DEPARTMENT WORKLOAD & PERFORMANCE SUMMARY -->
+      <!-- ============================================================== -->
+      <div *ngIf="activeReportType() === 'dept-workload' || activeReportType() === 'executive-combined'" class="report-section print-area mt-4">
+        
+        <div class="official-print-header" *ngIf="activeReportType() === 'dept-workload'">
+          <div class="ministry-title">DEPARTMENTAL EFFICIENCY & WORKLOAD AUDIT</div>
+          <h2 class="office-name">DEPARTMENTAL WORKLOAD & PERFORMANCE SUMMARY</h2>
+          <div class="meta-row">
+            <span><strong>Period:</strong> {{ reportPeriodLabel() }}</span>
+            <span><strong>Total Departments:</strong> {{ departmentMatrix().length }}</span>
+            <span><strong>Generated:</strong> {{ today | date:'medium' }}</span>
+          </div>
+        </div>
+
+        <div class="section-heading-bar no-print">
+          <div class="sh-left">
+            <mat-icon class="sec-icon indigo-icon">business</mat-icon>
+            <div>
+              <h3>Department Workload & Performance Summary</h3>
+              <span class="heading-sub">Workload volume, action backlog, and resolution efficiency per department</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="table-outer-card">
+          <table class="report-table workload-table">
+            <thead>
+              <tr>
+                <th style="width: 40px;" class="text-center">#</th>
+                <th>Department Name</th>
+                <th style="width: 80px;" class="text-center">Code</th>
+                <th style="width: 120px;" class="text-center">Total Assigned</th>
+                <th style="width: 120px;" class="text-center">Active Backlog</th>
+                <th style="width: 120px;" class="text-center">Resolved / Done</th>
+                <th style="width: 180px;">Efficiency Progress</th>
+                <th style="width: 120px;" class="text-center">Resolution Rate</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let d of departmentMatrix(); let i = index">
+                <td class="text-center">{{ i + 1 }}</td>
+                <td><strong>{{ d.department }}</strong></td>
+                <td class="text-center">{{ d.code || '-' }}</td>
+                <td class="text-center font-bold">{{ d.total }}</td>
+                <td class="text-center" [class.text-red]="(d.received + d.inReview + d.actionRequired + d.inProgress) > 0">
+                  {{ d.received + d.inReview + d.actionRequired + d.inProgress }}
+                </td>
+                <td class="text-center text-green font-bold">{{ d.completed + d.dispatched }}</td>
+                <td>
+                  <mat-progress-bar mode="determinate" [value]="parseIntRate(d.turnaroundRate)" class="workload-progress"></mat-progress-bar>
+                </td>
+                <td class="text-center">
+                  <span class="rate-badge" [ngClass]="getRateClass(d.turnaroundRate)">{{ d.turnaroundRate }}</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ============================================================== -->
+      <!-- REPORT TYPE 6: MASTER CORRESPONDENCE LEDGER REGISTER -->
+      <!-- ============================================================== -->
+      <div *ngIf="activeReportType() === 'ledger' || activeReportType() === 'executive-combined'" class="report-section print-area mt-4">
+        
+        <div class="official-print-header" *ngIf="activeReportType() === 'ledger'">
+          <div class="ministry-title">CENTRAL REGISTRY ARCHIVAL LOG</div>
+          <h2 class="office-name">OFFICIAL INWARD CORRESPONDENCE MASTER LEDGER</h2>
+          <div class="meta-row">
+            <span><strong>Period:</strong> {{ reportPeriodLabel() }}</span>
+            <span><strong>Department:</strong> {{ selectedDept === 'ALL' ? 'All Departments' : selectedDept }}</span>
+            <span><strong>Category:</strong> {{ selectedCategory === 'ALL' ? 'All Categories' : selectedCategory }}</span>
+            <span><strong>Total Records:</strong> {{ filteredLetters().length }}</span>
+            <span><strong>Generated:</strong> {{ today | date:'medium' }}</span>
+          </div>
+        </div>
+
+        <div class="section-heading-bar no-print">
+          <div class="sh-left">
+            <mat-icon class="sec-icon slate-icon">receipt_long</mat-icon>
+            <div>
+              <h3>Master Correspondence Ledger Register</h3>
+              <span class="heading-sub">Total: {{ filteredLetters().length }} registered letters in timeframe</span>
+            </div>
+          </div>
+          <button mat-stroked-button class="sm-btn" (click)="exportLettersCSV()">
+            <mat-icon>download</mat-icon> Export Ledger CSV
+          </button>
+        </div>
+
+        <div class="table-outer-card">
+          <table class="report-table ledger-table">
+            <thead>
+              <tr>
+                <th style="width: 36px;" class="text-center">#</th>
+                <th style="width: 140px;">Reference No.</th>
+                <th style="width: 90px;">Date Rec'd</th>
+                <th>Letter Title & Subject</th>
+                <th style="width: 150px;">Received From</th>
+                <th style="width: 110px;">Category</th>
+                <th style="width: 130px;">Send To (Dept)</th>
+                <th style="width: 130px;">Assigned Officer</th>
+                <th style="width: 80px;" class="text-center">Priority</th>
+                <th style="width: 100px;" class="text-center">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let l of filteredLetters(); let i = index" class="data-row">
+                <td class="text-center">{{ i + 1 }}</td>
+                <td>
+                  <span class="ref-mono">{{ l.ref_number }}</span>
+                  <div *ngIf="l.link_ref" class="link-ref-sub">Ref: {{ l.link_ref }}</div>
+                </td>
                 <td>{{ l.received_date }}</td>
                 <td>
                   <strong>{{ l.title }}</strong>
-                  <div *ngIf="l.link_ref" class="sub-link-meta">Ref: {{ l.link_ref }}</div>
+                  <div *ngIf="l.description" class="sub-link-meta">{{ l.description }}</div>
                 </td>
                 <td>{{ l.received_from }}</td>
-                <td>{{ l.send_to.join(', ') || '-' }}</td>
+                <td><span class="cat-chip">{{ l.category || 'General' }}</span></td>
+                <td>{{ (l.send_to && l.send_to.length) ? l.send_to.join(', ') : '-' }}</td>
                 <td>{{ l.assigned_user_names?.join(', ') || l.assigned_to.join(', ') || '-' }}</td>
                 <td class="text-center">
                   <span class="priority-tag" [ngClass]="(l.priority || 'Normal').toLowerCase()">
@@ -509,7 +1085,7 @@ interface DeptMatrixRow {
                 </td>
               </tr>
               <tr *ngIf="filteredLetters().length === 0">
-                <td colspan="9" class="text-center p-6 text-gray-500">
+                <td colspan="10" class="text-center p-8 text-gray-500">
                   No letters registered matching the selected criteria.
                 </td>
               </tr>
@@ -518,7 +1094,9 @@ interface DeptMatrixRow {
         </div>
       </div>
 
+      <!-- ============================================================== -->
       <!-- OFFICIAL PRINT SIGNATURE FOOTER (Print only, 4 Horizontal Columns) -->
+      <!-- ============================================================== -->
       <div class="print-signatures-block">
         <div class="sig-box">
           <div class="sig-line"></div>
@@ -545,24 +1123,63 @@ interface DeptMatrixRow {
     </div>
   `,
   styles: [`
-    .page-container { display: flex; flex-direction: column; gap: 14px; }
-    
+    .page-container {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    /* Page Header */
     .page-header {
       display: flex;
       justify-content: space-between;
       align-items: flex-start;
       flex-wrap: wrap;
       gap: 12px;
+
       .header-titles {
         .title-row {
           display: flex;
           align-items: center;
-          gap: 8px;
-          .title-icon { color: #0284c7; font-size: 24px; width: 24px; height: 24px; }
-          .page-title { font-size: 20px; font-weight: 700; color: #0f172a; margin: 0; }
+          gap: 10px;
+
+          .icon-avatar {
+            width: 42px;
+            height: 42px;
+            border-radius: 10px;
+            background: #e0f2fe;
+            color: #0284c7;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            mat-icon { font-size: 24px; width: 24px; height: 24px; }
+          }
+
+          .breadcrumb-text {
+            font-size: 10.5px;
+            font-weight: 700;
+            color: #0284c7;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+          }
+
+          .page-title {
+            font-size: 20px;
+            font-weight: 700;
+            color: #0f172a;
+            margin: 0;
+            line-height: 1.2;
+          }
         }
-        .page-desc { font-size: 12.5px; color: #64748b; margin: 3px 0 0 0; }
+        .page-desc {
+          font-size: 12px;
+          color: #64748b;
+          margin: 4px 0 0 52px;
+        }
       }
+
       .actions-group {
         display: flex;
         align-items: center;
@@ -570,48 +1187,280 @@ interface DeptMatrixRow {
         flex-wrap: wrap;
         .action-btn { height: 36px; font-size: 12.5px; }
       }
+    }
 
-      .paper-size-pill-group {
+    /* Density Switcher */
+    .density-pill-group {
+      display: inline-flex;
+      align-items: center;
+      background: #f1f5f9;
+      padding: 3px;
+      border-radius: 8px;
+      gap: 3px;
+      border: 1px solid #cbd5e1;
+
+      .density-btn {
         display: inline-flex;
         align-items: center;
-        background: #f1f5f9;
-        padding: 3px;
-        border-radius: 8px;
-        gap: 3px;
-        border: 1px solid #cbd5e1;
-        .paper-label {
-          font-size: 11px;
+        gap: 4px;
+        padding: 4px 8px;
+        border-radius: 6px;
+        font-size: 11px;
+        font-weight: 600;
+        color: #475569;
+        background: transparent;
+        border: none;
+        cursor: pointer;
+        transition: all 0.15s ease;
+        mat-icon { font-size: 14px; width: 14px; height: 14px; }
+        &:hover { color: #0f172a; background: rgba(255,255,255,0.7); }
+        &.active {
+          background: #ffffff;
+          color: #0284c7;
+          box-shadow: 0 1px 3px rgba(0,0,0,0.1);
           font-weight: 700;
-          text-transform: uppercase;
-          color: #64748b;
-          padding: 0 4px 0 6px;
         }
-        .paper-btn {
+      }
+    }
+
+    /* Paper Size Selector */
+    .paper-size-pill-group {
+      display: inline-flex;
+      align-items: center;
+      background: #f1f5f9;
+      padding: 3px;
+      border-radius: 8px;
+      gap: 3px;
+      border: 1px solid #cbd5e1;
+      .paper-label {
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        color: #64748b;
+        padding: 0 4px 0 6px;
+      }
+      .paper-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 4px 10px;
+        border-radius: 6px;
+        font-size: 11.5px;
+        font-weight: 600;
+        color: #475569;
+        background: transparent;
+        border: none;
+        cursor: pointer;
+        transition: all 0.15s ease;
+        mat-icon { font-size: 15px; width: 15px; height: 15px; }
+        &:hover { color: #0f172a; background: rgba(255,255,255,0.7); }
+        &.active {
+          background: #ffffff;
+          color: #0f172a;
+          box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+          font-weight: 700;
+        }
+      }
+    }
+
+    /* Dedicated Daily Inward Quick Banner */
+    .daily-inward-quick-banner {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+      background: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%);
+      border: 1px solid #a7f3d0;
+      border-radius: 12px;
+      padding: 12px 18px;
+
+      .banner-left {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+
+        .daily-badge-icon {
+          width: 38px;
+          height: 38px;
+          border-radius: 8px;
+          background: #10b981;
+          color: white;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          mat-icon { font-size: 20px; width: 20px; height: 20px; }
+        }
+
+        .banner-text {
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+
+          .banner-title {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13.5px;
+            color: #065f46;
+
+            .daily-count-chip {
+              background: #047857;
+              color: white;
+              font-size: 10px;
+              font-weight: 700;
+              padding: 2px 7px;
+              border-radius: 999px;
+            }
+          }
+
+          .banner-sub {
+            font-size: 11.5px;
+            color: #047857;
+          }
+        }
+      }
+
+      .banner-shortcuts {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+
+        .quick-daily-btn {
           display: inline-flex;
           align-items: center;
-          gap: 4px;
-          padding: 4px 10px;
-          border-radius: 6px;
-          font-size: 11.5px;
+          gap: 6px;
+          padding: 6px 12px;
+          border-radius: 8px;
+          border: 1px solid #6ee7b7;
+          background: #ffffff;
+          color: #065f46;
+          font-size: 12px;
           font-weight: 600;
-          color: #475569;
-          background: transparent;
-          border: none;
           cursor: pointer;
-          transition: all 0.15s ease;
-          mat-icon { font-size: 15px; width: 15px; height: 15px; }
-          &:hover { color: #0f172a; background: rgba(255,255,255,0.7); }
+          transition: all 0.2s ease;
+          mat-icon { font-size: 16px; width: 16px; height: 16px; }
+
+          &:hover {
+            background: #d1fae5;
+            border-color: #34d399;
+          }
+
           &.active {
-            background: #ffffff;
-            color: #0f172a;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            background: #059669;
+            color: #ffffff;
+            border-color: #047857;
+            box-shadow: 0 2px 4px rgba(5,150,105,0.25);
+          }
+
+          &.highlight {
+            border-color: #10b981;
             font-weight: 700;
           }
         }
       }
     }
 
-    /* TIMEFRAME PRESETS & CONTROLS */
+    /* Report Types Navigation Ribbon */
+    .report-types-ribbon {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+
+      .ribbon-label {
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        color: #475569;
+        letter-spacing: 0.04em;
+      }
+
+      .report-type-cards {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 10px;
+      }
+
+      .rtype-card {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+        padding: 10px 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        position: relative;
+
+        &:hover {
+          border-color: #94a3b8;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+          transform: translateY(-1px);
+        }
+
+        &.active {
+          border-color: #0284c7;
+          background: #f0f9ff;
+          box-shadow: 0 4px 14px rgba(2,132,199,0.12);
+
+          .rtype-title { color: #0369a1; }
+        }
+
+        .rtype-icon-wrap {
+          width: 32px;
+          height: 32px;
+          border-radius: 8px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          mat-icon { font-size: 18px; width: 18px; height: 18px; }
+
+          &.emerald { background: #ecfdf5; color: #059669; }
+          &.blue { background: #eff6ff; color: #2563eb; }
+          &.rose { background: #fff1f2; color: #e11d48; }
+          &.amber { background: #fffbeb; color: #d97706; }
+          &.indigo { background: #eef2ff; color: #4f46e5; }
+          &.slate { background: #f1f5f9; color: #475569; }
+          &.purple { background: #faf5ff; color: #9333ea; }
+        }
+
+        .rtype-info {
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+
+          .rtype-title {
+            font-size: 12px;
+            font-weight: 700;
+            color: #1e293b;
+          }
+
+          .rtype-sub {
+            font-size: 10.5px;
+            color: #64748b;
+            line-height: 1.25;
+          }
+        }
+
+        .rtype-badge {
+          align-self: flex-start;
+          font-size: 10px;
+          font-weight: 700;
+          padding: 1px 6px;
+          border-radius: 4px;
+          background: #f1f5f9;
+          color: #475569;
+          margin-top: 2px;
+
+          &.red-badge { background: #fee2e2; color: #b91c1c; }
+          &.purple-badge { background: #f3e8ff; color: #7e22ce; }
+        }
+      }
+    }
+
+    /* Filter Card */
     .filter-card {
       padding: 12px 16px;
       border: 1px solid #e2e8f0;
@@ -627,14 +1476,14 @@ interface DeptMatrixRow {
       justify-content: space-between;
       align-items: center;
       flex-wrap: wrap;
-      gap: 12px;
+      gap: 10px;
     }
 
     .timeframe-segmented {
       display: flex;
       align-items: center;
-      gap: 10px;
-      .ctrl-label { font-size: 12px; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.03em; }
+      gap: 8px;
+      .ctrl-label { font-size: 11.5px; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.03em; }
     }
 
     .pill-group {
@@ -642,24 +1491,24 @@ interface DeptMatrixRow {
       background: #f1f5f9;
       padding: 3px;
       border-radius: 8px;
-      gap: 3px;
+      gap: 2px;
       border: 1px solid #e2e8f0;
     }
 
     .pill-btn {
       display: inline-flex;
       align-items: center;
-      gap: 5px;
-      padding: 5px 12px;
+      gap: 4px;
+      padding: 4px 10px;
       border-radius: 6px;
-      font-size: 12px;
+      font-size: 11.5px;
       font-weight: 600;
       color: #64748b;
       background: transparent;
       border: none;
       cursor: pointer;
       transition: all 0.15s ease;
-      mat-icon { font-size: 16px; width: 16px; height: 16px; }
+      mat-icon { font-size: 15px; width: 15px; height: 15px; }
       &:hover { color: #0f172a; background: rgba(255,255,255,0.6); }
       &.active {
         background: #ffffff;
@@ -668,12 +1517,43 @@ interface DeptMatrixRow {
       }
     }
 
+    /* Search Box */
+    .search-box-wrap {
+      display: inline-flex;
+      align-items: center;
+      position: relative;
+      background: #f8fafc;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      padding: 0 8px;
+      height: 36px;
+      width: 250px;
+
+      .search-icon { font-size: 18px; width: 18px; height: 18px; color: #64748b; margin-right: 6px; }
+      .search-input {
+        border: none;
+        outline: none;
+        background: transparent;
+        font-size: 12px;
+        color: #1e293b;
+        width: 100%;
+        &::placeholder { color: #94a3b8; }
+      }
+      .clear-search-btn {
+        width: 24px;
+        height: 24px;
+        line-height: 24px;
+        mat-icon { font-size: 14px; width: 14px; height: 14px; color: #64748b; }
+      }
+    }
+
     .dropdown-filters {
       display: flex;
       align-items: center;
       gap: 8px;
       flex-wrap: wrap;
-      .filter-select { width: 170px; }
+      .filter-select { width: 150px; }
+      .sm-select { width: 105px; }
       .sm-btn {
         width: 34px;
         height: 34px;
@@ -704,11 +1584,51 @@ interface DeptMatrixRow {
         line-height: 32px;
         mat-icon { font-size: 20px; width: 20px; height: 20px; }
       }
-      .preset-btn { height: 32px; font-size: 12px; font-weight: 600; }
+      .preset-btn {
+        height: 32px;
+        font-size: 11.5px;
+        font-weight: 600;
+        &.active-preset { background: #e0f2fe; color: #0369a1; border-color: #38bdf8; }
+      }
     }
 
-    .date-input-wrap {
-      width: 170px;
+    .date-input-wrap { width: 170px; }
+
+    .active-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 11.5px;
+      font-weight: 600;
+      mat-icon { font-size: 16px; width: 16px; height: 16px; }
+
+      &.daily { background: #ecfdf5; color: #059669; border: 1px solid #a7f3d0; }
+      &.weekly { background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; }
+      &.monthly { background: #faf5ff; color: #7e22ce; border: 1px solid #e9d5ff; }
+      &.custom { background: #fefce8; color: #a16207; border: 1px solid #fef08a; }
+    }
+
+    .daily-batch-pills {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-left: auto;
+      flex-wrap: wrap;
+
+      .batch-chip {
+        font-size: 11px;
+        padding: 3px 8px;
+        border-radius: 6px;
+        font-weight: 500;
+        border: 1px solid transparent;
+
+        &.total { background: #f1f5f9; color: #1e293b; border-color: #cbd5e1; }
+        &.urgent { background: #fee2e2; color: #991b1b; border-color: #fca5a5; }
+        &.pending { background: #ffedd5; color: #9a3412; border-color: #fdba74; }
+        &.resolved { background: #ecfdf5; color: #065f46; border-color: #a7f3d0; }
+      }
     }
 
     .custom-range-row {
@@ -722,7 +1642,7 @@ interface DeptMatrixRow {
       display: flex;
       align-items: center;
       gap: 8px;
-      .date-field { width: 155px; }
+      .date-field { width: 150px; }
       .range-sep { font-size: 12px; color: #64748b; font-weight: 500; }
     }
 
@@ -732,11 +1652,11 @@ interface DeptMatrixRow {
       gap: 6px;
       flex-wrap: wrap;
       .quick-chip {
-        padding: 4px 10px;
+        padding: 4px 9px;
         border-radius: 6px;
         border: 1px solid #cbd5e1;
         background: #f8fafc;
-        font-size: 11.5px;
+        font-size: 11px;
         font-weight: 500;
         color: #475569;
         cursor: pointer;
@@ -745,280 +1665,419 @@ interface DeptMatrixRow {
       }
     }
 
-    .active-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 5px 12px;
-      border-radius: 6px;
-      font-size: 12px;
-      font-weight: 700;
-      margin-left: auto;
-      mat-icon { font-size: 16px; width: 16px; height: 16px; }
-      &.daily { background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; }
-      &.weekly { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
-      &.monthly { background: #ede9fe; color: #6d28d9; border: 1px solid #ddd6fe; }
-      &.custom { background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; }
-    }
-
-    /* KPI CARDS */
+    /* KPI Grid */
     .kpi-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 12px;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 10px;
+
+      @media (max-width: 1200px) { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      @media (max-width: 768px) { grid-template-columns: 1fr; }
     }
 
     .stat-card {
-      padding: 12px 16px;
+      padding: 12px 14px;
       border: 1px solid #e2e8f0;
-      border-radius: 8px;
+      border-radius: 10px;
+      background: white;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
       display: flex;
       flex-direction: column;
+      gap: 2px;
+      min-width: 0;
+
       .stat-top {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        .stat-label { font-size: 10.5px; font-weight: 700; text-transform: uppercase; color: #64748b; }
+        .stat-label { font-size: 11px; font-weight: 600; text-transform: uppercase; color: #64748b; letter-spacing: 0.03em; }
         .stat-icon {
           font-size: 18px; width: 18px; height: 18px;
           &.blue { color: #0284c7; }
-          &.red { color: #dc2626; }
-          &.green { color: #16a34a; }
-          &.purple { color: #7c3aed; }
+          &.rose { color: #e11d48; }
+          &.orange { color: #ea580c; }
+          &.green { color: #059669; }
+          &.purple { color: #9333ea; }
         }
       }
-      .stat-val { font-size: 24px; font-weight: 800; color: #0f172a; margin: 3px 0; }
-      .stat-sub { font-size: 11px; color: #94a3b8; }
-      .text-green { color: #16a34a; }
-      .text-red { color: #dc2626; }
-      .text-purple { color: #7c3aed; }
+
+      .stat-val {
+        font-size: 20px;
+        font-weight: 800;
+        color: #0f172a;
+        line-height: 1.2;
+        margin: 2px 0;
+      }
+      .stat-sub { font-size: 10.5px; color: #94a3b8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     }
 
-    /* VIEW SWITCHER BAR */
-    .view-switcher-bar {
+    .text-red { color: #dc2626 !important; }
+    .text-orange { color: #ea580c !important; }
+    .text-green { color: #059669 !important; }
+    .text-purple { color: #9333ea !important; }
+    .text-indigo { color: #4f46e5 !important; }
+    .text-muted { color: #64748b !important; }
+
+    /* Section Headings */
+    .section-heading-bar {
       display: flex;
       justify-content: space-between;
       align-items: center;
       flex-wrap: wrap;
-      gap: 12px;
-      background: white;
-      padding: 8px 12px;
-      border: 1px solid #e2e8f0;
-      border-radius: 8px;
-    }
-
-    .tab-pill-group {
-      display: inline-flex;
-      background: #f8fafc;
-      padding: 3px;
-      border-radius: 8px;
-      gap: 4px;
-      border: 1px solid #e2e8f0;
-    }
-
-    .view-tab-btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 6px 14px;
-      border-radius: 6px;
-      font-size: 12px;
-      font-weight: 600;
-      color: #64748b;
-      background: transparent;
-      border: none;
-      cursor: pointer;
-      transition: all 0.15s ease;
-      mat-icon { font-size: 16px; width: 16px; height: 16px; }
-      &:hover { color: #0f172a; background: rgba(0,0,0,0.03); }
-      &.active {
-        background: #0284c7;
-        color: white;
-        box-shadow: 0 1px 3px rgba(2, 132, 199, 0.3);
-      }
-    }
-
-    .priority-pills {
-      display: flex;
-      gap: 6px;
-      .p-pill {
-        font-size: 11px;
-        padding: 3px 8px;
-        border-radius: 4px;
-        font-weight: 500;
-        &.normal { background: #f1f5f9; color: #475569; }
-        &.urgent { background: #fef3c7; color: #92400e; }
-        &.immediate { background: #fee2e2; color: #991b1b; }
-      }
-    }
-
-    /* SECTION HEADINGS */
-    .section-heading-bar {
-      display: flex;
-      align-items: center;
       gap: 8px;
       margin-bottom: 8px;
-      .sec-icon { font-size: 20px; width: 20px; height: 20px; color: #0284c7; }
-      h3 { font-size: 14px; font-weight: 700; color: #0f172a; margin: 0; }
-      .heading-sub { font-size: 11.5px; color: #64748b; margin-left: 6px; }
+
+      .sh-left {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        .sec-icon {
+          font-size: 20px; width: 20px; height: 20px;
+          &.emerald-icon { color: #059669; }
+          &.blue-icon { color: #2563eb; }
+          &.rose-icon { color: #e11d48; }
+          &.amber-icon { color: #d97706; }
+          &.indigo-icon { color: #4f46e5; }
+          &.slate-icon { color: #475569; }
+        }
+        h3 { margin: 0; font-size: 14.5px; font-weight: 700; color: #0f172a; }
+        .heading-sub { font-size: 11px; color: #64748b; }
+      }
+
+      .sh-right {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        .count-pill {
+          font-size: 11px;
+          font-weight: 600;
+          padding: 2px 8px;
+          border-radius: 6px;
+          background: #f1f5f9;
+          color: #475569;
+          &.red-pill { background: #fee2e2; color: #991b1b; }
+        }
+        .sm-btn { height: 30px; font-size: 11.5px; }
+      }
     }
 
-    /* STATUS CARDS GRID */
+    /* Status Summary Cards Grid */
     .status-cards-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      grid-template-columns: repeat(7, minmax(0, 1fr));
       gap: 8px;
+      margin-bottom: 12px;
+
+      @media (max-width: 1024px) { grid-template-columns: repeat(4, 1fr); }
+      @media (max-width: 640px) { grid-template-columns: repeat(2, 1fr); }
     }
 
     .status-summary-card {
       background: white;
       border: 1px solid #e2e8f0;
       border-radius: 8px;
-      padding: 10px 12px;
-      cursor: pointer;
-      transition: all 0.15s ease;
+      padding: 8px 10px;
       display: flex;
       flex-direction: column;
-      gap: 6px;
-      &:hover { transform: translateY(-1px); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
+      gap: 4px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+
+      &:hover { border-color: #94a3b8; transform: translateY(-1px); }
       &.selected-card {
         border-color: #0284c7;
-        box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.2);
         background: #f0f9ff;
+        box-shadow: 0 0 0 2px rgba(2,132,199,0.2);
       }
+
       .sc-top {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        .sc-status-name { font-size: 11px; font-weight: 700; color: #475569; }
-        .sc-icon { font-size: 16px; width: 16px; height: 16px; }
+        .sc-status-name { font-size: 10.5px; font-weight: 700; text-transform: uppercase; color: #475569; }
+        .sc-icon { font-size: 14px; width: 14px; height: 14px; color: #64748b; }
       }
+
       .sc-val-row {
         display: flex;
         justify-content: space-between;
         align-items: baseline;
-        .sc-count { font-size: 20px; font-weight: 800; color: #0f172a; }
-        .sc-pct { font-size: 11px; font-weight: 600; color: #64748b; }
+        .sc-count { font-size: 16px; font-weight: 800; color: #0f172a; }
+        .sc-pct { font-size: 10.5px; font-weight: 600; color: #64748b; }
       }
-      .sc-progress { height: 4px; border-radius: 2px; }
-
-      &.st-received { .sc-icon { color: #0284c7; } .sc-progress ::ng-deep .mdc-linear-progress__bar-inner { border-color: #0284c7 !important; } }
-      &.st-in-review { .sc-icon { color: #d97706; } .sc-progress ::ng-deep .mdc-linear-progress__bar-inner { border-color: #d97706 !important; } }
-      &.st-action-required { .sc-icon { color: #dc2626; } .sc-progress ::ng-deep .mdc-linear-progress__bar-inner { border-color: #dc2626 !important; } }
-      &.st-in-progress { .sc-icon { color: #7c3aed; } .sc-progress ::ng-deep .mdc-linear-progress__bar-inner { border-color: #7c3aed !important; } }
-      &.st-completed { .sc-icon { color: #16a34a; } .sc-progress ::ng-deep .mdc-linear-progress__bar-inner { border-color: #16a34a !important; } }
-      &.st-dispatched { .sc-icon { color: #4338ca; } .sc-progress ::ng-deep .mdc-linear-progress__bar-inner { border-color: #4338ca !important; } }
-      &.st-archived { .sc-icon { color: #64748b; } .sc-progress ::ng-deep .mdc-linear-progress__bar-inner { border-color: #64748b !important; } }
+      .sc-progress { height: 3px; border-radius: 2px; }
     }
 
-    /* MATRIX & REPORT TABLES */
-    .matrix-card, .ledger-container {
-      background: white;
-      border: 1px solid #cbd5e1;
-      border-radius: 8px;
+    /* Category Cards Grid */
+    .category-cards-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 8px;
+      margin-bottom: 12px;
+
+      .cat-summary-card {
+        background: white;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 8px 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        cursor: pointer;
+        transition: all 0.15s ease;
+
+        &:hover { border-color: #f59e0b; }
+        &.selected-cat { border-color: #d97706; background: #fffbeb; }
+
+        .cat-card-top {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          .cat-name { font-size: 11.5px; font-weight: 700; color: #1e293b; }
+          .cat-count-badge { font-size: 11px; font-weight: 800; background: #f1f5f9; padding: 1px 6px; border-radius: 4px; }
+        }
+
+        .cat-progress-wrap {
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+          .cat-progress { height: 4px; border-radius: 2px; }
+          .cat-pct-label { font-size: 9.5px; color: #64748b; }
+        }
+
+        .cat-meta-footer {
+          display: flex;
+          justify-content: space-between;
+          font-size: 10px;
+          color: #64748b;
+          font-weight: 600;
+          .cat-urgent-text { color: #dc2626; }
+        }
+      }
+    }
+
+    /* Table Container & Common Table Styles */
+    .table-outer-card {
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
       overflow-x: auto;
+      background: white;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+      width: 100%;
+      box-sizing: border-box;
     }
 
     .report-table {
       width: 100%;
       border-collapse: collapse;
       font-size: 12px;
-      th {
+      text-align: left;
+
+      thead {
         background: #f8fafc;
-        color: #334155;
-        font-weight: 700;
-        text-align: left;
-        padding: 8px 10px;
-        border: 1px solid #e2e8f0;
-        white-space: nowrap;
+        border-bottom: 2px solid #e2e8f0;
+        th {
+          padding: 8px 10px;
+          font-size: 11px;
+          font-weight: 700;
+          color: #334155;
+          text-transform: uppercase;
+          letter-spacing: 0.03em;
+          white-space: nowrap;
+        }
       }
+
+      tbody tr {
+        border-bottom: 1px solid #f1f5f9;
+        transition: background-color 0.15s;
+        &:hover { background-color: #f8fafc; }
+        &.urgent-row { background-color: #fff1f2; }
+      }
+
       td {
-        padding: 7px 10px;
-        border: 1px solid #e2e8f0;
-        color: #334155;
+        padding: 8px 10px;
+        color: #1e293b;
+        vertical-align: middle;
       }
+    }
+
+    /* Compact Density Overrides for High Volume */
+    .compact-density {
+      .report-table {
+        font-size: 11px;
+        thead th { padding: 5px 8px; font-size: 10px; }
+        td { padding: 5px 8px; }
+      }
+      .letter-desc-snippet { display: none !important; }
+      .ack-cell { padding: 3px 6px !important; }
+    }
+
+    /* Badges & Pills */
+    .ref-mono {
+      font-family: monospace;
+      font-weight: 700;
+      font-size: 11px;
+      color: #1e40af;
+      background: #eff6ff;
+      padding: 2px 6px;
+      border-radius: 4px;
+      white-space: nowrap;
+    }
+
+    .link-ref-sub {
+      font-size: 9.5px;
+      color: #64748b;
+      margin-top: 2px;
+    }
+
+    .cat-chip {
+      font-size: 10px;
+      font-weight: 600;
+      padding: 1px 6px;
+      border-radius: 4px;
+      background: #f1f5f9;
+      color: #475569;
+      white-space: nowrap;
+    }
+
+    .priority-tag {
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 4px;
+      display: inline-block;
+      white-space: nowrap;
+
+      &.normal { background: #f1f5f9; color: #475569; }
+      &.urgent { background: #fef3c7; color: #92400e; }
+      &.immediate { background: #fee2e2; color: #991b1b; }
+    }
+
+    .status-tag {
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 4px;
+      display: inline-block;
+      white-space: nowrap;
+
+      &.received { background: #e0f2fe; color: #0369a1; }
+      &.in-review { background: #fef3c7; color: #b45309; }
+      &.action-required { background: #fee2e2; color: #b91c1c; }
+      &.in-progress { background: #f3e8ff; color: #7e22ce; }
+      &.completed { background: #dcfce7; color: #15803d; }
+      &.dispatched { background: #e0e7ff; color: #4338ca; }
+      &.archived { background: #f1f5f9; color: #64748b; }
+    }
+
+    .rate-badge {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 4px;
+      &.high { background: #dcfce7; color: #15803d; }
+      &.mid { background: #fef3c7; color: #b45309; }
+      &.low { background: #fee2e2; color: #b91c1c; }
+    }
+
+    /* Handover / Acknowledgement Column in Daily Register */
+    .ack-header { text-align: left; }
+    .ack-cell {
+      .ack-sign-line {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        border: 1px dashed #cbd5e1;
+        padding: 4px 6px;
+        border-radius: 4px;
+        background: #fafafa;
+        .ack-sub { font-size: 9.5px; color: #64748b; white-space: nowrap; }
+      }
+    }
+
+    .letter-title-text {
+      font-weight: 600;
+      color: #0f172a;
+      line-height: 1.3;
+    }
+
+    .letter-desc-snippet {
+      font-size: 10.5px;
+      color: #64748b;
+      margin-top: 2px;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .empty-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      .empty-icon { font-size: 32px; width: 32px; height: 32px; color: #94a3b8; }
+      .empty-title { margin: 0; font-size: 13px; font-weight: 700; color: #334155; }
+      .empty-sub { margin: 0; font-size: 11.5px; color: #94a3b8; }
     }
 
     .matrix-table {
-      .dept-col { min-width: 180px; }
-      .dept-cell {
-        font-size: 12px;
-        .dept-code { color: #64748b; font-size: 11px; margin-left: 4px; }
+      tfoot {
+        background: #f8fafc;
+        border-top: 2px solid #cbd5e1;
+        td { font-weight: 700; padding: 10px; }
       }
-      .stat-col { width: 85px; }
-      .total-header, .total-cell { background: #f1f5f9; }
-      .turnaround-header { width: 120px; }
-      .highlight-cell { font-weight: 700; }
-      .action-req-cell { font-weight: 700; color: #dc2626; background: #fff1f2; }
-      .text-green { color: #16a34a; font-weight: 700; }
-      .text-indigo { color: #4338ca; font-weight: 700; }
-      .text-muted { color: #94a3b8; }
-      .matrix-footer-row td {
-        background: #e2e8f0;
-        font-weight: 700;
-        border-top: 2px solid #94a3b8;
-      }
-      .rate-badge {
-        font-size: 11px;
-        font-weight: 700;
-        padding: 2px 7px;
-        border-radius: 4px;
-        &.high { background: #dcfce7; color: #15803d; }
-        &.mid { background: #fef3c7; color: #b45309; }
-        &.low { background: #fee2e2; color: #b91c1c; }
-      }
+      .highlight-cell { font-weight: 700; color: #0284c7; }
+      .action-req-cell { font-weight: 800; color: #dc2626; background: #fff1f2; }
+      .total-cell { background: #f1f5f9; font-size: 12.5px; }
     }
 
-    /* LEDGER SPECIFIC STYLING */
-    .ledger-table {
-      .ref-mono { font-family: monospace; font-weight: 700; color: #1e40af; }
-      .sub-link-meta { font-size: 10px; color: #64748b; margin-top: 1px; }
-      .priority-tag {
-        font-size: 10px;
-        font-weight: 700;
-        padding: 1px 6px;
-        border-radius: 4px;
-        &.normal { background: #f1f5f9; color: #475569; }
-        &.urgent { background: #fef3c7; color: #b45309; }
-        &.immediate { background: #fee2e2; color: #b91c1c; }
-      }
-      .status-tag {
-        font-size: 10px;
-        font-weight: 700;
-        padding: 2px 6px;
-        border-radius: 4px;
-        display: inline-block;
-        &.received { background: #e0f2fe; color: #0369a1; }
-        &.in-review { background: #fef3c7; color: #b45309; }
-        &.action-required { background: #fee2e2; color: #b91c1c; }
-        &.in-progress { background: #f3e8ff; color: #7e22ce; }
-        &.completed { background: #dcfce7; color: #15803d; }
-        &.dispatched { background: #e0e7ff; color: #4338ca; }
-        &.archived { background: #f1f5f9; color: #64748b; }
-      }
-    }
+    .workload-progress { height: 6px; border-radius: 3px; }
 
     .text-center { text-align: center; }
+    .font-bold { font-weight: 700; }
+    .mt-1 { margin-top: 4px; }
     .mt-4 { margin-top: 16px; }
     .mt-6 { margin-top: 24px; }
 
-    /* OFFICIAL PRINT HEADER & SIGNATURES */
+    /* ==========================================================================
+       OFFICIAL HORIZONTAL LANDSCAPE PRINT STYLES (A4 & Legal)
+       ========================================================================== */
     .official-print-header {
-      display: none; /* Only visible in print */
+      display: none; /* Print only */
       text-align: center;
-      margin-bottom: 16px;
+      margin-bottom: 14px;
       padding-bottom: 8px;
       border-bottom: 2px solid #0f172a;
-      .office-name { margin: 0; font-size: 16px; font-weight: 800; color: #0f172a; letter-spacing: 0.5px; }
+
+      .ministry-title {
+        font-size: 10pt;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: #475569;
+        margin-bottom: 2px;
+      }
+      .office-name {
+        margin: 0;
+        font-size: 14pt;
+        font-weight: 800;
+        color: #0f172a;
+        letter-spacing: 0.5px;
+      }
       .meta-row {
         display: flex;
         justify-content: center;
         gap: 16px;
         flex-wrap: wrap;
-        font-size: 11px;
-        color: #475569;
+        font-size: 8.5pt;
+        color: #334155;
         margin-top: 4px;
       }
+    }
+
+    .print-signatures-block {
+      display: none; /* Print only */
     }
 
     @media print {
@@ -1039,6 +2098,7 @@ interface DeptMatrixRow {
       }
 
       .no-print { display: none !important; }
+
       .page-container {
         width: 100% !important;
         max-width: 100% !important;
@@ -1048,63 +2108,9 @@ interface DeptMatrixRow {
 
       .official-print-header {
         display: block !important;
-        margin-bottom: 10px !important;
-        padding-bottom: 6px !important;
-        border-bottom: 2px solid #0f172a !important;
-        .office-name {
-          font-size: 14pt !important;
-          font-weight: 800 !important;
-          color: #0f172a !important;
-          text-align: center !important;
-          letter-spacing: 0.5px !important;
-          margin: 0 0 4px 0 !important;
-        }
-        .meta-row {
-          display: flex !important;
-          justify-content: center !important;
-          gap: 16px !important;
-          flex-wrap: wrap !important;
-          font-size: 8.5pt !important;
-          color: #334155 !important;
-        }
       }
 
-      .section-heading-bar {
-        page-break-after: avoid !important;
-        break-after: avoid !important;
-        margin-top: 10px !important;
-        margin-bottom: 6px !important;
-        h3 { font-size: 10.5pt !important; font-weight: 700 !important; color: #000 !important; }
-        .sec-icon { display: none !important; }
-      }
-
-      /* 7 Status Cards horizontally aligned across the landscape width */
-      .status-cards-grid {
-        display: grid !important;
-        grid-template-columns: repeat(7, 1fr) !important;
-        gap: 6px !important;
-        margin-bottom: 12px !important;
-        page-break-inside: avoid !important;
-        break-inside: avoid !important;
-      }
-
-      .status-summary-card {
-        border: 1px solid #64748b !important;
-        background: #ffffff !important;
-        padding: 6px 8px !important;
-        box-shadow: none !important;
-        border-radius: 4px !important;
-        page-break-inside: avoid !important;
-        break-inside: avoid !important;
-        .sc-status-name { font-size: 7.5pt !important; color: #1e293b !important; }
-        .sc-icon { display: none !important; }
-        .sc-count { font-size: 13pt !important; font-weight: 800 !important; color: #000 !important; }
-        .sc-pct { font-size: 8pt !important; font-weight: 700 !important; color: #334155 !important; }
-        .sc-progress { height: 3px !important; }
-      }
-
-      /* Tables formatted for Horizontal Landscape */
-      .matrix-card, .ledger-container {
+      .table-outer-card {
         border: 1px solid #334155 !important;
         border-radius: 0 !important;
         box-shadow: none !important;
@@ -1116,55 +2122,54 @@ interface DeptMatrixRow {
       .report-table {
         width: 100% !important;
         border-collapse: collapse !important;
-        font-size: 8.5pt !important;
+        font-size: 8pt !important;
 
         thead {
           display: table-header-group !important;
+          th {
+            background: #f1f5f9 !important;
+            color: #000000 !important;
+            border: 1px solid #475569 !important;
+            padding: 3px 5px !important;
+            font-size: 7.5pt !important;
+            font-weight: 700 !important;
+          }
         }
-        tfoot {
-          display: table-footer-group !important;
-        }
+
+        tfoot { display: table-footer-group !important; }
+
         tr {
           page-break-inside: avoid !important;
           break-inside: avoid !important;
         }
-        th {
-          background: #f1f5f9 !important;
-          color: #000000 !important;
-          border: 1px solid #475569 !important;
-          padding: 4px 6px !important;
-          font-weight: 700 !important;
-          font-size: 8pt !important;
-          -webkit-print-color-adjust: exact !important;
-          print-color-adjust: exact !important;
-        }
+
         td {
           border: 1px solid #64748b !important;
           color: #000000 !important;
-          padding: 4px 6px !important;
-          font-size: 8pt !important;
-        }
-      }
-
-      .matrix-table {
-        .matrix-footer-row td {
-          background: #e2e8f0 !important;
-          font-weight: 800 !important;
-          border-top: 2px solid #000 !important;
-          -webkit-print-color-adjust: exact !important;
-          print-color-adjust: exact !important;
-        }
-      }
-
-      .ledger-table {
-        .ref-mono { font-family: monospace !important; font-weight: 700 !important; color: #000 !important; }
-        .priority-tag, .status-tag {
-          border: 1px solid #64748b !important;
-          background: transparent !important;
-          color: #000 !important;
-          padding: 1px 4px !important;
+          padding: 3px 5px !important;
           font-size: 7.5pt !important;
         }
+      }
+
+      .ref-mono {
+        font-family: monospace !important;
+        font-weight: 700 !important;
+        color: #000 !important;
+        background: transparent !important;
+        padding: 0 !important;
+      }
+
+      .priority-tag, .status-tag, .cat-chip {
+        border: 1px solid #64748b !important;
+        background: transparent !important;
+        color: #000 !important;
+        padding: 1px 3px !important;
+        font-size: 7pt !important;
+      }
+
+      .ack-cell .ack-sign-line {
+        border: 1px solid #475569 !important;
+        background: transparent !important;
       }
 
       /* 4 Signature columns spread evenly across horizontal landscape width */
@@ -1213,17 +2218,23 @@ export class LetterReportsComponent implements OnInit {
 
   allLetters = signal<Letter[]>([]);
   departments = signal<Department[]>([]);
+  letterSettings = signal<LetterSettings>(DEFAULT_LETTER_SETTINGS);
   statuses = ALL_LETTER_STATUSES;
   today = new Date();
 
-  // Active Timeframe Mode: daily | weekly | monthly | custom
+  // Active Report View Type: daily-register | status-matrix | urgent-directives | category-report | dept-workload | ledger | executive-combined
+  activeReportType = signal<ReportViewType>('daily-register');
+
+  // Timeframe Mode: daily | weekly | monthly | custom
   timeframeMode = signal<TimeframeMode>('daily');
-  activeTab = signal<ReportViewTab>('status-report');
+
+  // Density Mode: standard | compact
+  densityMode = signal<'standard' | 'compact'>('compact');
 
   // Paper Format for Horizontal Printing: 'A4' or 'legal'
   paperSize = signal<'A4' | 'legal'>('A4');
 
-  // Dates for different modes
+  // Filter States
   dailyDate: string = this.formatDate(new Date());
   weeklyAnchor: Date = new Date();
   monthlyMonth: string = this.formatMonth(new Date());
@@ -1234,8 +2245,11 @@ export class LetterReportsComponent implements OnInit {
   customFromObj = computed(() => this.dateFrom ? new Date(this.dateFrom + 'T00:00:00') : null);
   customToObj = computed(() => this.dateTo ? new Date(this.dateTo + 'T00:00:00') : null);
 
-  // Dropdown filters
+  // Dropdown / Instant Filters
+  searchQuery: string = '';
   selectedDept: string = 'ALL';
+  selectedCategory: string = 'ALL';
+  selectedPriority: string = 'ALL';
   selectedStatus: string = 'ALL';
 
   ngOnInit() {
@@ -1249,12 +2263,40 @@ export class LetterReportsComponent implements OnInit {
       this.departments.set(depts);
     });
 
-    // Initialize with today for daily
+    this.letterService.getSettings().subscribe(s => {
+      if (s) {
+        this.letterSettings.set({
+          ...DEFAULT_LETTER_SETTINGS,
+          ...s
+        });
+      }
+    });
+
+    // Default to today daily
     this.setToday();
   }
 
-  // --- PAPER SIZE & PRINT ORIENTATION ---
+  // --- REPORT TYPE SELECTOR ---
+  selectReportType(type: ReportViewType) {
+    this.activeReportType.set(type);
+    if (type === 'daily-register') {
+      this.setTimeframeMode('daily');
+    }
+  }
 
+  switchToTodayDailyRegister() {
+    this.setTimeframeMode('daily');
+    this.setToday();
+    this.activeReportType.set('daily-register');
+  }
+
+  switchToYesterdayDailyRegister() {
+    this.setTimeframeMode('daily');
+    this.setYesterday();
+    this.activeReportType.set('daily-register');
+  }
+
+  // --- PAPER SIZE & PRINT ORIENTATION ---
   setPaperSize(size: 'A4' | 'legal') {
     this.paperSize.set(size);
     this.applyPageStyle(size);
@@ -1272,8 +2314,7 @@ export class LetterReportsComponent implements OnInit {
     styleEl.innerHTML = `@page { size: ${pageRule}; margin: 7mm 10mm 7mm 10mm; }`;
   }
 
-  // --- TIMEFRAME CONTROLS ---
-
+  // --- TIMEFRAME HANDLERS ---
   setTimeframeMode(mode: TimeframeMode) {
     this.timeframeMode.set(mode);
     if (mode === 'daily') {
@@ -1287,10 +2328,26 @@ export class LetterReportsComponent implements OnInit {
     }
   }
 
-  // Daily Mode Handlers
   setToday() {
     this.dailyDate = this.formatDate(new Date());
     this.onDailyDateChange();
+  }
+
+  setYesterday() {
+    const yest = new Date();
+    yest.setDate(yest.getDate() - 1);
+    this.dailyDate = this.formatDate(yest);
+    this.onDailyDateChange();
+  }
+
+  isTodayDaily(): boolean {
+    return this.dailyDate === this.formatDate(new Date());
+  }
+
+  isYesterdayDaily(): boolean {
+    const yest = new Date();
+    yest.setDate(yest.getDate() - 1);
+    return this.dailyDate === this.formatDate(yest);
   }
 
   prevDay() {
@@ -1370,10 +2427,7 @@ export class LetterReportsComponent implements OnInit {
     this.dateTo = this.formatDate(lastDay);
   }
 
-  // Custom Range Handlers
-  onCustomRangeChange() {
-    // Already binds to dateFrom & dateTo
-  }
+  onCustomRangeChange() {}
 
   onDailyDatePicked(d: Date | null) {
     if (d) {
@@ -1418,23 +2472,40 @@ export class LetterReportsComponent implements OnInit {
   }
 
   resetFilters() {
+    this.searchQuery = '';
     this.selectedDept = 'ALL';
+    this.selectedCategory = 'ALL';
+    this.selectedPriority = 'ALL';
     this.selectedStatus = 'ALL';
     this.setTimeframeMode('daily');
     this.setToday();
   }
 
   toggleStatusFilter(status: LetterStatus) {
-    if (this.selectedStatus === status) {
-      this.selectedStatus = 'ALL';
-    } else {
-      this.selectedStatus = status;
-    }
+    this.selectedStatus = this.selectedStatus === status ? 'ALL' : status;
+  }
+
+  toggleCategoryFilter(cat: string) {
+    this.selectedCategory = this.selectedCategory === cat ? 'ALL' : cat;
   }
 
   // --- COMPUTED PROPERTIES ---
 
-  // Letters filtered strictly by the date timeframe (before dept / status filters)
+  availableCategories = computed(() => {
+    const s = this.letterSettings();
+    if (s.categories && s.categories.length > 0) return s.categories;
+    // Fallback: extract distinct categories from all letters
+    const distinct = Array.from(new Set(this.allLetters().map(l => l.category).filter(Boolean)));
+    return distinct.length > 0 ? distinct : DEFAULT_LETTER_SETTINGS.categories;
+  });
+
+  // Today's total registered inward count
+  todayInwardCount = computed(() => {
+    const todayStr = this.formatDate(new Date());
+    return this.allLetters().filter(l => l.received_date === todayStr).length;
+  });
+
+  // Letters filtered strictly by the date timeframe (before dept / category / status / search)
   timeframeLetters = computed(() => {
     let list = this.allLetters();
     if (this.dateFrom) {
@@ -1446,26 +2517,54 @@ export class LetterReportsComponent implements OnInit {
     return list;
   });
 
-  // Letters filtered by timeframe AND department AND status
+  // Letters filtered by timeframe AND department, category, priority, status, and search query
   filteredLetters = computed(() => {
     let list = this.timeframeLetters();
 
     if (this.selectedDept !== 'ALL') {
       list = list.filter(l => l.send_to?.includes(this.selectedDept));
     }
+    if (this.selectedCategory !== 'ALL') {
+      list = list.filter(l => l.category === this.selectedCategory);
+    }
+    if (this.selectedPriority !== 'ALL') {
+      list = list.filter(l => l.priority === this.selectedPriority);
+    }
     if (this.selectedStatus !== 'ALL') {
       list = list.filter(l => l.status === this.selectedStatus);
+    }
+
+    if (this.searchQuery.trim()) {
+      const q = this.searchQuery.toLowerCase().trim();
+      list = list.filter(l =>
+        l.ref_number?.toLowerCase().includes(q) ||
+        l.title?.toLowerCase().includes(q) ||
+        l.received_from?.toLowerCase().includes(q) ||
+        l.link_ref?.toLowerCase().includes(q) ||
+        l.category?.toLowerCase().includes(q) ||
+        l.send_to?.some(d => d.toLowerCase().includes(q)) ||
+        l.assigned_user_names?.some(u => u.toLowerCase().includes(q)) ||
+        l.assigned_to?.some(u => u.toLowerCase().includes(q))
+      );
     }
 
     return list;
   });
 
+  // Urgent Directives Letters (Priority Immediate / Urgent OR Status Action Required)
+  urgentDirectivesLetters = computed(() => {
+    return this.filteredLetters().filter(l => 
+      l.priority === 'Immediate' || 
+      l.priority === 'Urgent' || 
+      l.status === 'Action Required'
+    );
+  });
+
+  urgentDirectivesCount = computed(() => this.urgentDirectivesLetters().length);
+
   // Status breakdown array for cards
   statusBreakdown = computed<StatusItem[]>(() => {
-    let letters = this.timeframeLetters();
-    if (this.selectedDept !== 'ALL') {
-      letters = letters.filter(l => l.send_to?.includes(this.selectedDept));
-    }
+    let letters = this.filteredLetters();
     const total = letters.length;
 
     const icons: Record<LetterStatus, string> = {
@@ -1503,7 +2602,7 @@ export class LetterReportsComponent implements OnInit {
 
   // Department-wise Status Matrix cross-tabulation
   departmentMatrix = computed<DeptMatrixRow[]>(() => {
-    const letters = this.timeframeLetters();
+    const letters = this.filteredLetters();
     const depts = this.departments();
 
     const rows: DeptMatrixRow[] = depts.map(d => {
@@ -1534,7 +2633,7 @@ export class LetterReportsComponent implements OnInit {
       };
     });
 
-    // Check for unassigned / general letters (no departments matching)
+    // Check for unassigned / general letters
     const unassignedLetters = letters.filter(l => !l.send_to?.length);
     if (unassignedLetters.length > 0) {
       const received = unassignedLetters.filter(l => l.status === 'Received').length;
@@ -1564,6 +2663,33 @@ export class LetterReportsComponent implements OnInit {
     }
 
     return rows;
+  });
+
+  // Category summary array
+  categorySummary = computed<CategorySummaryRow[]>(() => {
+    const letters = this.filteredLetters();
+    const totalAll = letters.length;
+    const cats = this.availableCategories();
+
+    return cats.map(cat => {
+      const catLetters = letters.filter(l => l.category === cat);
+      const total = catLetters.length;
+      const percent = totalAll > 0 ? Math.round((total / totalAll) * 100) : 0;
+      const urgent = catLetters.filter(l => l.priority === 'Urgent' || l.priority === 'Immediate').length;
+      const completed = catLetters.filter(l => l.status === 'Completed' || l.status === 'Dispatched').length;
+      const pending = total - completed;
+      const turnaroundRate = total > 0 ? Math.round((completed / total) * 100) + '%' : '0%';
+
+      return {
+        category: cat,
+        total,
+        percent,
+        urgent,
+        pending,
+        completed,
+        turnaroundRate
+      };
+    }).filter(c => c.total > 0 || this.selectedCategory === c.category);
   });
 
   // Totals row for the Department Matrix
@@ -1609,7 +2735,7 @@ export class LetterReportsComponent implements OnInit {
     return this.filteredLetters().filter(l => l.status === 'Completed' || l.status === 'Dispatched').length;
   });
 
-  // Pending count (awaiting final action)
+  // Pending count
   pendingCount = computed(() => {
     return this.filteredLetters().length - this.resolvedCount();
   });
@@ -1621,7 +2747,7 @@ export class LetterReportsComponent implements OnInit {
     return Math.round((this.resolvedCount() / total) * 100) + '%';
   });
 
-  // User-facing Label for current reporting timeframe
+  // Period Label for header
   reportPeriodLabel = computed(() => {
     const mode = this.timeframeMode();
     if (mode === 'daily') {
@@ -1641,13 +2767,11 @@ export class LetterReportsComponent implements OnInit {
       const d = new Date(year, month - 1, 1);
       return d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
     }
-    // Custom
     if (!this.dateFrom && !this.dateTo) return 'All Recorded Time';
     return `${this.dateFrom || 'Start'} to ${this.dateTo || 'Present'}`;
   });
 
   // --- HELPERS ---
-
   private formatDate(d: Date): string {
     const y = d.getFullYear();
     const m = String(d.getMonth() + 1).padStart(2, '0');
@@ -1677,6 +2801,11 @@ export class LetterReportsComponent implements OnInit {
     return 'low';
   }
 
+  parseIntRate(rate: string): number {
+    return parseInt(rate, 10) || 0;
+  }
+
+  // --- PRINTING ---
   printReport(size?: 'A4' | 'legal') {
     const chosenSize = size || this.paperSize();
     this.paperSize.set(chosenSize);
@@ -1684,6 +2813,50 @@ export class LetterReportsComponent implements OnInit {
     setTimeout(() => {
       window.print();
     }, 80);
+  }
+
+  // --- EXPORT HANDLERS ---
+  exportDailyInwardCSV() {
+    const rows = this.filteredLetters();
+    if (rows.length === 0) {
+      alert('No daily inward letters found to export.');
+      return;
+    }
+
+    const headers = [
+      '#',
+      'Official Reference No.',
+      'Inward Date',
+      'Letter Title / Subject',
+      'Linked Ref',
+      'Received From',
+      'Category',
+      'Send To Departments',
+      'Assigned Officers',
+      'Priority',
+      'Workflow Status',
+      'Remarks / Directives'
+    ];
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map((r, i) => [
+        i + 1,
+        `"${r.ref_number || ''}"`,
+        `"${r.received_date || ''}"`,
+        `"${(r.title || '').replace(/"/g, '""')}"`,
+        `"${(r.link_ref || '').replace(/"/g, '""')}"`,
+        `"${(r.received_from || '').replace(/"/g, '""')}"`,
+        `"${r.category || ''}"`,
+        `"${(r.send_to || []).join('; ')}"`,
+        `"${(r.assigned_user_names || r.assigned_to || []).join('; ')}"`,
+        `"${r.priority || ''}"`,
+        `"${r.status || ''}"`,
+        `"${(r.description || '').replace(/"/g, '""')}"`
+      ].join(','))
+    ].join('\n');
+
+    this.downloadCSV(csvContent, `daily_inward_register_${this.dailyDate || this.formatDate(new Date())}.csv`);
   }
 
   exportLettersCSV() {
@@ -1763,7 +2936,6 @@ export class LetterReportsComponent implements OnInit {
         r.total,
         `"${r.turnaroundRate}"`
       ].join(',')),
-      // Totals Row
       [
         '"SUMMARY TOTAL"',
         '""',
@@ -1780,6 +2952,39 @@ export class LetterReportsComponent implements OnInit {
     ].join('\n');
 
     this.downloadCSV(csvContent, `status_report_matrix_${this.timeframeMode()}_${this.formatDate(new Date())}.csv`);
+  }
+
+  exportCategorySummaryCSV() {
+    const summary = this.categorySummary();
+    if (summary.length === 0) {
+      alert('No category data to export.');
+      return;
+    }
+
+    const headers = [
+      'Category',
+      'Total Letters',
+      'Volume Share (%)',
+      'Urgent Items',
+      'Action Pending',
+      'Resolved / Completed',
+      'Turnaround Rate'
+    ];
+
+    const csvContent = [
+      headers.join(','),
+      ...summary.map(c => [
+        `"${c.category}"`,
+        c.total,
+        c.percent,
+        c.urgent,
+        c.pending,
+        c.completed,
+        `"${c.turnaroundRate}"`
+      ].join(','))
+    ].join('\n');
+
+    this.downloadCSV(csvContent, `category_summary_${this.timeframeMode()}_${this.formatDate(new Date())}.csv`);
   }
 
   private downloadCSV(content: string, filename: string) {
