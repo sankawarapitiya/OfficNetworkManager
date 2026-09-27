@@ -430,7 +430,7 @@ interface CategorySummaryRow {
             </div>
 
             <div class="date-input-wrap">
-              <mat-form-field appearance="outline" class="compact-field" subscriptSizing="dynamic">
+              <mat-form-field appearance="outline" class="compact-field date-picker-field" subscriptSizing="dynamic">
                 <mat-label>Selected Inward Date</mat-label>
                 <input matInput [matDatepicker]="dailyPicker" [ngModel]="dailyDateObj()" (ngModelChange)="onDailyDatePicked($event)" (click)="dailyPicker.open()" placeholder="Select date">
                 <mat-datepicker-toggle matIconSuffix [for]="dailyPicker"></mat-datepicker-toggle>
@@ -480,7 +480,7 @@ interface CategorySummaryRow {
               </button>
             </div>
             <div class="date-input-wrap">
-              <mat-form-field appearance="outline" class="compact-field" subscriptSizing="dynamic">
+              <mat-form-field appearance="outline" class="compact-field date-picker-field" subscriptSizing="dynamic">
                 <mat-label>Select Month</mat-label>
                 <input matInput type="month" [ngModel]="monthlyMonth()" (ngModelChange)="onMonthlyChange($event)">
               </mat-form-field>
@@ -1623,7 +1623,8 @@ interface CategorySummaryRow {
     }
 
     .timeframe-subcontrols {
-      padding-top: 10px;
+      padding-top: 14px;
+      margin-top: 2px;
       border-top: 1px dashed #e2e8f0;
       width: 100%;
       box-sizing: border-box;
@@ -1641,6 +1642,7 @@ interface CategorySummaryRow {
       display: inline-flex;
       align-items: center;
       gap: 4px;
+      flex-shrink: 0;
       .nav-arr-btn {
         width: 32px;
         height: 32px;
@@ -1655,16 +1657,48 @@ interface CategorySummaryRow {
       }
     }
 
-    .date-input-wrap { width: 170px; }
+    .date-input-wrap {
+      width: 220px;
+      min-width: 210px;
+      flex-shrink: 0;
+
+      .mat-mdc-form-field,
+      mat-form-field,
+      .date-picker-field {
+        width: 100% !important;
+        display: block !important;
+      }
+
+      .mat-mdc-icon-button {
+        width: 32px !important;
+        height: 32px !important;
+        padding: 4px !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        mat-icon {
+          font-size: 18px !important;
+          width: 18px !important;
+          height: 18px !important;
+        }
+      }
+
+      @media (max-width: 640px) {
+        width: 100%;
+        min-width: 100%;
+      }
+    }
 
     .active-badge {
       display: inline-flex;
       align-items: center;
       gap: 6px;
-      padding: 4px 10px;
+      padding: 5px 12px;
       border-radius: 6px;
       font-size: 11.5px;
       font-weight: 600;
+      white-space: nowrap;
+      flex-shrink: 0;
       mat-icon { font-size: 16px; width: 16px; height: 16px; }
 
       &.daily { background: #ecfdf5; color: #059669; border: 1px solid #a7f3d0; }
@@ -1680,12 +1714,18 @@ interface CategorySummaryRow {
       margin-left: auto;
       flex-wrap: wrap;
 
+      @media (max-width: 1100px) {
+        margin-left: 0;
+        width: 100%;
+      }
+
       .batch-chip {
         font-size: 11px;
         padding: 3px 8px;
         border-radius: 6px;
         font-weight: 500;
         border: 1px solid transparent;
+        white-space: nowrap;
 
         &.total { background: #f1f5f9; color: #1e293b; border-color: #cbd5e1; }
         &.urgent { background: #fee2e2; color: #991b1b; border-color: #fca5a5; }
@@ -1705,8 +1745,38 @@ interface CategorySummaryRow {
       display: flex;
       align-items: center;
       gap: 8px;
-      .date-field { width: 150px; }
+      flex-shrink: 0;
+      flex-wrap: wrap;
+
+      .date-field {
+        width: 185px;
+        min-width: 165px;
+        display: block;
+      }
       .range-sep { font-size: 12px; color: #64748b; font-weight: 500; }
+
+      .mat-mdc-icon-button {
+        width: 32px !important;
+        height: 32px !important;
+        padding: 4px !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        mat-icon {
+          font-size: 18px !important;
+          width: 18px !important;
+          height: 18px !important;
+        }
+      }
+
+      @media (max-width: 640px) {
+        width: 100%;
+        .date-field {
+          flex: 1;
+          width: auto;
+          min-width: 130px;
+        }
+      }
     }
 
     .quick-chips {
