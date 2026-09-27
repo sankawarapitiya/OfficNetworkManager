@@ -1,0 +1,585 @@
+<div class="actions-page-container">
+
+  <!-- 1. Hero Header Banner -->
+  <div class="hero-banner">
+    <div class="hero-left">
+      <div class="hero-tag">
+        <span class="pulse-dot"></span>
+        <span>Directives Pipeline · Active Stream</span>
+      </div>
+      <h1 class="hero-title">Directives & Pending Actions</h1>
+      <p class="hero-subtitle">
+        Track, prioritize, and execute official correspondence requiring officer turnaround or ministerial action.
+      </p>
+    </div>
+
+    <div class="hero-actions">
+      <a mat-stroked-button routerLink="/letters/inbox" class="nav-btn">
+        <mat-icon>inbox</mat-icon> Inbox Registry
+      </a>
+      <button mat-flat-button color="primary" (click)="openRegisterDialog()" class="register-btn">
+        <mat-icon>add</mat-icon> Register Inward
+      </button>
+    </div>
+  </div>
+
+  <!-- 2. Smart Analytical KPI Metrics Ribbon -->
+  <div class="kpi-metrics-grid">
+    
+    <!-- KPI 1: Assigned to Me -->
+    <div class="kpi-stat-card" 
+         [class.active-kpi]="activeSegment() === 'MINE'" 
+         (click)="setSegment('MINE')">
+      <div class="kpi-icon-wrap emerald">
+        <mat-icon>person</mat-icon>
+      </div>
+      <div class="kpi-text-info">
+        <span class="kpi-label">Assigned to Me</span>
+        <span class="kpi-num">{{ myActions().length }}</span>
+        <span class="kpi-sub">Direct officer queue</span>
+      </div>
+      <div class="kpi-chevron">
+        <mat-icon>chevron_right</mat-icon>
+      </div>
+    </div>
+
+    <!-- KPI 2: Department Queue -->
+    <div class="kpi-stat-card" 
+         [class.active-kpi]="activeSegment() === 'DEPT'" 
+         (click)="setSegment('DEPT')">
+      <div class="kpi-icon-wrap indigo">
+        <mat-icon>domain</mat-icon>
+      </div>
+      <div class="kpi-text-info">
+        <span class="kpi-label">My Department</span>
+        <span class="kpi-num">{{ deptActions().length }}</span>
+        <span class="kpi-sub">{{ userDept() ? userDept() + ' unit' : 'All units' }}</span>
+      </div>
+      <div class="kpi-chevron">
+        <mat-icon>chevron_right</mat-icon>
+      </div>
+    </div>
+
+    <!-- KPI 3: Urgent & Immediate -->
+    <div class="kpi-stat-card urgent-kpi" 
+         [class.active-kpi]="activeSegment() === 'URGENT'" 
+         (click)="setSegment('URGENT')">
+      <div class="kpi-icon-wrap coral">
+        <mat-icon>priority_high</mat-icon>
+      </div>
+      <div class="kpi-text-info">
+        <span class="kpi-label">Urgent & Immediate</span>
+        <span class="kpi-num coral-num">{{ urgentActions().length }}</span>
+        <span class="kpi-sub">Critical turnaround needed</span>
+      </div>
+      <div class="kpi-chevron">
+        <mat-icon>chevron_right</mat-icon>
+      </div>
+    </div>
+
+    <!-- KPI 4: Total Open Pipeline -->
+    <div class="kpi-stat-card" 
+         [class.active-kpi]="activeSegment() === 'ALL_OPEN'" 
+         (click)="setSegment('ALL_OPEN')">
+      <div class="kpi-icon-wrap amber">
+        <mat-icon>pending_actions</mat-icon>
+      </div>
+      <div class="kpi-text-info">
+        <span class="kpi-label">Total Open Pipeline</span>
+        <span class="kpi-num">{{ allOpenActions().length }}</span>
+        <span class="kpi-sub">Active directives system-wide</span>
+      </div>
+      <div class="kpi-chevron">
+        <mat-icon>chevron_right</mat-icon>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- 3. Smart Search & Filter Control Bar -->
+  <mat-card class="filter-control-card">
+    <div class="filter-top-row">
+      <!-- Full-text Search -->
+      <div class="search-input-wrap">
+        <mat-icon class="search-icon">search</mat-icon>
+        <input type="text" 
+               placeholder="Search directives, ref no, sender, assignees..." 
+               [ngModel]="searchQuery()" 
+               (ngModelChange)="searchQuery.set($event)">
+        <button *ngIf="searchQuery()" mat-icon-button (click)="searchQuery.set('')" class="clear-search-btn">
+          <mat-icon>close</mat-icon>
+        </button>
+      </div>
+
+      <!-- Controls: View Mode & Dropdown Filters -->
+      <div class="filter-right-controls">
+        <!-- Priority Dropdown -->
+        <mat-form-field appearance="outline" class="filter-select-field" subscriptSizing="dynamic">
+          <mat-label>Priority</mat-label>
+          <mat-select [ngModel]="selectedPriority()" (ngModelChange)="selectedPriority.set($event)">
+            <mat-option value="ALL">All Priorities</mat-option>
+            <mat-option value="Immediate">Immediate Only</mat-option>
+            <mat-option value="Urgent">Urgent Only</mat-option>
+            <mat-option value="Normal">Normal</mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <!-- Department Dropdown -->
+        <mat-form-field appearance="outline" class="filter-select-field dept-select" subscriptSizing="dynamic" *ngIf="departments().length > 0">
+          <mat-label>Department</mat-label>
+          <mat-select [ngModel]="selectedDepartment()" (ngModelChange)="selectedDepartment.set($event)">
+            <mat-option value="ALL">All Departments</mat-option>
+            <mat-option *ngFor="let d of departments()" [value]="d.name">{{ d.name }}</mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <!-- View Mode Toggle -->
+        <div class="view-mode-toggle">
+          <button type="button" 
+                  class="view-mode-btn" 
+                  [class.active]="viewMode() === 'grid'" 
+                  (click)="setViewMode('grid')" 
+                  matTooltip="Card Grid View">
+            <mat-icon>grid_view</mat-icon>
+          </button>
+          <button type="button" 
+                  class="view-mode-btn" 
+                  [class.active]="viewMode() === 'kanban'" 
+                  (click)="setViewMode('kanban')" 
+                  matTooltip="Workflow Kanban Board">
+            <mat-icon>view_kanban</mat-icon>
+          </button>
+          <button type="button" 
+                  class="view-mode-btn" 
+                  [class.active]="viewMode() === 'table'" 
+                  (click)="setViewMode('table')" 
+                  matTooltip="Dense Table View">
+            <mat-icon>table_rows</mat-icon>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Segment Filter Pills -->
+    <div class="filter-pills-row">
+      <div class="pills-scroll-list">
+        <button class="segment-pill-btn" 
+                [class.active]="activeSegment() === 'ALL_OPEN'" 
+                (click)="setSegment('ALL_OPEN')">
+          <mat-icon class="pill-ico">all_inclusive</mat-icon>
+          <span>All Open</span>
+          <span class="pill-counter">{{ allOpenActions().length }}</span>
+        </button>
+
+        <button class="segment-pill-btn" 
+                [class.active]="activeSegment() === 'MINE'" 
+                (click)="setSegment('MINE')">
+          <mat-icon class="pill-ico">person</mat-icon>
+          <span>Assigned to Me</span>
+          <span class="pill-counter">{{ myActions().length }}</span>
+        </button>
+
+        <button class="segment-pill-btn" 
+                [class.active]="activeSegment() === 'DEPT'" 
+                (click)="setSegment('DEPT')">
+          <mat-icon class="pill-ico">domain</mat-icon>
+          <span>My Department</span>
+          <span class="pill-counter">{{ deptActions().length }}</span>
+        </button>
+
+        <button class="segment-pill-btn urgent-pill-btn" 
+                [class.active]="activeSegment() === 'URGENT'" 
+                (click)="setSegment('URGENT')">
+          <mat-icon class="pill-ico">priority_high</mat-icon>
+          <span>Urgent</span>
+          <span class="pill-counter urgent-count">{{ urgentActions().length }}</span>
+        </button>
+
+        <button class="segment-pill-btn" 
+                [class.active]="activeSegment() === 'ACTION_REQ'" 
+                (click)="setSegment('ACTION_REQ')">
+          <mat-icon class="pill-ico">assignment_late</mat-icon>
+          <span>Action Required</span>
+          <span class="pill-counter">{{ actionRequiredActions().length }}</span>
+        </button>
+
+        <button class="segment-pill-btn" 
+                [class.active]="activeSegment() === 'IN_PROGRESS'" 
+                (click)="setSegment('IN_PROGRESS')">
+          <mat-icon class="pill-ico">pending</mat-icon>
+          <span>In Progress & Review</span>
+          <span class="pill-counter">{{ inProgressActions().length }}</span>
+        </button>
+      </div>
+
+      <!-- Active Filter Reset -->
+      <button *ngIf="searchQuery() || selectedDepartment() !== 'ALL' || selectedPriority() !== 'ALL' || activeSegment() !== 'ALL_OPEN'" 
+              mat-button 
+              color="warn" 
+              class="reset-filters-btn" 
+              (click)="clearFilters()">
+        <mat-icon>filter_alt_off</mat-icon> Clear Filters
+      </button>
+    </div>
+  </mat-card>
+
+  <!-- 4. Content Area Based on Selected View Mode -->
+  
+  <!-- VIEW A: KANBAN WORKFLOW BOARD -->
+  <div class="kanban-board-container" *ngIf="viewMode() === 'kanban'">
+    <div class="kanban-column" *ngFor="let col of kanbanColumns" [ngClass]="col.colorClass">
+      
+      <!-- Column Header -->
+      <div class="kanban-column-header">
+        <div class="col-title-wrap">
+          <mat-icon class="col-icon">{{ col.icon }}</mat-icon>
+          <span class="col-name">{{ col.label }}</span>
+        </div>
+        <span class="col-badge">{{ getLettersForColumn(col.status).length }}</span>
+      </div>
+
+      <!-- Column Card Stack -->
+      <div class="kanban-card-stack">
+        
+        <div class="kanban-card" 
+             *ngFor="let letter of getLettersForColumn(col.status)"
+             [class.is-urgent]="letter.priority === 'Urgent' || letter.priority === 'Immediate'"
+             (click)="openDetail(letter)">
+          
+          <div class="k-card-header">
+            <span class="k-ref-badge">{{ letter.ref_number }}</span>
+            <div class="k-pills">
+              <span class="priority-pill" [ngClass]="getPriorityClass(letter.priority)">
+                {{ letter.priority }}
+              </span>
+              <span class="att-indicator" *ngIf="letter.attachments?.length" matTooltip="Attached documents (inspect on side)">
+                <mat-icon>attach_file</mat-icon> {{ letter.attachments?.length }}
+              </span>
+            </div>
+          </div>
+
+          <h4 class="k-title" [matTooltip]="letter.title">{{ letter.title }}</h4>
+
+          <div class="k-meta-row">
+            <span class="k-meta-item">
+              <mat-icon>domain</mat-icon> {{ letter.received_from }}
+            </span>
+            <span class="k-age-tag">
+              {{ getTimeAgo(letter.received_date) }}
+            </span>
+          </div>
+
+          <div class="k-dept-tag" *ngIf="letter.send_to?.length">
+            <mat-icon>apartment</mat-icon> {{ letter.send_to.join(', ') }}
+          </div>
+
+          <div class="k-card-footer" (click)="$event.stopPropagation()">
+            <div class="k-assignees">
+              <div class="user-avatar" 
+                   *ngFor="let u of (letter.assigned_user_names || letter.assigned_to)?.slice(0, 2)"
+                   [matTooltip]="u">
+                {{ getInitials(u) }}
+              </div>
+              <span *ngIf="!letter.assigned_to?.length" class="unassigned-text">Unassigned</span>
+            </div>
+
+            <!-- Quick Advance Stage Buttons -->
+            <div class="k-advance-actions">
+              <button *ngIf="col.status === 'Received'" 
+                      mat-stroked-button 
+                      class="advance-btn" 
+                      (click)="advanceStage(letter, 'In Review')" 
+                      matTooltip="Move to Under Review">
+                Review <mat-icon>arrow_forward</mat-icon>
+              </button>
+
+              <button *ngIf="col.status === 'In Review'" 
+                      mat-stroked-button 
+                      class="advance-btn" 
+                      (click)="advanceStage(letter, 'In Progress')" 
+                      matTooltip="Move to In Progress">
+                Progress <mat-icon>arrow_forward</mat-icon>
+              </button>
+
+              <button *ngIf="col.status === 'Action Required'" 
+                      mat-stroked-button 
+                      class="advance-btn" 
+                      (click)="advanceStage(letter, 'In Progress')" 
+                      matTooltip="Move to In Progress">
+                Progress <mat-icon>arrow_forward</mat-icon>
+              </button>
+
+              <button *ngIf="col.status === 'In Progress'" 
+                      mat-flat-button 
+                      color="primary" 
+                      class="advance-btn complete" 
+                      (click)="advanceStage(letter, 'Completed')" 
+                      matTooltip="Mark as Completed">
+                <mat-icon>check</mat-icon> Done
+              </button>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Column Empty Placeholder -->
+        <div class="kanban-empty-column" *ngIf="getLettersForColumn(col.status).length === 0">
+          <mat-icon>inbox</mat-icon>
+          <span>No directives in this stage</span>
+        </div>
+
+      </div>
+
+    </div>
+  </div>
+
+  <!-- VIEW B: INTERACTIVE GRID VIEW -->
+  <div class="actions-grid-container" *ngIf="viewMode() === 'grid'">
+    
+    <div class="action-directive-card" 
+         *ngFor="let letter of filteredLetters()"
+         [class.card-urgent]="letter.priority === 'Urgent' || letter.priority === 'Immediate'"
+         [class.card-action-required]="letter.status === 'Action Required'">
+      
+      <!-- Card Top Bar -->
+      <div class="card-header-bar">
+        <div class="header-bar-left">
+          <span class="ref-badge">{{ letter.ref_number }}</span>
+          <span class="priority-pill" [ngClass]="getPriorityClass(letter.priority)">
+            {{ letter.priority }}
+          </span>
+          <span class="status-pill" [ngClass]="getStatusClass(letter.status)">
+            {{ letter.status }}
+          </span>
+        </div>
+
+        <div class="header-bar-right">
+          <!-- Direct Assignment Badge -->
+          <span class="assignment-badge" [class.is-mine]="isDirectlyAssigned(letter)">
+            <mat-icon>{{ isDirectlyAssigned(letter) ? 'person' : 'domain' }}</mat-icon>
+            {{ isDirectlyAssigned(letter) ? 'Assigned to You' : (userDept() || 'Department') }}
+          </span>
+
+          <!-- Attachments Badge (opens side document viewer) -->
+          <span class="att-badge-link" 
+                *ngIf="letter.attachments?.length" 
+                (click)="openDetail(letter)" 
+                matTooltip="Click to inspect attached document on side">
+            <mat-icon>attach_file</mat-icon> {{ letter.attachments?.length }}
+          </span>
+        </div>
+      </div>
+
+      <!-- Card Title & Subject -->
+      <h3 class="directive-title" (click)="openDetail(letter)">{{ letter.title }}</h3>
+
+      <!-- Meta Grid Details -->
+      <div class="directive-meta-grid">
+        <div class="meta-field">
+          <mat-icon class="meta-ico">domain</mat-icon>
+          <div class="meta-info">
+            <span class="meta-label">Received From</span>
+            <span class="meta-val font-semibold">{{ letter.received_from }}</span>
+          </div>
+        </div>
+
+        <div class="meta-field">
+          <mat-icon class="meta-ico">schedule</mat-icon>
+          <div class="meta-info">
+            <span class="meta-label">Received Date</span>
+            <span class="meta-val">{{ letter.received_date }} ({{ getTimeAgo(letter.received_date) }})</span>
+          </div>
+        </div>
+
+        <div class="meta-field" *ngIf="letter.send_to?.length">
+          <mat-icon class="meta-ico">apartment</mat-icon>
+          <div class="meta-info">
+            <span class="meta-label">Routed Department</span>
+            <span class="meta-val">{{ letter.send_to.join(', ') }}</span>
+          </div>
+        </div>
+
+        <div class="meta-field" *ngIf="letter.link_ref">
+          <mat-icon class="meta-ico">link</mat-icon>
+          <div class="meta-info">
+            <span class="meta-label">Linked Reference</span>
+            <span class="meta-val link-val">{{ letter.link_ref }}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Description / Directive Callout -->
+      <div class="directive-desc-box" *ngIf="letter.description">
+        <mat-icon class="desc-quote-icon">format_quote</mat-icon>
+        <p class="desc-paragraph">{{ letter.description }}</p>
+      </div>
+
+      <!-- Latest Officer Action Note -->
+      <div class="latest-action-strip" *ngIf="getLastLog(letter) as lastLog">
+        <mat-icon class="history-ico">history</mat-icon>
+        <div class="action-strip-content">
+          <span class="officer-name">{{ lastLog.officer_name }}</span>
+          <span class="log-text">"{{ lastLog.remarks }}"</span>
+          <span class="log-time">{{ lastLog.timestamp | date:'shortTime' }}</span>
+        </div>
+      </div>
+
+      <!-- Card Footer -->
+      <div class="directive-card-footer">
+        <!-- Assignees with Initials -->
+        <div class="assignees-group">
+          <span class="assignee-label">Officers:</span>
+          <div class="avatar-stack">
+            <div class="officer-avatar" 
+                 *ngFor="let u of (letter.assigned_user_names || letter.assigned_to)" 
+                 [matTooltip]="u">
+              {{ getInitials(u) }}
+            </div>
+            <span *ngIf="!letter.assigned_to?.length" class="unassigned-chip">Unassigned</span>
+          </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="footer-action-buttons">
+          <button mat-stroked-button color="primary" class="dossier-btn" (click)="openDetail(letter)">
+            <mat-icon>dock_to_right</mat-icon> Dossier & Document
+          </button>
+          <button mat-flat-button color="primary" class="update-btn" (click)="openUpdateStatus(letter)">
+            <mat-icon>update</mat-icon> Update Status
+          </button>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Empty State for Grid -->
+    <div class="grid-empty-state" *ngIf="filteredLetters().length === 0">
+      <div class="empty-icon-wrap">
+        <mat-icon>task_alt</mat-icon>
+      </div>
+      <h3>No Pending Directives in this View</h3>
+      <p>All official letters matching your selected filter criteria have been addressed or resolved.</p>
+      <button mat-stroked-button (click)="clearFilters()">
+        <mat-icon>filter_alt_off</mat-icon> Reset View Filters
+      </button>
+    </div>
+
+  </div>
+
+  <!-- VIEW C: DENSE TABLE VIEW -->
+  <mat-card class="table-view-card" *ngIf="viewMode() === 'table'">
+    <div class="table-responsive-container">
+      <table mat-table [dataSource]="filteredLetters()" class="dense-directives-table">
+        
+        <!-- Ref Number Column -->
+        <ng-container matColumnDef="ref_number">
+          <th mat-header-cell *matHeaderCellDef> Reference No. </th>
+          <td mat-cell *matCellDef="let l">
+            <span class="ref-badge" (click)="openDetail(l)" matTooltip="Inspect letter dossier">{{ l.ref_number }}</span>
+          </td>
+        </ng-container>
+
+        <!-- Priority Column -->
+        <ng-container matColumnDef="priority">
+          <th mat-header-cell *matHeaderCellDef> Priority </th>
+          <td mat-cell *matCellDef="let l">
+            <span class="priority-pill" [ngClass]="getPriorityClass(l.priority)">
+              {{ l.priority }}
+            </span>
+          </td>
+        </ng-container>
+
+        <!-- Title Column -->
+        <ng-container matColumnDef="title">
+          <th mat-header-cell *matHeaderCellDef> Subject / Directive </th>
+          <td mat-cell *matCellDef="let l" class="title-cell-wrap" (click)="openDetail(l)">
+            <div class="t-wrapper">
+              <span class="subject-txt">{{ l.title }}</span>
+              <span class="att-chip-sm" *ngIf="l.attachments?.length">
+                <mat-icon>attach_file</mat-icon> {{ l.attachments?.length }}
+              </span>
+            </div>
+          </td>
+        </ng-container>
+
+        <!-- Received From Column -->
+        <ng-container matColumnDef="received_from">
+          <th mat-header-cell *matHeaderCellDef> Sender / Entity </th>
+          <td mat-cell *matCellDef="let l">
+            <span class="sender-txt">{{ l.received_from }}</span>
+          </td>
+        </ng-container>
+
+        <!-- Received Date Column -->
+        <ng-container matColumnDef="received_date">
+          <th mat-header-cell *matHeaderCellDef> Date Received </th>
+          <td mat-cell *matCellDef="let l">
+            <div class="date-stacked">
+              <span>{{ l.received_date }}</span>
+              <span class="time-ago">{{ getTimeAgo(l.received_date) }}</span>
+            </div>
+          </td>
+        </ng-container>
+
+        <!-- Department Column -->
+        <ng-container matColumnDef="send_to">
+          <th mat-header-cell *matHeaderCellDef> Department </th>
+          <td mat-cell *matCellDef="let l">
+            <span class="dept-text">{{ l.send_to?.join(', ') || '-' }}</span>
+          </td>
+        </ng-container>
+
+        <!-- Assigned To Column -->
+        <ng-container matColumnDef="assigned_to">
+          <th mat-header-cell *matHeaderCellDef> Assigned Officer </th>
+          <td mat-cell *matCellDef="let l">
+            <div class="table-officer-row">
+              <div class="officer-avatar sm" *ngFor="let u of (l.assigned_user_names || l.assigned_to)?.slice(0, 1)" [matTooltip]="u">
+                {{ getInitials(u) }}
+              </div>
+              <span>{{ (l.assigned_user_names || l.assigned_to)?.[0] || 'Unassigned' }}</span>
+            </div>
+          </td>
+        </ng-container>
+
+        <!-- Status Column -->
+        <ng-container matColumnDef="status">
+          <th mat-header-cell *matHeaderCellDef> Status </th>
+          <td mat-cell *matCellDef="let l">
+            <span class="status-pill" [ngClass]="getStatusClass(l.status)">
+              {{ l.status }}
+            </span>
+          </td>
+        </ng-container>
+
+        <!-- Actions Column -->
+        <ng-container matColumnDef="actions">
+          <th mat-header-cell *matHeaderCellDef class="text-right"> Actions </th>
+          <td mat-cell *matCellDef="let l" class="text-right">
+            <div class="table-action-btns">
+              <button mat-icon-button (click)="openDetail(l)" matTooltip="Inspect Dossier & Documents" color="primary">
+                <mat-icon>dock_to_right</mat-icon>
+              </button>
+              <button mat-icon-button (click)="openUpdateStatus(l)" matTooltip="Update Directive Status">
+                <mat-icon>update</mat-icon>
+              </button>
+            </div>
+          </td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="tableDisplayedColumns"></tr>
+        <tr mat-row *matRowDef="let row; columns: tableDisplayedColumns;" class="tbl-hover-row"></tr>
+
+        <tr class="mat-row" *matNoDataRow>
+          <td class="mat-cell empty-table-td" [attr.colspan]="tableDisplayedColumns.length">
+            <div class="table-no-data">
+              <mat-icon>search_off</mat-icon>
+              <span>No pending action directives found matching criteria.</span>
+            </div>
+          </td>
+        </tr>
+      </table>
+    </div>
+  </mat-card>
+
+</div>
