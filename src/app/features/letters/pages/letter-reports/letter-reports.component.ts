@@ -85,16 +85,14 @@ interface CategorySummaryRow {
       <!-- ============================================================== -->
       <div class="page-header no-print">
         <div class="header-titles">
-          <div class="title-row">
-            <div class="icon-avatar">
-              <mat-icon>assessment</mat-icon>
-            </div>
-            <div>
-              <div class="breadcrumb-text">Official Correspondence & Inward Workflow</div>
-              <h1 class="page-title">Reports & Correspondence Analytics</h1>
-            </div>
+          <div class="icon-avatar">
+            <mat-icon>assessment</mat-icon>
           </div>
-          <p class="page-desc">Generate official daily inward logs, department distribution matrices, priority directives audits, and executive registers.</p>
+          <div class="title-text-wrap">
+            <div class="breadcrumb-text">Official Correspondence & Inward Workflow</div>
+            <h1 class="page-title">Reports & Correspondence Analytics</h1>
+            <p class="page-desc">Generate official daily inward logs, department distribution matrices, priority directives audits, and executive registers.</p>
+          </div>
         </div>
 
         <div class="actions-group">
@@ -321,8 +319,8 @@ interface CategorySummaryRow {
       <!-- TIMEFRAME PRESETS & MULTI-FILTER BAR (No Print) -->
       <!-- ============================================================== -->
       <mat-card class="filter-card no-print">
-        <div class="timeframe-header-row">
-          <!-- Preset Mode Segmented Control -->
+        <!-- Row 1: Timeframe Segmented Control + Search Box + Reset -->
+        <div class="filter-top-row">
           <div class="timeframe-segmented">
             <span class="ctrl-label">Timeframe:</span>
             <div class="pill-group">
@@ -357,61 +355,66 @@ interface CategorySummaryRow {
           <div class="search-box-wrap">
             <mat-icon class="search-icon">search</mat-icon>
             <input type="text" 
-                   [(ngModel)]="searchQuery" 
+                   [ngModel]="searchQuery()" 
+                   (ngModelChange)="searchQuery.set($event)"
                    placeholder="Search Ref, Title, Sender, or Officer..." 
                    class="search-input">
-            <button *ngIf="searchQuery" mat-icon-button (click)="searchQuery = ''" class="clear-search-btn">
+            <button *ngIf="searchQuery()" mat-icon-button (click)="searchQuery.set('')" class="clear-search-btn">
               <mat-icon>close</mat-icon>
             </button>
           </div>
 
-          <!-- Dropdown Filters: Department, Category, Status, Priority -->
-          <div class="dropdown-filters">
-            <!-- Department Filter -->
-            <mat-form-field appearance="outline" class="compact-field filter-select" subscriptSizing="dynamic">
-              <mat-label>Department</mat-label>
-              <mat-select [(ngModel)]="selectedDept">
-                <mat-option value="ALL">All Departments</mat-option>
-                <mat-option *ngFor="let d of departments()" [value]="d.name">{{ d.name }}</mat-option>
-              </mat-select>
-            </mat-form-field>
-
-            <!-- Category Filter -->
-            <mat-form-field appearance="outline" class="compact-field filter-select" subscriptSizing="dynamic">
-              <mat-label>Category</mat-label>
-              <mat-select [(ngModel)]="selectedCategory">
-                <mat-option value="ALL">All Categories</mat-option>
-                <mat-option *ngFor="let cat of availableCategories()" [value]="cat">{{ cat }}</mat-option>
-              </mat-select>
-            </mat-form-field>
-
-            <!-- Priority Filter -->
-            <mat-form-field appearance="outline" class="compact-field filter-select sm-select" subscriptSizing="dynamic">
-              <mat-label>Priority</mat-label>
-              <mat-select [(ngModel)]="selectedPriority">
-                <mat-option value="ALL">All</mat-option>
-                <mat-option value="Normal">Normal</mat-option>
-                <mat-option value="Urgent">Urgent</mat-option>
-                <mat-option value="Immediate">Immediate</mat-option>
-              </mat-select>
-            </mat-form-field>
-
-            <!-- Status Filter -->
-            <mat-form-field appearance="outline" class="compact-field filter-select" subscriptSizing="dynamic">
-              <mat-label>Status</mat-label>
-              <mat-select [(ngModel)]="selectedStatus">
-                <mat-option value="ALL">All Statuses</mat-option>
-                <mat-option *ngFor="let s of statuses" [value]="s">{{ s }}</mat-option>
-              </mat-select>
-            </mat-form-field>
-
-            <button mat-icon-button (click)="resetFilters()" matTooltip="Reset All Filters" class="reset-btn sm-btn">
-              <mat-icon>restart_alt</mat-icon>
-            </button>
-          </div>
+          <button mat-stroked-button (click)="resetFilters()" matTooltip="Reset All Filters" class="reset-filter-btn">
+            <mat-icon>restart_alt</mat-icon> Reset Filters
+          </button>
         </div>
 
-        <!-- Dynamic Date Subcontrols based on Active Mode -->
+        <!-- Row 2: 4 Dropdown Filters in Equal Alignment Grid -->
+        <div class="filters-grid-row">
+          <!-- Department Filter -->
+          <mat-form-field appearance="outline" class="compact-field filter-field" subscriptSizing="dynamic">
+            <mat-label>Department Filter</mat-label>
+            <mat-select [ngModel]="selectedDept()" (ngModelChange)="selectedDept.set($event)">
+              <mat-option value="ALL">All Departments</mat-option>
+              <mat-option *ngFor="let d of departments()" [value]="d.name">{{ d.name }}</mat-option>
+            </mat-select>
+            <mat-icon matSuffix>business</mat-icon>
+          </mat-form-field>
+
+          <!-- Category Filter -->
+          <mat-form-field appearance="outline" class="compact-field filter-field" subscriptSizing="dynamic">
+            <mat-label>Classification / Category</mat-label>
+            <mat-select [ngModel]="selectedCategory()" (ngModelChange)="selectedCategory.set($event)">
+              <mat-option value="ALL">All Categories</mat-option>
+              <mat-option *ngFor="let cat of availableCategories()" [value]="cat">{{ cat }}</mat-option>
+            </mat-select>
+            <mat-icon matSuffix>category</mat-icon>
+          </mat-form-field>
+
+          <!-- Priority Filter -->
+          <mat-form-field appearance="outline" class="compact-field filter-field" subscriptSizing="dynamic">
+            <mat-label>Priority Level</mat-label>
+            <mat-select [ngModel]="selectedPriority()" (ngModelChange)="selectedPriority.set($event)">
+              <mat-option value="ALL">All Priorities</mat-option>
+              <mat-option value="Normal">Normal</mat-option>
+              <mat-option value="Urgent">Urgent</mat-option>
+              <mat-option value="Immediate">Immediate</mat-option>
+            </mat-select>
+            <mat-icon matSuffix>flag</mat-icon>
+          </mat-form-field>
+
+          <!-- Status Filter -->
+          <mat-form-field appearance="outline" class="compact-field filter-field" subscriptSizing="dynamic">
+            <mat-label>Workflow Status</mat-label>
+            <mat-select [ngModel]="selectedStatus()" (ngModelChange)="selectedStatus.set($event)">
+              <mat-option value="ALL">All Statuses</mat-option>
+              <mat-option *ngFor="let s of statuses" [value]="s">{{ s }}</mat-option>
+            </mat-select>
+            <mat-icon matSuffix>filter_list</mat-icon>
+          </mat-form-field>
+        </div>
+
+        <!-- Row 3: Dynamic Date Subcontrols based on Active Mode -->
         <div class="timeframe-subcontrols">
           <!-- DAILY CONTROLS -->
           <div *ngIf="timeframeMode() === 'daily'" class="subcontrol-row">
@@ -439,7 +442,7 @@ interface CategorySummaryRow {
               <mat-icon>event</mat-icon> {{ reportPeriodLabel() }}
             </span>
 
-            <div class="daily-batch-pills" *ngIf="timeframeMode() === 'daily'">
+            <div class="daily-batch-pills">
               <span class="batch-chip total"><strong>{{ filteredLetters().length }}</strong> Inward Letters</span>
               <span class="batch-chip urgent" *ngIf="priorityCounts().urgent + priorityCounts().immediate > 0">
                 <strong>{{ priorityCounts().urgent + priorityCounts().immediate }}</strong> Urgent Directives
@@ -479,7 +482,7 @@ interface CategorySummaryRow {
             <div class="date-input-wrap">
               <mat-form-field appearance="outline" class="compact-field" subscriptSizing="dynamic">
                 <mat-label>Select Month</mat-label>
-                <input matInput type="month" [(ngModel)]="monthlyMonth" (change)="onMonthlyChange()">
+                <input matInput type="month" [ngModel]="monthlyMonth()" (ngModelChange)="onMonthlyChange($event)">
               </mat-form-field>
             </div>
             <span class="active-badge monthly">
@@ -579,7 +582,8 @@ interface CategorySummaryRow {
           <h2 class="office-name">DAILY INWARD CORRESPONDENCE REGISTER & DISPATCH SHEET</h2>
           <div class="meta-row">
             <span><strong>Inward Date / Period:</strong> {{ reportPeriodLabel() }}</span>
-            <span><strong>Department Scope:</strong> {{ selectedDept === 'ALL' ? 'All Departments' : selectedDept }}</span>
+            <span><strong>Department Scope:</strong> {{ selectedDept() === 'ALL' ? 'All Departments' : selectedDept() }}</span>
+            <span><strong>Classification:</strong> {{ selectedCategory() === 'ALL' ? 'All Categories' : selectedCategory() }}</span>
             <span><strong>Total Inward Letters:</strong> {{ filteredLetters().length }}</span>
             <span><strong>Urgent Items:</strong> {{ priorityCounts().urgent + priorityCounts().immediate }}</span>
             <span><strong>Paper Format:</strong> {{ paperSize() === 'A4' ? 'A4 Landscape' : 'Legal Landscape' }}</span>
@@ -683,8 +687,8 @@ interface CategorySummaryRow {
           <h2 class="office-name">DEPARTMENT WORKFLOW & STATUS CROSS-TABULATION MATRIX</h2>
           <div class="meta-row">
             <span><strong>Period:</strong> {{ reportPeriodLabel() }}</span>
-            <span><strong>Department Scope:</strong> {{ selectedDept === 'ALL' ? 'All Departments' : selectedDept }}</span>
-            <span><strong>Status Filter:</strong> {{ selectedStatus === 'ALL' ? 'All Statuses' : selectedStatus }}</span>
+            <span><strong>Department Scope:</strong> {{ selectedDept() === 'ALL' ? 'All Departments' : selectedDept() }}</span>
+            <span><strong>Status Filter:</strong> {{ selectedStatus() === 'ALL' ? 'All Statuses' : selectedStatus() }}</span>
             <span><strong>Paper Format:</strong> {{ paperSize() === 'A4' ? 'A4 Landscape' : 'Legal Landscape' }}</span>
             <span><strong>Generated:</strong> {{ today | date:'medium' }}</span>
           </div>
@@ -707,7 +711,7 @@ interface CategorySummaryRow {
         <div class="status-cards-grid no-print">
           <div *ngFor="let s of statusBreakdown()" 
                class="status-summary-card" 
-               [ngClass]="[s.cssClass, selectedStatus === s.status ? 'selected-card' : '']"
+               [ngClass]="[s.cssClass, selectedStatus() === s.status ? 'selected-card' : '']"
                (click)="toggleStatusFilter(s.status)"
                [matTooltip]="'Click to filter by ' + s.status">
             <div class="sc-top">
@@ -901,8 +905,8 @@ interface CategorySummaryRow {
         <!-- Category Metric Cards -->
         <div class="category-cards-grid no-print">
           <div *ngFor="let cat of categorySummary()" 
-               class="cat-summary-card"
-               [class.selected-cat]="selectedCategory === cat.category"
+               class="cat-summary-card" 
+               [class.selected-cat]="selectedCategory() === cat.category"
                (click)="toggleCategoryFilter(cat.category)">
             <div class="cat-card-top">
               <span class="cat-name">{{ cat.category }}</span>
@@ -1023,8 +1027,8 @@ interface CategorySummaryRow {
           <h2 class="office-name">OFFICIAL INWARD CORRESPONDENCE MASTER LEDGER</h2>
           <div class="meta-row">
             <span><strong>Period:</strong> {{ reportPeriodLabel() }}</span>
-            <span><strong>Department:</strong> {{ selectedDept === 'ALL' ? 'All Departments' : selectedDept }}</span>
-            <span><strong>Category:</strong> {{ selectedCategory === 'ALL' ? 'All Categories' : selectedCategory }}</span>
+            <span><strong>Department:</strong> {{ selectedDept() === 'ALL' ? 'All Departments' : selectedDept() }}</span>
+            <span><strong>Category:</strong> {{ selectedCategory() === 'ALL' ? 'All Categories' : selectedCategory() }}</span>
             <span><strong>Total Records:</strong> {{ filteredLetters().length }}</span>
             <span><strong>Generated:</strong> {{ today | date:'medium' }}</span>
           </div>
@@ -1126,7 +1130,7 @@ interface CategorySummaryRow {
     .page-container {
       display: flex;
       flex-direction: column;
-      gap: 14px;
+      gap: 16px;
       width: 100%;
       box-sizing: border-box;
     }
@@ -1137,28 +1141,37 @@ interface CategorySummaryRow {
       justify-content: space-between;
       align-items: flex-start;
       flex-wrap: wrap;
-      gap: 12px;
+      gap: 14px;
+      width: 100%;
+      box-sizing: border-box;
 
       .header-titles {
-        .title-row {
+        display: flex;
+        align-items: flex-start;
+        gap: 14px;
+        min-width: 0;
+
+        .icon-avatar {
+          width: 44px;
+          height: 44px;
+          border-radius: 10px;
+          background: #e0f2fe;
+          color: #0284c7;
           display: flex;
           align-items: center;
-          gap: 10px;
+          justify-content: center;
+          flex-shrink: 0;
+          mat-icon { font-size: 26px; width: 26px; height: 26px; }
+        }
 
-          .icon-avatar {
-            width: 42px;
-            height: 42px;
-            border-radius: 10px;
-            background: #e0f2fe;
-            color: #0284c7;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            mat-icon { font-size: 24px; width: 24px; height: 24px; }
-          }
+        .title-text-wrap {
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+          min-width: 0;
 
           .breadcrumb-text {
-            font-size: 10.5px;
+            font-size: 11px;
             font-weight: 700;
             color: #0284c7;
             text-transform: uppercase;
@@ -1166,17 +1179,19 @@ interface CategorySummaryRow {
           }
 
           .page-title {
-            font-size: 20px;
+            font-size: 22px;
             font-weight: 700;
             color: #0f172a;
             margin: 0;
             line-height: 1.2;
           }
-        }
-        .page-desc {
-          font-size: 12px;
-          color: #64748b;
-          margin: 4px 0 0 52px;
+
+          .page-desc {
+            font-size: 12.5px;
+            color: #64748b;
+            margin: 2px 0 0 0;
+            line-height: 1.4;
+          }
         }
       }
 
@@ -1185,6 +1200,7 @@ interface CategorySummaryRow {
         align-items: center;
         gap: 8px;
         flex-wrap: wrap;
+        margin-left: auto;
         .action-btn { height: 36px; font-size: 12.5px; }
       }
     }
@@ -1274,6 +1290,8 @@ interface CategorySummaryRow {
       border: 1px solid #a7f3d0;
       border-radius: 12px;
       padding: 12px 18px;
+      width: 100%;
+      box-sizing: border-box;
 
       .banner-left {
         display: flex;
@@ -1367,6 +1385,8 @@ interface CategorySummaryRow {
       display: flex;
       flex-direction: column;
       gap: 8px;
+      width: 100%;
+      box-sizing: border-box;
 
       .ribbon-label {
         font-size: 11px;
@@ -1378,8 +1398,20 @@ interface CategorySummaryRow {
 
       .report-type-cards {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        grid-template-columns: repeat(7, minmax(0, 1fr));
         gap: 10px;
+        width: 100%;
+        box-sizing: border-box;
+
+        @media (max-width: 1400px) {
+          grid-template-columns: repeat(4, minmax(0, 1fr));
+        }
+        @media (max-width: 900px) {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+        @media (max-width: 500px) {
+          grid-template-columns: 1fr;
+        }
       }
 
       .rtype-card {
@@ -1393,6 +1425,7 @@ interface CategorySummaryRow {
         cursor: pointer;
         transition: all 0.2s ease;
         position: relative;
+        min-width: 0;
 
         &:hover {
           border-color: #94a3b8;
@@ -1430,17 +1463,25 @@ interface CategorySummaryRow {
           display: flex;
           flex-direction: column;
           gap: 2px;
+          min-width: 0;
 
           .rtype-title {
             font-size: 12px;
             font-weight: 700;
             color: #1e293b;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
           }
 
           .rtype-sub {
             font-size: 10.5px;
             color: #64748b;
             line-height: 1.25;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
           }
         }
 
@@ -1462,21 +1503,33 @@ interface CategorySummaryRow {
 
     /* Filter Card */
     .filter-card {
-      padding: 12px 16px;
+      padding: 14px 16px;
       border: 1px solid #e2e8f0;
-      border-radius: 10px;
+      border-radius: 12px;
       background: #ffffff;
       display: flex;
       flex-direction: column;
       gap: 12px;
+      width: 100%;
+      box-sizing: border-box;
     }
 
-    .timeframe-header-row {
+    .filter-top-row {
       display: flex;
       justify-content: space-between;
       align-items: center;
       flex-wrap: wrap;
-      gap: 10px;
+      gap: 12px;
+      width: 100%;
+
+      .reset-filter-btn {
+        height: 36px;
+        font-size: 12px;
+        font-weight: 600;
+        color: #64748b;
+        margin-left: auto;
+        mat-icon { font-size: 18px; width: 18px; height: 18px; }
+      }
     }
 
     .timeframe-segmented {
@@ -1499,7 +1552,7 @@ interface CategorySummaryRow {
       display: inline-flex;
       align-items: center;
       gap: 4px;
-      padding: 4px 10px;
+      padding: 5px 11px;
       border-radius: 6px;
       font-size: 11.5px;
       font-weight: 600;
@@ -1525,11 +1578,12 @@ interface CategorySummaryRow {
       background: #f8fafc;
       border: 1px solid #cbd5e1;
       border-radius: 8px;
-      padding: 0 8px;
+      padding: 0 10px;
       height: 36px;
-      width: 250px;
+      min-width: 260px;
+      flex: 0 1 320px;
 
-      .search-icon { font-size: 18px; width: 18px; height: 18px; color: #64748b; margin-right: 6px; }
+      .search-icon { font-size: 18px; width: 18px; height: 18px; color: #64748b; margin-right: 6px; flex-shrink: 0; }
       .search-input {
         border: none;
         outline: none;
@@ -1543,28 +1597,36 @@ interface CategorySummaryRow {
         width: 24px;
         height: 24px;
         line-height: 24px;
+        flex-shrink: 0;
         mat-icon { font-size: 14px; width: 14px; height: 14px; color: #64748b; }
       }
     }
 
-    .dropdown-filters {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      flex-wrap: wrap;
-      .filter-select { width: 150px; }
-      .sm-select { width: 105px; }
-      .sm-btn {
-        width: 34px;
-        height: 34px;
-        line-height: 34px;
-        mat-icon { font-size: 18px; width: 18px; height: 18px; }
+    /* Filters Grid Row (4 Aligned Equal Columns) */
+    .filters-grid-row {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      width: 100%;
+      box-sizing: border-box;
+
+      @media (max-width: 1024px) {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      @media (max-width: 600px) {
+        grid-template-columns: 1fr;
+      }
+
+      .filter-field {
+        width: 100%;
       }
     }
 
     .timeframe-subcontrols {
-      padding-top: 8px;
+      padding-top: 10px;
       border-top: 1px dashed #e2e8f0;
+      width: 100%;
+      box-sizing: border-box;
     }
 
     .subcontrol-row {
@@ -1572,6 +1634,7 @@ interface CategorySummaryRow {
       align-items: center;
       gap: 12px;
       flex-wrap: wrap;
+      width: 100%;
     }
 
     .nav-cluster {
@@ -1670,9 +1733,12 @@ interface CategorySummaryRow {
       display: grid;
       grid-template-columns: repeat(5, minmax(0, 1fr));
       gap: 10px;
+      width: 100%;
+      box-sizing: border-box;
 
-      @media (max-width: 1200px) { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-      @media (max-width: 768px) { grid-template-columns: 1fr; }
+      @media (max-width: 1300px) { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      @media (max-width: 800px) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      @media (max-width: 500px) { grid-template-columns: 1fr; }
     }
 
     .stat-card {
@@ -1726,6 +1792,8 @@ interface CategorySummaryRow {
       flex-wrap: wrap;
       gap: 8px;
       margin-bottom: 8px;
+      width: 100%;
+      box-sizing: border-box;
 
       .sh-left {
         display: flex;
@@ -1748,6 +1816,7 @@ interface CategorySummaryRow {
         display: flex;
         align-items: center;
         gap: 8px;
+        margin-left: auto;
         .count-pill {
           font-size: 11px;
           font-weight: 600;
@@ -1767,8 +1836,10 @@ interface CategorySummaryRow {
       grid-template-columns: repeat(7, minmax(0, 1fr));
       gap: 8px;
       margin-bottom: 12px;
+      width: 100%;
+      box-sizing: border-box;
 
-      @media (max-width: 1024px) { grid-template-columns: repeat(4, 1fr); }
+      @media (max-width: 1200px) { grid-template-columns: repeat(4, 1fr); }
       @media (max-width: 640px) { grid-template-columns: repeat(2, 1fr); }
     }
 
@@ -1814,6 +1885,8 @@ interface CategorySummaryRow {
       grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
       gap: 8px;
       margin-bottom: 12px;
+      width: 100%;
+      box-sizing: border-box;
 
       .cat-summary-card {
         background: white;
@@ -2040,9 +2113,9 @@ interface CategorySummaryRow {
     .mt-4 { margin-top: 16px; }
     .mt-6 { margin-top: 24px; }
 
-    /* ==========================================================================
+    /* ==============================================================
        OFFICIAL HORIZONTAL LANDSCAPE PRINT STYLES (A4 & Legal)
-       ========================================================================== */
+       ============================================================== */
     .official-print-header {
       display: none; /* Print only */
       text-align: center;
@@ -2234,23 +2307,30 @@ export class LetterReportsComponent implements OnInit {
   // Paper Format for Horizontal Printing: 'A4' or 'legal'
   paperSize = signal<'A4' | 'legal'>('A4');
 
-  // Filter States
-  dailyDate: string = this.formatDate(new Date());
-  weeklyAnchor: Date = new Date();
-  monthlyMonth: string = this.formatMonth(new Date());
-  dateFrom: string = this.formatDate(new Date());
-  dateTo: string = this.formatDate(new Date());
+  // Filter Signals (Fully reactive so computed() re-evaluates automatically)
+  searchQuery = signal<string>('');
+  selectedDept = signal<string>('ALL');
+  selectedCategory = signal<string>('ALL');
+  selectedPriority = signal<string>('ALL');
+  selectedStatus = signal<string>('ALL');
 
-  dailyDateObj = computed(() => this.dailyDate ? new Date(this.dailyDate + 'T00:00:00') : null);
-  customFromObj = computed(() => this.dateFrom ? new Date(this.dateFrom + 'T00:00:00') : null);
-  customToObj = computed(() => this.dateTo ? new Date(this.dateTo + 'T00:00:00') : null);
+  // Date Signals
+  dailyDate = signal<string>(this.formatDate(new Date()));
+  weeklyAnchor = signal<Date>(new Date());
+  monthlyMonth = signal<string>(this.formatMonth(new Date()));
+  dateFrom = signal<string>(this.formatDate(new Date()));
+  dateTo = signal<string>(this.formatDate(new Date()));
 
-  // Dropdown / Instant Filters
-  searchQuery: string = '';
-  selectedDept: string = 'ALL';
-  selectedCategory: string = 'ALL';
-  selectedPriority: string = 'ALL';
-  selectedStatus: string = 'ALL';
+  dailyDateObj = computed(() => this.dailyDate() ? new Date(this.dailyDate() + 'T00:00:00') : null);
+  customFromObj = computed(() => this.dateFrom() ? new Date(this.dateFrom() + 'T00:00:00') : null);
+  customToObj = computed(() => this.dateTo() ? new Date(this.dateTo() + 'T00:00:00') : null);
+
+  isTodayDaily = computed(() => this.dailyDate() === this.formatDate(new Date()));
+  isYesterdayDaily = computed(() => {
+    const yest = new Date();
+    yest.setDate(yest.getDate() - 1);
+    return this.dailyDate() === this.formatDate(yest);
+  });
 
   ngOnInit() {
     this.applyPageStyle(this.paperSize());
@@ -2318,75 +2398,71 @@ export class LetterReportsComponent implements OnInit {
   setTimeframeMode(mode: TimeframeMode) {
     this.timeframeMode.set(mode);
     if (mode === 'daily') {
-      this.onDailyDateChange();
+      this.dateFrom.set(this.dailyDate());
+      this.dateTo.set(this.dailyDate());
     } else if (mode === 'weekly') {
       this.updateWeeklyDates();
     } else if (mode === 'monthly') {
-      this.onMonthlyChange();
-    } else if (mode === 'custom') {
-      this.onCustomRangeChange();
+      this.updateMonthlyDates(this.monthlyMonth());
     }
   }
 
   setToday() {
-    this.dailyDate = this.formatDate(new Date());
-    this.onDailyDateChange();
+    const todayStr = this.formatDate(new Date());
+    this.dailyDate.set(todayStr);
+    this.dateFrom.set(todayStr);
+    this.dateTo.set(todayStr);
   }
 
   setYesterday() {
     const yest = new Date();
     yest.setDate(yest.getDate() - 1);
-    this.dailyDate = this.formatDate(yest);
-    this.onDailyDateChange();
-  }
-
-  isTodayDaily(): boolean {
-    return this.dailyDate === this.formatDate(new Date());
-  }
-
-  isYesterdayDaily(): boolean {
-    const yest = new Date();
-    yest.setDate(yest.getDate() - 1);
-    return this.dailyDate === this.formatDate(yest);
+    const yestStr = this.formatDate(yest);
+    this.dailyDate.set(yestStr);
+    this.dateFrom.set(yestStr);
+    this.dateTo.set(yestStr);
   }
 
   prevDay() {
-    const d = this.parseDate(this.dailyDate);
+    const d = this.parseDate(this.dailyDate());
     d.setDate(d.getDate() - 1);
-    this.dailyDate = this.formatDate(d);
-    this.onDailyDateChange();
+    const dStr = this.formatDate(d);
+    this.dailyDate.set(dStr);
+    this.dateFrom.set(dStr);
+    this.dateTo.set(dStr);
   }
 
   nextDay() {
-    const d = this.parseDate(this.dailyDate);
+    const d = this.parseDate(this.dailyDate());
     d.setDate(d.getDate() + 1);
-    this.dailyDate = this.formatDate(d);
-    this.onDailyDateChange();
-  }
-
-  onDailyDateChange() {
-    this.dateFrom = this.dailyDate;
-    this.dateTo = this.dailyDate;
+    const dStr = this.formatDate(d);
+    this.dailyDate.set(dStr);
+    this.dateFrom.set(dStr);
+    this.dateTo.set(dStr);
   }
 
   // Weekly Mode Handlers
   setThisWeek() {
-    this.weeklyAnchor = new Date();
+    this.weeklyAnchor.set(new Date());
     this.updateWeeklyDates();
   }
 
   prevWeek() {
-    this.weeklyAnchor.setDate(this.weeklyAnchor.getDate() - 7);
+    const curr = new Date(this.weeklyAnchor());
+    curr.setDate(curr.getDate() - 7);
+    this.weeklyAnchor.set(curr);
     this.updateWeeklyDates();
   }
 
   nextWeek() {
-    this.weeklyAnchor.setDate(this.weeklyAnchor.getDate() + 7);
+    const curr = new Date(this.weeklyAnchor());
+    curr.setDate(curr.getDate() + 7);
+    this.weeklyAnchor.set(curr);
     this.updateWeeklyDates();
   }
 
   private updateWeeklyDates() {
-    const curr = new Date(this.weeklyAnchor);
+    const curr = new Date(this.weeklyAnchor());
     const day = curr.getDay(); // 0 = Sun, 1 = Mon...
     const diffToMon = (day === 0 ? -6 : 1) - day;
     const mon = new Date(curr);
@@ -2394,99 +2470,108 @@ export class LetterReportsComponent implements OnInit {
     const sun = new Date(mon);
     sun.setDate(mon.getDate() + 6);
 
-    this.dateFrom = this.formatDate(mon);
-    this.dateTo = this.formatDate(sun);
+    this.dateFrom.set(this.formatDate(mon));
+    this.dateTo.set(this.formatDate(sun));
   }
 
   // Monthly Mode Handlers
   setThisMonth() {
-    this.monthlyMonth = this.formatMonth(new Date());
-    this.onMonthlyChange();
+    const mStr = this.formatMonth(new Date());
+    this.monthlyMonth.set(mStr);
+    this.updateMonthlyDates(mStr);
   }
 
   prevMonth() {
-    const [year, month] = this.monthlyMonth.split('-').map(Number);
+    const [year, month] = this.monthlyMonth().split('-').map(Number);
     const prev = new Date(year, month - 2, 1);
-    this.monthlyMonth = this.formatMonth(prev);
-    this.onMonthlyChange();
+    const mStr = this.formatMonth(prev);
+    this.monthlyMonth.set(mStr);
+    this.updateMonthlyDates(mStr);
   }
 
   nextMonth() {
-    const [year, month] = this.monthlyMonth.split('-').map(Number);
+    const [year, month] = this.monthlyMonth().split('-').map(Number);
     const next = new Date(year, month, 1);
-    this.monthlyMonth = this.formatMonth(next);
-    this.onMonthlyChange();
+    const mStr = this.formatMonth(next);
+    this.monthlyMonth.set(mStr);
+    this.updateMonthlyDates(mStr);
   }
 
-  onMonthlyChange() {
-    const [year, month] = this.monthlyMonth.split('-').map(Number);
+  onMonthlyChange(monthVal?: string) {
+    if (monthVal) {
+      this.monthlyMonth.set(monthVal);
+    }
+    this.updateMonthlyDates(this.monthlyMonth());
+  }
+
+  private updateMonthlyDates(monthVal: string) {
+    if (!monthVal) return;
+    const [year, month] = monthVal.split('-').map(Number);
     const firstDay = new Date(year, month - 1, 1);
     const lastDay = new Date(year, month, 0);
 
-    this.dateFrom = this.formatDate(firstDay);
-    this.dateTo = this.formatDate(lastDay);
+    this.dateFrom.set(this.formatDate(firstDay));
+    this.dateTo.set(this.formatDate(lastDay));
   }
-
-  onCustomRangeChange() {}
 
   onDailyDatePicked(d: Date | null) {
     if (d) {
-      this.dailyDate = this.formatDate(d);
-      this.onDailyDateChange();
+      const dStr = this.formatDate(d);
+      this.dailyDate.set(dStr);
+      this.dateFrom.set(dStr);
+      this.dateTo.set(dStr);
     }
   }
 
   onCustomFromPicked(d: Date | null) {
-    this.dateFrom = d ? this.formatDate(d) : '';
-    this.onCustomRangeChange();
+    this.dateFrom.set(d ? this.formatDate(d) : '');
   }
 
   onCustomToPicked(d: Date | null) {
-    this.dateTo = d ? this.formatDate(d) : '';
-    this.onCustomRangeChange();
+    this.dateTo.set(d ? this.formatDate(d) : '');
   }
 
   setCustomPreset(preset: '7d' | '30d' | 'quarter' | 'year' | 'all') {
     const today = new Date();
-    this.dateTo = this.formatDate(today);
+    this.dateTo.set(this.formatDate(today));
 
     if (preset === '7d') {
       const past = new Date(today);
       past.setDate(today.getDate() - 6);
-      this.dateFrom = this.formatDate(past);
+      this.dateFrom.set(this.formatDate(past));
     } else if (preset === '30d') {
       const past = new Date(today);
       past.setDate(today.getDate() - 29);
-      this.dateFrom = this.formatDate(past);
+      this.dateFrom.set(this.formatDate(past));
     } else if (preset === 'quarter') {
       const currentQuarter = Math.floor(today.getMonth() / 3);
       const startQuarter = new Date(today.getFullYear(), currentQuarter * 3, 1);
-      this.dateFrom = this.formatDate(startQuarter);
+      this.dateFrom.set(this.formatDate(startQuarter));
     } else if (preset === 'year') {
       const startYear = new Date(today.getFullYear(), 0, 1);
-      this.dateFrom = this.formatDate(startYear);
+      this.dateFrom.set(this.formatDate(startYear));
     } else if (preset === 'all') {
-      this.dateFrom = '';
-      this.dateTo = '';
+      this.dateFrom.set('');
+      this.dateTo.set('');
     }
   }
 
   resetFilters() {
-    this.searchQuery = '';
-    this.selectedDept = 'ALL';
-    this.selectedCategory = 'ALL';
-    this.selectedPriority = 'ALL';
-    this.selectedStatus = 'ALL';
+    this.searchQuery.set('');
+    this.selectedDept.set('ALL');
+    this.selectedCategory.set('ALL');
+    this.selectedPriority.set('ALL');
+    this.selectedStatus.set('ALL');
     this.setTimeframeMode('daily');
     this.setToday();
   }
 
   toggleStatusFilter(status: LetterStatus) {
-    this.selectedStatus = this.selectedStatus === status ? 'ALL' : status;
+    this.selectedStatus.update(curr => curr === status ? 'ALL' : status);
   }
 
   toggleCategoryFilter(cat: string) {
-    this.selectedCategory = this.selectedCategory === cat ? 'ALL' : cat;
+    this.selectedCategory.update(curr => curr === cat ? 'ALL' : cat);
   }
 
   // --- COMPUTED PROPERTIES ---
@@ -2494,7 +2579,6 @@ export class LetterReportsComponent implements OnInit {
   availableCategories = computed(() => {
     const s = this.letterSettings();
     if (s.categories && s.categories.length > 0) return s.categories;
-    // Fallback: extract distinct categories from all letters
     const distinct = Array.from(new Set(this.allLetters().map(l => l.category).filter(Boolean)));
     return distinct.length > 0 ? distinct : DEFAULT_LETTER_SETTINGS.categories;
   });
@@ -2508,11 +2592,13 @@ export class LetterReportsComponent implements OnInit {
   // Letters filtered strictly by the date timeframe (before dept / category / status / search)
   timeframeLetters = computed(() => {
     let list = this.allLetters();
-    if (this.dateFrom) {
-      list = list.filter(l => l.received_date >= this.dateFrom);
+    const from = this.dateFrom();
+    const to = this.dateTo();
+    if (from) {
+      list = list.filter(l => l.received_date >= from);
     }
-    if (this.dateTo) {
-      list = list.filter(l => l.received_date <= this.dateTo);
+    if (to) {
+      list = list.filter(l => l.received_date <= to);
     }
     return list;
   });
@@ -2520,22 +2606,26 @@ export class LetterReportsComponent implements OnInit {
   // Letters filtered by timeframe AND department, category, priority, status, and search query
   filteredLetters = computed(() => {
     let list = this.timeframeLetters();
+    const dept = this.selectedDept();
+    const cat = this.selectedCategory();
+    const priority = this.selectedPriority();
+    const status = this.selectedStatus();
+    const q = this.searchQuery().toLowerCase().trim();
 
-    if (this.selectedDept !== 'ALL') {
-      list = list.filter(l => l.send_to?.includes(this.selectedDept));
+    if (dept !== 'ALL') {
+      list = list.filter(l => l.send_to?.includes(dept));
     }
-    if (this.selectedCategory !== 'ALL') {
-      list = list.filter(l => l.category === this.selectedCategory);
+    if (cat !== 'ALL') {
+      list = list.filter(l => l.category === cat);
     }
-    if (this.selectedPriority !== 'ALL') {
-      list = list.filter(l => l.priority === this.selectedPriority);
+    if (priority !== 'ALL') {
+      list = list.filter(l => l.priority === priority);
     }
-    if (this.selectedStatus !== 'ALL') {
-      list = list.filter(l => l.status === this.selectedStatus);
+    if (status !== 'ALL') {
+      list = list.filter(l => l.status === status);
     }
 
-    if (this.searchQuery.trim()) {
-      const q = this.searchQuery.toLowerCase().trim();
+    if (q) {
       list = list.filter(l =>
         l.ref_number?.toLowerCase().includes(q) ||
         l.title?.toLowerCase().includes(q) ||
@@ -2670,6 +2760,7 @@ export class LetterReportsComponent implements OnInit {
     const letters = this.filteredLetters();
     const totalAll = letters.length;
     const cats = this.availableCategories();
+    const selected = this.selectedCategory();
 
     return cats.map(cat => {
       const catLetters = letters.filter(l => l.category === cat);
@@ -2689,7 +2780,7 @@ export class LetterReportsComponent implements OnInit {
         completed,
         turnaroundRate
       };
-    }).filter(c => c.total > 0 || this.selectedCategory === c.category);
+    }).filter(c => c.total > 0 || selected === c.category);
   });
 
   // Totals row for the Department Matrix
@@ -2751,24 +2842,30 @@ export class LetterReportsComponent implements OnInit {
   reportPeriodLabel = computed(() => {
     const mode = this.timeframeMode();
     if (mode === 'daily') {
-      if (!this.dailyDate) return 'Today';
-      const d = this.parseDate(this.dailyDate);
+      const dVal = this.dailyDate();
+      if (!dVal) return 'Today';
+      const d = this.parseDate(dVal);
       return d.toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
     }
     if (mode === 'weekly') {
-      if (!this.dateFrom || !this.dateTo) return 'This Week';
-      const from = this.parseDate(this.dateFrom).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-      const to = this.parseDate(this.dateTo).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-      return `${from} – ${to} (Weekly)`;
+      const from = this.dateFrom();
+      const to = this.dateTo();
+      if (!from || !to) return 'This Week';
+      const fromStr = this.parseDate(from).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      const toStr = this.parseDate(to).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      return `${fromStr} – ${toStr} (Weekly)`;
     }
     if (mode === 'monthly') {
-      if (!this.monthlyMonth) return 'This Month';
-      const [year, month] = this.monthlyMonth.split('-').map(Number);
+      const mVal = this.monthlyMonth();
+      if (!mVal) return 'This Month';
+      const [year, month] = mVal.split('-').map(Number);
       const d = new Date(year, month - 1, 1);
       return d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
     }
-    if (!this.dateFrom && !this.dateTo) return 'All Recorded Time';
-    return `${this.dateFrom || 'Start'} to ${this.dateTo || 'Present'}`;
+    const from = this.dateFrom();
+    const to = this.dateTo();
+    if (!from && !to) return 'All Recorded Time';
+    return `${from || 'Start'} to ${to || 'Present'}`;
   });
 
   // --- HELPERS ---
@@ -2856,7 +2953,7 @@ export class LetterReportsComponent implements OnInit {
       ].join(','))
     ].join('\n');
 
-    this.downloadCSV(csvContent, `daily_inward_register_${this.dailyDate || this.formatDate(new Date())}.csv`);
+    this.downloadCSV(csvContent, `daily_inward_register_${this.dailyDate() || this.formatDate(new Date())}.csv`);
   }
 
   exportLettersCSV() {
