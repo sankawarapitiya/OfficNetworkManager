@@ -109,6 +109,11 @@ export const routes: Routes = [
             data: { module: 'letters', permission: 'letters:view_inward' }
           },
           {
+            path: 'inward',
+            redirectTo: 'inbox',
+            pathMatch: 'full'
+          },
+          {
             path: 'actions',
             loadComponent: () => import('./features/letters/pages/letter-actions/letter-actions.component').then(m => m.LetterActionsComponent),
             canActivate: [rbacGuard],

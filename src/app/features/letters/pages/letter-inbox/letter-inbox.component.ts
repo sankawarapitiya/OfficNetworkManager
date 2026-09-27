@@ -1090,8 +1090,9 @@ export class LetterInboxComponent implements OnInit {
   openAddDialog() {
     this.dialog.open(LetterDialogComponent, {
       width: '840px',
+      height: '92vh',
       maxWidth: '95vw',
-      maxHeight: '92vh',
+      maxHeight: '94vh',
       panelClass: 'letter-dialog-overlay',
       autoFocus: false,
       data: {}
@@ -1101,6 +1102,7 @@ export class LetterInboxComponent implements OnInit {
   openEditDialog(letter: Letter) {
     this.dialog.open(LetterDialogComponent, {
       width: letter.attachments?.length ? '1440px' : '840px',
+      height: '92vh',
       maxWidth: '96vw',
       maxHeight: '94vh',
       panelClass: 'letter-dialog-overlay',
@@ -1112,6 +1114,7 @@ export class LetterInboxComponent implements OnInit {
   openDetail(letter: Letter) {
     this.dialog.open(LetterDetailDialogComponent, {
       width: letter.attachments?.length ? '1440px' : '780px',
+      height: '92vh',
       maxWidth: '96vw',
       maxHeight: '94vh',
       panelClass: 'letter-detail-dialog-overlay',

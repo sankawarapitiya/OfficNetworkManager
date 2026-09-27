@@ -345,11 +345,14 @@ import { LetterStatusDialogComponent } from '../letter-status-dialog/letter-stat
       max-height: 94vh;
       overflow: hidden;
       background: white;
+      min-height: 0;
     }
 
     .letter-detail-wrapper {
       display: flex;
       flex-direction: row;
+      flex: 1 1 auto;
+      min-height: 0;
       height: 100%;
       max-height: 94vh;
       overflow: hidden;
@@ -396,6 +399,8 @@ import { LetterStatusDialogComponent } from '../letter-status-dialog/letter-stat
     .dossier-panel {
       display: flex;
       flex-direction: column;
+      flex: 1 1 auto;
+      min-height: 0;
       height: 100%;
       overflow: hidden;
       background: white;
@@ -497,12 +502,30 @@ import { LetterStatusDialogComponent } from '../letter-status-dialog/letter-stat
       &.archived { background: #f1f5f9; color: #64748b; }
     }
 
-    .dialog-body { 
-      padding: 16px 20px !important; 
+    .dialog-body {
+      padding: 16px 20px !important;
       flex: 1 1 auto;
+      min-height: 0;
       overflow-y: auto !important;
       max-height: none !important;
       margin: 0 !important;
+      scrollbar-width: thin;
+      scrollbar-color: #94a3b8 #f1f5f9;
+
+      &::-webkit-scrollbar {
+        width: 8px;
+      }
+      &::-webkit-scrollbar-track {
+        background: #f8fafc;
+        border-radius: 4px;
+      }
+      &::-webkit-scrollbar-thumb {
+        background: #94a3b8;
+        border-radius: 4px;
+        &:hover {
+          background: #64748b;
+        }
+      }
     }
 
     .letter-title {

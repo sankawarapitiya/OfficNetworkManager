@@ -482,6 +482,7 @@ import { AppUser } from '../../../profile/profile.component';
       max-height: 92vh;
       overflow: hidden;
       box-sizing: border-box;
+      min-height: 0;
     }
 
     .dialog-header {
@@ -561,8 +562,9 @@ import { AppUser } from '../../../profile/profile.component';
     .dialog-split-wrapper {
       display: flex;
       flex-direction: row;
+      flex: 1 1 auto;
+      min-height: 0;
       height: 100%;
-      max-height: calc(92vh - 66px);
       overflow: hidden;
 
       &.has-side-viewer {
@@ -605,6 +607,8 @@ import { AppUser } from '../../../profile/profile.component';
     .form-scroll-pane {
       display: flex;
       flex-direction: column;
+      flex: 1 1 auto;
+      min-height: 0;
       height: 100%;
       overflow: hidden;
       background: white;
@@ -614,9 +618,27 @@ import { AppUser } from '../../../profile/profile.component';
       padding: 16px 22px !important;
       margin: 0 !important;
       flex: 1 1 auto;
+      min-height: 0;
       max-height: none !important;
       overflow-y: auto !important;
       box-sizing: border-box;
+      scrollbar-width: thin;
+      scrollbar-color: #94a3b8 #f1f5f9;
+
+      &::-webkit-scrollbar {
+        width: 8px;
+      }
+      &::-webkit-scrollbar-track {
+        background: #f8fafc;
+        border-radius: 4px;
+      }
+      &::-webkit-scrollbar-thumb {
+        background: #94a3b8;
+        border-radius: 4px;
+        &:hover {
+          background: #64748b;
+        }
+      }
     }
 
     .form-container {

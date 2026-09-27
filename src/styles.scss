@@ -492,22 +492,28 @@ html, body {
 }
 
 /* ==========================================================================
-   Letter Dialog Overlay Window Page Alignment
+   Letter Dialog Overlay Window Page Alignment & Scrolling
    ========================================================================== */
 .letter-dialog-overlay,
 .letter-detail-dialog-overlay {
   .mat-mdc-dialog-container {
     --mdc-dialog-container-shape: 14px;
     padding: 0 !important;
+    height: 92vh !important;
+    max-height: 94vh !important;
+    overflow: hidden !important;
+
     .mdc-dialog__surface {
       padding: 0 !important;
       border-radius: 14px !important;
       overflow: hidden !important;
       display: flex !important;
       flex-direction: column !important;
-      max-height: 94vh !important;
+      height: 100% !important;
+      max-height: 100% !important;
       box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.15), 0 10px 10px -5px rgba(0, 0, 0, 0.05) !important;
     }
   }
 }
+
 
