@@ -31,6 +31,7 @@ import {
 import { LetterService } from '../../services/letter.service';
 import { SettingsService, Department } from '../../../settings/settings.service';
 import { FirestoreService } from '../../../../core/services/firestore.service';
+import { NotificationService } from '../../../../core/services/notification.service';
 import { AppUser } from '../../../profile/profile.component';
 
 @Component({
@@ -1222,6 +1223,7 @@ export class LetterDialogComponent implements OnInit {
   private settingsService = inject(SettingsService);
   private firestoreService = inject(FirestoreService);
   private sanitizer = inject(DomSanitizer);
+  private notif = inject(NotificationService);
 
   showSidePreview = signal<boolean>(false);
   selectedAttachment = signal<LetterAttachment | null>(null);
@@ -1583,8 +1585,10 @@ export class LetterDialogComponent implements OnInit {
     try {
       if (this.data.letter && this.data.letter.id) {
         await this.letterService.updateLetter(this.data.letter.id, payload, 'Updated letter properties via form');
+        this.notif.success(`Official letter ${payload.ref_number || ''} updated successfully`);
       } else {
         await this.letterService.addLetter(payload as Omit<Letter, 'id'>);
+        this.notif.success(`Official letter ${payload.ref_number || ''} registered successfully`);
         // Increment next sequence counter in settings for selected prefix
         const s = this.letterSettings();
         if (s.ref_auto_generate !== false) {
@@ -1602,8 +1606,9 @@ export class LetterDialogComponent implements OnInit {
         }
       }
       this.dialogRef.close(true);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to save letter:', err);
+      this.notif.error(err?.message || 'Failed to save official letter. Please check required fields.');
     } finally {
       this.isSaving.set(false);
     }

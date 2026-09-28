@@ -17,6 +17,7 @@ import { AuthService } from '../../auth/auth.service';
 import { RbacService } from '../../auth/rbac.service';
 import { updateProfile } from '@angular/fire/auth';
 import { FirestoreService } from '../../core/services/firestore.service';
+import { NotificationService } from '../../core/services/notification.service';
 import { SettingsService, Department } from '../settings/settings.service';
 import { UserRoleDialogComponent } from './user-role-dialog.component';
 import { DEFAULT_ROLE_PERMISSIONS, ALL_SYSTEM_PERMISSION_IDS } from '../../core/models/permission.model';
@@ -52,6 +53,7 @@ export class ProfileComponent implements OnInit {
   private settingsService = inject(SettingsService);
   private fb = inject(FormBuilder);
   private dialog = inject(MatDialog);
+  private notif = inject(NotificationService);
 
   profileForm: FormGroup;
   isSaving = signal(false);
@@ -195,10 +197,12 @@ export class ProfileComponent implements OnInit {
         });
 
         this.successMessage.set('Profile and department updated successfully!');
+        this.notif.success('Profile and department updated successfully!');
         setTimeout(() => this.successMessage.set(''), 3000);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error updating profile', err);
+      this.notif.error(err?.message || 'Failed to update profile');
     } finally {
       this.isSaving.set(false);
     }
@@ -277,10 +281,11 @@ export class ProfileComponent implements OnInit {
       await deleteApp(secondaryApp);
       
       this.successMessage.set('User created with roles and permissions successfully!');
+      this.notif.success(`User account created successfully for ${formValue.email}`);
       setTimeout(() => this.successMessage.set(''), 3000);
     } catch (err: any) {
       console.error('Error creating user:', err);
-      alert(err.message || 'Failed to create user. Please try again.');
+      this.notif.error(err?.message || 'Failed to create user. Please try again.');
     }
   }
 
@@ -300,9 +305,11 @@ export class ProfileComponent implements OnInit {
 
       await this.firestoreService.updateDocument('users', userId, updatePayload);
       this.successMessage.set('User access, roles & permissions updated successfully!');
+      this.notif.success('User access, roles & permissions updated successfully!');
       setTimeout(() => this.successMessage.set(''), 3000);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error saving user roles', err);
+      this.notif.error(err?.message || 'Failed to update user roles');
     }
   }
 }

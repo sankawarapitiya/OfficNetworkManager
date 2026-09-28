@@ -25,6 +25,7 @@ import { LetterDialogComponent } from '../../components/letter-dialog/letter-dia
 import { AuthService } from '../../../../auth/auth.service';
 import { RbacService } from '../../../../auth/rbac.service';
 import { SettingsService, Department } from '../../../settings/settings.service';
+import { NotificationService } from '../../../../core/services/notification.service';
 
 export type ActionSegment = 'ALL_OPEN' | 'MINE' | 'DEPT' | 'URGENT' | 'ACTION_REQ' | 'IN_PROGRESS';
 export type ViewMode = 'grid' | 'kanban' | 'table';
@@ -65,6 +66,7 @@ export class LetterActionsComponent implements OnInit {
   private rbacService = inject(RbacService);
   private settingsService = inject(SettingsService);
   private dialog = inject(MatDialog);
+  private notif = inject(NotificationService);
 
   allLetters = signal<Letter[]>([]);
   departments = signal<Department[]>([]);
@@ -374,7 +376,13 @@ export class LetterActionsComponent implements OnInit {
     const user = this.currentUser();
     const officerName = user?.displayName || user?.email || 'Officer';
     const remarks = `Workflow stage advanced to "${nextStatus}" via Directives Board by ${officerName}.`;
-    await this.letterService.updateLetterStatus(letter, nextStatus, remarks);
+    try {
+      await this.letterService.updateLetterStatus(letter, nextStatus, remarks);
+      this.notif.success(`Directive ${letter.ref_number} advanced to "${nextStatus}"`);
+    } catch (err: any) {
+      console.error('Failed to advance stage:', err);
+      this.notif.error(err?.message || 'Failed to advance directive stage');
+    }
   }
 
   openRegisterDialog() {

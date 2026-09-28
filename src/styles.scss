@@ -1,7 +1,4 @@
 @import '@angular/material/prebuilt-themes/azure-blue.css';
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-@import url('https://fonts.googleapis.com/icon?family=Material+Icons|Material+Icons+Outlined|Material+Icons+Round');
-@import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200');
 
 mat-icon {
   font-family: 'Material Icons', 'Material Icons Outlined', 'Material Symbols Outlined' !important;
@@ -512,6 +509,63 @@ html, body {
       height: 100% !important;
       max-height: 100% !important;
       box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.15), 0 10px 10px -5px rgba(0, 0, 0, 0.05) !important;
+    }
+  }
+}
+
+/* Sleek Enterprise Toast Notifications */
+.mat-mdc-snack-bar-container {
+  &.app-snackbar-success {
+    --mdc-snackbar-container-color: #064e3b;
+    --mdc-snackbar-supporting-text-color: #ecfdf5;
+    --mat-snack-bar-button-color: #6ee7b7;
+    .mdc-snackbar__surface {
+      border: 1px solid #059669 !important;
+      border-radius: 10px !important;
+      box-shadow: 0 10px 25px -5px rgba(5, 150, 105, 0.3) !important;
+    }
+  }
+
+  &.app-snackbar-error {
+    --mdc-snackbar-container-color: #881337;
+    --mdc-snackbar-supporting-text-color: #fff1f2;
+    --mat-snack-bar-button-color: #fda4af;
+    .mdc-snackbar__surface {
+      border: 1px solid #e11d48 !important;
+      border-radius: 10px !important;
+      box-shadow: 0 10px 25px -5px rgba(225, 29, 72, 0.3) !important;
+    }
+  }
+
+  &.app-snackbar-warning {
+    --mdc-snackbar-container-color: #78350f;
+    --mdc-snackbar-supporting-text-color: #fffbeb;
+    --mat-snack-bar-button-color: #fcd34d;
+    .mdc-snackbar__surface {
+      border: 1px solid #d97706 !important;
+      border-radius: 10px !important;
+      box-shadow: 0 10px 25px -5px rgba(217, 119, 6, 0.3) !important;
+    }
+  }
+
+  &.app-snackbar-info {
+    --mdc-snackbar-container-color: #0c4a6e;
+    --mdc-snackbar-supporting-text-color: #f0f9ff;
+    --mat-snack-bar-button-color: #7dd3fc;
+    .mdc-snackbar__surface {
+      border: 1px solid #0284c7 !important;
+      border-radius: 10px !important;
+      box-shadow: 0 10px 25px -5px rgba(2, 132, 199, 0.3) !important;
+    }
+  }
+
+  &.app-snackbar-offline {
+    --mdc-snackbar-container-color: #1e1b4b;
+    --mdc-snackbar-supporting-text-color: #eef2ff;
+    --mat-snack-bar-button-color: #a5b4fc;
+    .mdc-snackbar__surface {
+      border: 1px solid #4f46e5 !important;
+      border-radius: 10px !important;
     }
   }
 }

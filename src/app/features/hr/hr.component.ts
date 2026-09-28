@@ -4,6 +4,7 @@ import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
 import { HrService, Employee } from './services/hr.service';
 import { RbacService } from '../../auth/rbac.service';
+import { NotificationService } from '../../core/services/notification.service';
 
 @Component({
   selector: 'app-hr',
@@ -15,6 +16,7 @@ import { RbacService } from '../../auth/rbac.service';
 export class HrComponent implements OnInit {
   private hrService = inject(HrService);
   private rbacService = inject(RbacService);
+  private notif = inject(NotificationService);
 
   canManageEmployees = computed(() => this.rbacService.hasPermission('hr:manage_employees'));
   
@@ -36,6 +38,7 @@ export class HrComponent implements OnInit {
 
   async onboardEmployee() {
     if (!this.canManageEmployees()) {
+      this.notif.warning('Permission denied: You do not have permission to manage employees');
       return;
     }
 
@@ -50,6 +53,12 @@ export class HrComponent implements OnInit {
       joinedAt: Date.now()
     };
     
-    await this.hrService.addEmployee(mockEmployee);
+    try {
+      await this.hrService.addEmployee(mockEmployee);
+      this.notif.success(`Employee onboarded successfully (${mockEmployee.employeeId})`);
+    } catch (err: any) {
+      console.error('Failed to onboard employee:', err);
+      this.notif.error(err?.message || 'Failed to onboard employee');
+    }
   }
 }

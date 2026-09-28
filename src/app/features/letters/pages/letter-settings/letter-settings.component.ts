@@ -13,6 +13,7 @@ import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatSelectModule } from '@angular/material/select';
 
 import { LetterService } from '../../services/letter.service';
+import { NotificationService } from '../../../../core/services/notification.service';
 import { 
   LetterSettings, 
   DEFAULT_LETTER_SETTINGS, 
@@ -738,6 +739,7 @@ import {
 })
 export class LetterSettingsComponent implements OnInit {
   private letterService = inject(LetterService);
+  private notif = inject(NotificationService);
 
   settings: LetterSettings = { 
     ...DEFAULT_LETTER_SETTINGS,
@@ -817,6 +819,7 @@ export class LetterSettingsComponent implements OnInit {
     this.newPrefixLabel = '';
     this.newPrefixSeq = 1;
     this.selectedPreviewPrefix = code;
+    this.notif.success(`Reference prefix "${code}" configured`);
   }
 
   removePrefix(index: number) {
@@ -829,6 +832,7 @@ export class LetterSettingsComponent implements OnInit {
     if (this.selectedPreviewPrefix === removed?.code) {
       this.selectedPreviewPrefix = this.settings.ref_prefixes[0]?.code || 'LET';
     }
+    this.notif.info(`Reference prefix "${removed?.code}" removed`);
   }
 
   insertToken(token: string) {
@@ -848,12 +852,14 @@ export class LetterSettingsComponent implements OnInit {
     if (!loc) return;
     if (!this.settings.network_storage_locations.includes(loc)) {
       this.settings.network_storage_locations.push(loc);
+      this.notif.success('Network storage location added');
     }
     this.newNetworkLocation = '';
   }
 
   removeNetworkLocation(index: number) {
     this.settings.network_storage_locations.splice(index, 1);
+    this.notif.info('Network storage location removed');
   }
 
   addCategory() {
@@ -861,12 +867,15 @@ export class LetterSettingsComponent implements OnInit {
     if (!cat) return;
     if (!this.settings.categories.includes(cat)) {
       this.settings.categories.push(cat);
+      this.notif.success(`Classification category "${cat}" added`);
     }
     this.newCategory = '';
   }
 
   removeCategory(index: number) {
+    const removed = this.settings.categories[index];
     this.settings.categories.splice(index, 1);
+    this.notif.info(`Classification category "${removed || ''}" removed`);
   }
 
   getStatusDescription(status: string): string {
@@ -886,10 +895,10 @@ export class LetterSettingsComponent implements OnInit {
     this.isSaving.set(true);
     try {
       await this.letterService.saveSettings(this.settings);
-      alert('Letter management settings saved successfully.');
-    } catch (err) {
+      this.notif.success('Letter management configuration saved successfully');
+    } catch (err: any) {
       console.error('Failed to save settings:', err);
-      alert('Error saving settings.');
+      this.notif.error(err?.message || 'Error saving letter management settings');
     } finally {
       this.isSaving.set(false);
     }

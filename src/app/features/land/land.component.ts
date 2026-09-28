@@ -4,6 +4,7 @@ import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
 import { LandService, LandRecord } from './services/land.service';
 import { RbacService } from '../../auth/rbac.service';
+import { NotificationService } from '../../core/services/notification.service';
 
 @Component({
   selector: 'app-land',
@@ -15,6 +16,7 @@ import { RbacService } from '../../auth/rbac.service';
 export class LandComponent implements OnInit {
   private landService = inject(LandService);
   private rbacService = inject(RbacService);
+  private notif = inject(NotificationService);
 
   canRegisterDeed = computed(() => this.rbacService.hasPermission('land:register_deed'));
   
@@ -36,6 +38,7 @@ export class LandComponent implements OnInit {
 
   async registerNewParcel() {
     if (!this.canRegisterDeed()) {
+      this.notif.warning('Permission denied: You do not have permission to register deeds');
       return;
     }
 
@@ -46,6 +49,12 @@ export class LandComponent implements OnInit {
       sizeSqm: Math.floor(Math.random() * 5000) + 100
     };
     
-    await this.landService.addLandRecord(mockRecord);
+    try {
+      await this.landService.addLandRecord(mockRecord);
+      this.notif.success(`Land deed parcel registered successfully (${mockRecord.deedNumber})`);
+    } catch (err: any) {
+      console.error('Failed to register land record:', err);
+      this.notif.error(err?.message || 'Failed to register land record');
+    }
   }
 }

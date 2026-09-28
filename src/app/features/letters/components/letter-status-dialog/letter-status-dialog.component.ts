@@ -10,6 +10,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { Letter, LetterStatus, ALL_LETTER_STATUSES } from '../../models/letter.model';
 import { LetterService } from '../../services/letter.service';
 import { FirestoreService } from '../../../../core/services/firestore.service';
+import { NotificationService } from '../../../../core/services/notification.service';
 import { AppUser } from '../../../profile/profile.component';
 
 @Component({
@@ -180,6 +181,7 @@ export class LetterStatusDialogComponent {
   private fb = inject(FormBuilder);
   private letterService = inject(LetterService);
   private firestoreService = inject(FirestoreService);
+  private notif = inject(NotificationService);
 
   form: FormGroup;
   statuses = ALL_LETTER_STATUSES;
@@ -217,9 +219,11 @@ export class LetterStatusDialogComponent {
 
     try {
       await this.letterService.updateLetterStatus(this.data.letter, newStatus, remarks, assignedTo);
+      this.notif.success(`Letter status updated to "${newStatus}"`);
       this.dialogRef.close(true);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to update status:', err);
+      this.notif.error(err?.message || 'Failed to update letter status');
     } finally {
       this.isSaving.set(false);
     }

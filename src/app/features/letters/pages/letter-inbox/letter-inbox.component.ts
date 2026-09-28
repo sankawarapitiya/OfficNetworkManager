@@ -23,6 +23,7 @@ import { LetterStatusDialogComponent } from '../../components/letter-status-dial
 import { LetterDetailDialogComponent } from '../../components/letter-detail-dialog/letter-detail-dialog.component';
 import { SettingsService, Department } from '../../../settings/settings.service';
 import { FirestoreService } from '../../../../core/services/firestore.service';
+import { NotificationService } from '../../../../core/services/notification.service';
 import { AppUser } from '../../../profile/profile.component';
 
 @Component({
@@ -781,6 +782,7 @@ export class LetterInboxComponent implements OnInit {
   private settingsService = inject(SettingsService);
   private firestoreService = inject(FirestoreService);
   private dialog = inject(MatDialog);
+  private notif = inject(NotificationService);
 
   allLetters = signal<Letter[]>([]);
   departments = signal<Department[]>([]);
@@ -1131,7 +1133,13 @@ export class LetterInboxComponent implements OnInit {
 
   async deleteLetter(letter: Letter) {
     if (confirm('Are you sure you want to delete official letter ' + letter.ref_number + '?')) {
-      await this.letterService.deleteLetter(letter);
+      try {
+        await this.letterService.deleteLetter(letter);
+        this.notif.success('Official letter ' + letter.ref_number + ' deleted successfully');
+      } catch (err: any) {
+        console.error('Failed to delete letter:', err);
+        this.notif.error(err?.message || 'Failed to delete official letter');
+      }
     }
   }
 }
