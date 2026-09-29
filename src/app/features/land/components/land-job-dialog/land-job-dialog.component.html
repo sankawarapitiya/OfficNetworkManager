@@ -1,0 +1,500 @@
+<div class="dialog-container">
+  <!-- Dialog Header (Sticky Top) -->
+  <div class="dialog-header">
+    <div class="header-left">
+      <div class="icon-wrap" [class.edit-mode]="isEditMode()">
+        <mat-icon>{{ isEditMode() ? 'edit_document' : 'domain_add' }}</mat-icon>
+      </div>
+      <div>
+        <div class="title-row">
+          <h2 class="dialog-title">{{ isEditMode() ? 'Edit Land Task Dossier' : 'Register New Land Task / Job' }}</h2>
+          <span *ngIf="isEditMode() && existingJob" class="ref-badge">{{ existingJob.jobRef }}</span>
+          <span class="stage-indicator-pill">{{ currentStageName() }}</span>
+        </div>
+        <p class="dialog-subtitle">Cadastral parcel filing, verification workflow & deed tracking</p>
+      </div>
+    </div>
+    <button mat-icon-button (click)="close()" class="close-btn" matTooltip="Close without saving">
+      <mat-icon>close</mat-icon>
+    </button>
+  </div>
+
+  <mat-progress-bar *ngIf="isSaving()" mode="indeterminate" class="header-loader"></mat-progress-bar>
+
+  <!-- 4-Stage Stepper Wizard Content -->
+  <mat-dialog-content class="wizard-dialog-content">
+    <mat-stepper #stepper (selectionChange)="onStepChange($event)" class="land-stepper">
+
+      <!-- ============================================== -->
+      <!-- STAGE 1: INITIAL STAGE                         -->
+      <!-- ============================================== -->
+      <mat-step [stepControl]="initialForm" label="Initial Setup">
+        <form [formGroup]="initialForm" class="step-form">
+          <div class="stage-banner">
+            <span class="stage-badge">STAGE 1</span>
+            <div class="stage-desc-text">
+              <h3>Select Job Type & Enter Initial Details</h3>
+              <p>Documentation requirements and verification checklists will automatically configure based on your selected Job Type. You can save and exit at any time.</p>
+            </div>
+          </div>
+
+          <!-- Section 1A: Job Type Selector -->
+          <div class="form-card highlight-card">
+            <div class="card-title-row">
+              <mat-icon class="sec-icon text-indigo">category</mat-icon>
+              <h4 class="card-heading">1. Select Land Job Type</h4>
+            </div>
+
+            <div class="job-type-selection-grid">
+              <mat-form-field appearance="outline" class="w-full">
+                <mat-label>Select Land Job Type *</mat-label>
+                <mat-select formControlName="jobTypeId" (selectionChange)="onJobTypeChange($event.value)">
+                  <mat-option *ngFor="let jt of settings().jobTypes" [value]="jt.id" [disabled]="!jt.isActive">
+                    <span class="font-semibold">{{ jt.name }}</span>
+                    <span class="jt-code-tag">[{{ jt.code }}]</span>
+                    <span class="sla-text"> • SLA: {{ jt.estimatedDays }} days</span>
+                  </mat-option>
+                </mat-select>
+                <mat-hint *ngIf="selectedJobType()">
+                  {{ selectedJobType()?.description }}
+                </mat-hint>
+              </mat-form-field>
+            </div>
+
+            <div *ngIf="selectedJobType()" class="selected-jt-summary">
+              <div class="jt-metric-pill">
+                <mat-icon>description</mat-icon>
+                <span><strong>{{ selectedJobType()?.requiredDocumentTypes?.length || 0 }}</strong> Required Documents</span>
+              </div>
+              <div class="jt-metric-pill">
+                <mat-icon>fact_check</mat-icon>
+                <span><strong>{{ selectedJobType()?.verificationStages?.length || 0 }}</strong> Verification Stages</span>
+              </div>
+              <div class="jt-metric-pill">
+                <mat-icon>schedule</mat-icon>
+                <span>Target: <strong>{{ selectedJobType()?.estimatedDays }}</strong> Working Days</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Section 1B: Customer Information -->
+          <div class="form-card">
+            <div class="card-title-row">
+              <mat-icon class="sec-icon text-blue">person</mat-icon>
+              <h4 class="card-heading">2. Customer / Landowner Information</h4>
+            </div>
+
+            <!-- Existing Customer Autocomplete -->
+            <div class="customer-picker-row" *ngIf="!selectedCustomerName()">
+              <mat-form-field appearance="outline" class="w-full search-cust-field">
+                <mat-label>Search & Select Registered Citizen (Auto-fills form)</mat-label>
+                <input matInput 
+                       [ngModel]="customerFilterText()" 
+                       [ngModelOptions]="{standalone: true}"
+                       (ngModelChange)="customerFilterText.set($event)"
+                       [matAutocomplete]="autoCust" 
+                       placeholder="Type citizen name, NIC or phone number...">
+                <mat-icon matSuffix>search</mat-icon>
+                <mat-autocomplete #autoCust="matAutocomplete" (optionSelected)="onSelectExistingCustomer($event.option.value)">
+                  <mat-option *ngFor="let cust of filteredCustomers()" [value]="cust">
+                    <span class="font-medium">{{ cust.name }}</span>
+                    <span class="cust-nic-badge">{{ cust.nic }}</span>
+                    <span class="cust-sub-info">({{ cust.division }})</span>
+                  </mat-option>
+                </mat-autocomplete>
+              </mat-form-field>
+            </div>
+
+            <!-- Active Selected Customer Pill -->
+            <div *ngIf="selectedCustomerName()" class="selected-cust-banner">
+              <div class="cust-banner-left">
+                <mat-icon class="check-icon">how_to_reg</mat-icon>
+                <div>
+                  <span class="cust-banner-title">Citizen Linked: <strong>{{ selectedCustomerName() }}</strong></span>
+                  <span class="cust-banner-sub">NIC: {{ initialForm.get('customerNic')?.value }} • {{ initialForm.get('customerPhone')?.value }}</span>
+                </div>
+              </div>
+              <button mat-stroked-button color="warn" type="button" (click)="clearCustomerSelection()">
+                <mat-icon>change_circle</mat-icon> Change Citizen
+              </button>
+            </div>
+
+            <div class="grid-2-col">
+              <mat-form-field appearance="outline">
+                <mat-label>Customer Full Name *</mat-label>
+                <input matInput formControlName="customerName" placeholder="e.g. S. M. Gunasekara">
+                <mat-error *ngIf="initialForm.get('customerName')?.invalid">Customer name is required</mat-error>
+              </mat-form-field>
+
+              <mat-form-field appearance="outline">
+                <mat-label>National Identity Card (NIC) *</mat-label>
+                <input matInput formControlName="customerNic" placeholder="e.g. 198512345678 or 851234567V">
+                <mat-error *ngIf="initialForm.get('customerNic')?.invalid">NIC is required</mat-error>
+              </mat-form-field>
+
+              <mat-form-field appearance="outline">
+                <mat-label>Contact Phone Number *</mat-label>
+                <input matInput formControlName="customerPhone" placeholder="e.g. 077 123 4567">
+                <mat-error *ngIf="initialForm.get('customerPhone')?.invalid">Phone is required</mat-error>
+              </mat-form-field>
+
+              <mat-form-field appearance="outline">
+                <mat-label>Email Address</mat-label>
+                <input matInput formControlName="customerEmail" placeholder="e.g. customer@example.com">
+              </mat-form-field>
+
+              <mat-form-field appearance="outline" class="col-span-2">
+                <mat-label>Customer Postal Address *</mat-label>
+                <input matInput formControlName="customerAddress" placeholder="Street, Village / Town, City">
+                <mat-error *ngIf="initialForm.get('customerAddress')?.invalid">Address is required</mat-error>
+              </mat-form-field>
+            </div>
+          </div>
+
+          <!-- Section 1C: Land Details & Division -->
+          <div class="form-card">
+            <div class="card-title-row">
+              <mat-icon class="sec-icon text-amber">terrain</mat-icon>
+              <h4 class="card-heading">3. Cadastral Parcel & Location Details</h4>
+            </div>
+
+            <div class="grid-3-col">
+              <!-- Division Dropdown (Dynamic from Settings) -->
+              <mat-form-field appearance="outline">
+                <mat-label>Administrative Division *</mat-label>
+                <mat-select formControlName="division">
+                  <mat-option *ngFor="let div of settings().divisions" [value]="div">
+                    {{ div }}
+                  </mat-option>
+                </mat-select>
+                <mat-error *ngIf="initialForm.get('division')?.invalid">Division is required</mat-error>
+              </mat-form-field>
+
+              <mat-form-field appearance="outline">
+                <mat-label>Deed Number *</mat-label>
+                <input matInput formControlName="deedNumber" placeholder="e.g. DEED-4829/2018">
+                <mat-error *ngIf="initialForm.get('deedNumber')?.invalid">Deed # is required</mat-error>
+              </mat-form-field>
+
+              <mat-form-field appearance="outline">
+                <mat-label>Cadastral Plan Number *</mat-label>
+                <input matInput formControlName="planNumber" placeholder="e.g. PLAN-9204A">
+                <mat-error *ngIf="initialForm.get('planNumber')?.invalid">Plan # is required</mat-error>
+              </mat-form-field>
+
+              <mat-form-field appearance="outline">
+                <mat-label>Lot / Parcel Number *</mat-label>
+                <input matInput formControlName="lotNumber" placeholder="e.g. Lot 12-B">
+                <mat-error *ngIf="initialForm.get('lotNumber')?.invalid">Lot # is required</mat-error>
+              </mat-form-field>
+
+              <mat-form-field appearance="outline">
+                <mat-label>Extent / Land Size</mat-label>
+                <input matInput formControlName="extentText" placeholder="e.g. 0A-1R-20P or 500 sq.m">
+              </mat-form-field>
+
+              <mat-form-field appearance="outline">
+                <mat-label>Size in Sq. Meters</mat-label>
+                <input matInput type="number" formControlName="sizeSqm" placeholder="e.g. 505.8">
+              </mat-form-field>
+
+              <mat-form-field appearance="outline">
+                <mat-label>Parcel / Estate Name</mat-label>
+                <input matInput formControlName="landName" placeholder="e.g. Delgahawatta">
+              </mat-form-field>
+
+              <mat-form-field appearance="outline">
+                <mat-label>Grama Niladhari (GN) Division</mat-label>
+                <input matInput formControlName="gramaNiladhariDivision" placeholder="e.g. GN-542 Malabe North">
+              </mat-form-field>
+
+              <mat-form-field appearance="outline">
+                <mat-label>GPS Coordinates</mat-label>
+                <input matInput formControlName="gpsCoordinates" placeholder="e.g. 6.9012, 79.9234">
+              </mat-form-field>
+            </div>
+
+            <mat-form-field appearance="outline" class="w-full">
+              <mat-label>Land Physical Location / Boundary Address *</mat-label>
+              <input matInput formControlName="locationAddress" placeholder="Exact address / road where land is situated">
+              <mat-error *ngIf="initialForm.get('locationAddress')?.invalid">Land address is required</mat-error>
+            </mat-form-field>
+
+            <div class="grid-2-col">
+              <mat-form-field appearance="outline">
+                <mat-label>Priority Level</mat-label>
+                <mat-select formControlName="priority">
+                  <mat-option value="Normal">Normal</mat-option>
+                  <mat-option value="Urgent">Urgent</mat-option>
+                  <mat-option value="Immediate">Immediate / Expedited</mat-option>
+                </mat-select>
+              </mat-form-field>
+
+              <mat-form-field appearance="outline">
+                <mat-label>Initial Notes / Application Remarks</mat-label>
+                <input matInput formControlName="initialNotes" placeholder="Special applicant notes or instructions...">
+              </mat-form-field>
+            </div>
+          </div>
+        </form>
+      </mat-step>
+
+      <!-- ============================================== -->
+      <!-- STAGE 2: DOCUMENTATION STAGE                   -->
+      <!-- ============================================== -->
+      <mat-step label="Documentation">
+        <div class="step-form">
+          <div class="stage-banner doc-banner">
+            <span class="stage-badge doc-badge">STAGE 2</span>
+            <div class="stage-desc-text">
+              <h3>Required Documentation Verification & Attachments</h3>
+              <p>Dynamic document types configured for <strong>{{ selectedJobType()?.name }}</strong>. You can upload documents now or Save & Exit to complete later.</p>
+            </div>
+          </div>
+
+          <div class="doc-checklist-container">
+            <div *ngIf="dynamicDocuments().length === 0" class="empty-docs-alert">
+              <mat-icon>info</mat-icon>
+              <span>No document requirements configured for this job type. You may proceed to verification.</span>
+            </div>
+
+            <div *ngFor="let doc of dynamicDocuments(); let i = index" class="doc-item-row" [class.mandatory]="doc.isMandatory">
+              <div class="doc-meta-col">
+                <div class="doc-header-line">
+                  <span class="doc-name">{{ doc.docTypeName }}</span>
+                  <span *ngIf="doc.isMandatory" class="chip-mandatory">Required</span>
+                  <span *ngIf="!doc.isMandatory" class="chip-optional">Optional</span>
+                </div>
+
+                <!-- Status indicator -->
+                <div class="doc-status-line">
+                  <span class="status-indicator" [ngClass]="doc.status.toLowerCase()">
+                    <mat-icon>{{ doc.status === 'Uploaded' ? 'check_circle' : 'hourglass_empty' }}</mat-icon>
+                    {{ doc.status }}
+                  </span>
+                  <span *ngIf="doc.fileName" class="file-name-text">
+                    <mat-icon>attach_file</mat-icon> {{ doc.fileName }}
+                    <span *ngIf="doc.fileSize" class="file-size">({{ (doc.fileSize / 1024) | number:'1.0-1' }} KB)</span>
+                  </span>
+                </div>
+              </div>
+
+              <!-- File Upload Action -->
+              <div class="doc-actions-col">
+                <input type="file" #fileInput (change)="handleFileUpload($event, i)" style="display: none;">
+                
+                <button *ngIf="doc.status !== 'Uploaded'" mat-stroked-button color="primary" type="button" (click)="fileInput.click()" class="upload-btn">
+                  <mat-icon>upload_file</mat-icon> Browse File
+                </button>
+
+                <div *ngIf="doc.status === 'Uploaded'" class="uploaded-actions">
+                  <a *ngIf="doc.fileUrl" [href]="doc.fileUrl" target="_blank" mat-icon-button color="primary" matTooltip="View File">
+                    <mat-icon>visibility</mat-icon>
+                  </a>
+                  <button mat-icon-button color="warn" (click)="removeDocumentFile(i)" matTooltip="Remove File">
+                    <mat-icon>delete_outline</mat-icon>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Doc Remarks -->
+              <div class="doc-remarks-col">
+                <mat-form-field appearance="outline" class="w-full compact-field" subscriptSizing="dynamic">
+                  <mat-label>Remarks / Folio #</mat-label>
+                  <input matInput [ngModel]="doc.remarks" (ngModelChange)="updateDocRemarks(i, $event)" placeholder="e.g. Verified original deed">
+                </mat-form-field>
+              </div>
+            </div>
+          </div>
+        </div>
+      </mat-step>
+
+      <!-- ============================================== -->
+      <!-- STAGE 3: VERIFICATION STAGE                   -->
+      <!-- ============================================== -->
+      <mat-step label="Verification">
+        <div class="step-form">
+          <div class="stage-banner verif-banner">
+            <span class="stage-badge verif-badge">STAGE 3</span>
+            <div class="stage-desc-text">
+              <h3>Field Inspection & Cadastral Verification Stages</h3>
+              <p>Checklist items dynamically linked to <strong>{{ selectedJobType()?.name }}</strong>. Mark completed checks and record observations.</p>
+            </div>
+          </div>
+
+          <div class="verif-stages-container">
+            <div *ngIf="dynamicVerificationStages().length === 0" class="empty-docs-alert">
+              <mat-icon>info</mat-icon>
+              <span>No verification stages defined for this job type.</span>
+            </div>
+
+            <div *ngFor="let stage of dynamicVerificationStages(); let sIdx = index" class="verif-stage-card">
+              <div class="stage-card-header">
+                <div class="stage-title-group">
+                  <span class="stage-index-pill">{{ sIdx + 1 }}</span>
+                  <h4 class="stage-name">{{ stage.stageName }}</h4>
+                  <span class="role-badge"><mat-icon>badge</mat-icon> {{ stage.assignedRole }}</span>
+                </div>
+                <div class="stage-status-picker">
+                  <mat-form-field appearance="outline" class="compact-field" subscriptSizing="dynamic">
+                    <mat-label>Stage Status</mat-label>
+                    <mat-select [ngModel]="stage.status" (selectionChange)="updateStageStatus(sIdx, $event.value)">
+                      <mat-option value="Pending">Pending</mat-option>
+                      <mat-option value="In Progress">In Progress</mat-option>
+                      <mat-option value="Approved">Approved</mat-option>
+                      <mat-option value="Rejected">Rejected</mat-option>
+                    </mat-select>
+                  </mat-form-field>
+                </div>
+              </div>
+
+              <!-- Stage Checklist -->
+              <div class="stage-checklist">
+                <div class="checklist-top-row">
+                  <span class="checklist-header">Verification Checklist:</span>
+                  <div class="checklist-actions">
+                    <button mat-button color="primary" type="button" class="sm-txt-btn" (click)="toggleCheckAll(sIdx, true)">
+                      <mat-icon class="sm-icon">done_all</mat-icon> Check All
+                    </button>
+                    <button mat-button type="button" class="sm-txt-btn text-gray" (click)="toggleCheckAll(sIdx, false)">
+                      Clear
+                    </button>
+                  </div>
+                </div>
+
+                <div *ngFor="let item of stage.checklistResults; let iIdx = index" class="checklist-item">
+                  <mat-checkbox [checked]="item.checked" (change)="toggleChecklistItem(sIdx, iIdx)" color="primary">
+                    <span [class.checked-text]="item.checked">{{ item.item }}</span>
+                  </mat-checkbox>
+                </div>
+              </div>
+
+              <!-- Stage Findings Input -->
+              <div class="stage-findings-wrap">
+                <mat-form-field appearance="outline" class="w-full compact-field">
+                  <mat-label>Field Observations & Findings</mat-label>
+                  <textarea matInput rows="2" [ngModel]="stage.findings" (ngModelChange)="updateStageFindings(sIdx, $event)" placeholder="Enter field observations, survey peg verification or boundary dispute findings..."></textarea>
+                </mat-form-field>
+              </div>
+            </div>
+          </div>
+        </div>
+      </mat-step>
+
+      <!-- ============================================== -->
+      <!-- STAGE 4: COMPLETION & REVIEW                   -->
+      <!-- ============================================== -->
+      <mat-step label="Completion">
+        <form [formGroup]="completionForm" class="step-form">
+          <div class="stage-banner complete-banner">
+            <span class="stage-badge complete-badge">STAGE 4</span>
+            <div class="stage-desc-text">
+              <h3>Review Land Job Dossier & Finalize Registration</h3>
+              <p>Verify citizen dossier, assign responsible officer, and complete record in the Land Registry.</p>
+            </div>
+          </div>
+
+          <!-- Review Summary Dossier -->
+          <div class="summary-matrix-card">
+            <h4 class="summary-title"><mat-icon>fact_check</mat-icon> Application Dossier Summary</h4>
+            
+            <div class="summary-grid">
+              <div class="summary-item">
+                <span class="label">Job Type</span>
+                <span class="val font-semibold">{{ selectedJobType()?.name }} ({{ selectedJobType()?.code }})</span>
+              </div>
+              <div class="summary-item">
+                <span class="label">Customer / Citizen</span>
+                <span class="val font-semibold">{{ initialForm.get('customerName')?.value }}</span>
+                <span class="sub-val">NIC: {{ initialForm.get('customerNic')?.value }} • {{ initialForm.get('customerPhone')?.value }}</span>
+              </div>
+              <div class="summary-item">
+                <span class="label">Cadastral Parcel</span>
+                <span class="val font-mono">Lot {{ initialForm.get('lotNumber')?.value }} • Plan {{ initialForm.get('planNumber')?.value }}</span>
+                <span class="sub-val">Deed # {{ initialForm.get('deedNumber')?.value }}</span>
+              </div>
+              <div class="summary-item">
+                <span class="label">Division</span>
+                <span class="val font-semibold text-indigo">{{ initialForm.get('division')?.value }}</span>
+                <span class="sub-val">{{ initialForm.get('locationAddress')?.value }}</span>
+              </div>
+              <div class="summary-item">
+                <span class="label">Mandatory Documents</span>
+                <span class="val" [ngClass]="allMandatoryUploaded() ? 'text-green' : 'text-amber'">
+                  {{ uploadedMandatoryCount() }} of {{ mandatoryDocsCount() }} Attached
+                </span>
+              </div>
+              <div class="summary-item">
+                <span class="label">Current Status</span>
+                <span class="val font-semibold">
+                  <span class="stage-pill" [ngClass]="existingJob?.status ? existingJob!.status.toLowerCase() : 'initial'">
+                    {{ existingJob?.status || 'Initial' }}
+                  </span>
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Final Assignment & Remarks -->
+          <div class="form-card">
+            <div class="card-title-row">
+              <mat-icon class="sec-icon text-teal">assignment_ind</mat-icon>
+              <h4 class="card-heading">Assignment & Final Endorsement</h4>
+            </div>
+
+            <div class="grid-2-col">
+              <mat-form-field appearance="outline">
+                <mat-label>Assigned Land Officer / Surveyor</mat-label>
+                <input matInput formControlName="assignedOfficer" placeholder="e.g. Eng. K. Perera (Surveyor)">
+              </mat-form-field>
+
+              <mat-form-field appearance="outline">
+                <mat-label>Grant / Certificate / Partition Ref (If applicable)</mat-label>
+                <input matInput formControlName="certificateOrGrantNo" placeholder="e.g. CERT-2026-992">
+              </mat-form-field>
+            </div>
+
+            <mat-form-field appearance="outline" class="w-full">
+              <mat-label>Final Recommendation / Registration Remarks</mat-label>
+              <textarea matInput rows="3" formControlName="completionRemarks" placeholder="Enter registration instructions, conditions, or supervisory remarks..."></textarea>
+            </mat-form-field>
+          </div>
+        </form>
+      </mat-step>
+
+    </mat-stepper>
+  </mat-dialog-content>
+
+  <!-- Pinned / Sticky Footer Action Bar -->
+  <div class="sticky-footer-bar">
+    <div class="footer-left">
+      <span class="footer-step-tag">
+        Step {{ currentStepIndex() + 1 }} of 4: <strong>{{ currentStageName() }}</strong>
+      </span>
+      <button mat-button (click)="close()" class="cancel-btn">
+        Cancel
+      </button>
+    </div>
+
+    <div class="footer-right">
+      <!-- Back Button -->
+      <button *ngIf="currentStepIndex() > 0" mat-stroked-button (click)="stepper.previous()">
+        <mat-icon>arrow_back</mat-icon> Back
+      </button>
+
+      <!-- SAVE & EXIT AT CURRENT STAGE BUTTON -->
+      <button mat-flat-button color="accent" class="save-exit-btn" [disabled]="isSaving()" (click)="saveAndExit()" matTooltip="Save your current progress and exit. You can resume this task anytime.">
+        <mat-icon>save</mat-icon> Save & Exit
+      </button>
+
+      <!-- Next / Complete Button -->
+      <button *ngIf="currentStepIndex() < 3" mat-flat-button color="primary" class="next-btn" (click)="stepper.next()">
+        Next Stage <mat-icon>arrow_forward</mat-icon>
+      </button>
+
+      <button *ngIf="currentStepIndex() === 3" mat-flat-button color="primary" class="finalize-btn" [disabled]="isSaving()" (click)="finalizeJob()">
+        <mat-icon>check_circle</mat-icon> Finalize & Complete Task
+      </button>
+    </div>
+  </div>
+</div>

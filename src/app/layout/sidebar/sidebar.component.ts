@@ -27,6 +27,7 @@ export class SidebarComponent implements OnInit, OnDestroy {
 
   workPlansExpanded = signal<boolean>(false);
   lettersExpanded = signal<boolean>(false);
+  landExpanded = signal<boolean>(false);
 
   private routerSub?: Subscription;
 
@@ -44,16 +45,23 @@ export class SidebarComponent implements OnInit, OnDestroy {
   }
 
   private syncExpansionWithRoute(url: string) {
-    if (url.startsWith('/work-plans')) {
+    if (url.startsWith('/land')) {
+      this.landExpanded.set(true);
+      this.workPlansExpanded.set(false);
+      this.lettersExpanded.set(false);
+    } else if (url.startsWith('/work-plans')) {
       this.workPlansExpanded.set(true);
       this.lettersExpanded.set(false);
+      this.landExpanded.set(false);
     } else if (url.startsWith('/letters')) {
       this.lettersExpanded.set(true);
       this.workPlansExpanded.set(false);
+      this.landExpanded.set(false);
     } else {
       // In the root (/dashboard) or other root sections, keep toggle submenus closed
       this.workPlansExpanded.set(false);
       this.lettersExpanded.set(false);
+      this.landExpanded.set(false);
     }
   }
 
@@ -106,5 +114,16 @@ export class SidebarComponent implements OnInit, OnDestroy {
 
   isLettersActive(): boolean {
     return this.router.url.startsWith('/letters');
+  }
+
+  toggleLand(event?: MouseEvent) {
+    if (event) {
+      event.stopPropagation();
+    }
+    this.landExpanded.update(v => !v);
+  }
+
+  isLandActive(): boolean {
+    return this.router.url.startsWith('/land');
   }
 }

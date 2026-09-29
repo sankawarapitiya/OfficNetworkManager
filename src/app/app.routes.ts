@@ -38,9 +38,43 @@ export const routes: Routes = [
       },
       {
         path: 'land',
-        loadComponent: () => import('./features/land/land.component').then(m => m.LandComponent),
-        canActivate: [rbacGuard],
-        data: { module: 'land', permission: 'land:view_parcels' }
+        children: [
+          {
+            path: '',
+            redirectTo: 'dashboard',
+            pathMatch: 'full'
+          },
+          {
+            path: 'dashboard',
+            loadComponent: () => import('./features/land/pages/land-dashboard/land-dashboard.component').then(m => m.LandDashboardComponent),
+            canActivate: [rbacGuard],
+            data: { module: 'land', permission: 'land:view_parcels' }
+          },
+          {
+            path: 'jobs',
+            loadComponent: () => import('./features/land/pages/land-jobs/land-jobs.component').then(m => m.LandJobsComponent),
+            canActivate: [rbacGuard],
+            data: { module: 'land', permission: 'land:view_parcels' }
+          },
+          {
+            path: 'reports',
+            loadComponent: () => import('./features/land/pages/land-reports/land-reports.component').then(m => m.LandReportsComponent),
+            canActivate: [rbacGuard],
+            data: { module: 'land', permission: 'land:view_parcels' }
+          },
+          {
+            path: 'audit',
+            loadComponent: () => import('./features/land/pages/land-audit/land-audit.component').then(m => m.LandAuditComponent),
+            canActivate: [rbacGuard],
+            data: { module: 'land', permission: 'land:view_parcels' }
+          },
+          {
+            path: 'settings',
+            loadComponent: () => import('./features/land/pages/land-settings/land-settings.component').then(m => m.LandSettingsComponent),
+            canActivate: [rbacGuard],
+            data: { module: 'land', permission: 'land:register_deed' }
+          }
+        ]
       },
       {
         path: 'work-plans',

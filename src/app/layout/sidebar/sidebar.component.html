@@ -31,10 +31,42 @@
       <mat-icon matListItemIcon>groups</mat-icon>
       <span matListItemTitle>Customers</span>
     </a>
-    <a mat-list-item *ngIf="rbacService.canAccessModule('land')" routerLink="/land" routerLinkActive="active-link">
-      <mat-icon matListItemIcon>domain</mat-icon>
-      <span matListItemTitle>Land Registry</span>
-    </a>
+    <!-- Land Management with Sub-categories -->
+    <div class="nav-expandable-group" *ngIf="rbacService.canAccessModule('land')">
+      <div class="nav-parent-item" [class.expanded]="landExpanded()" [class.parent-active]="isLandActive()">
+        <a routerLink="/land/jobs" class="parent-link">
+          <mat-icon class="parent-icon">terrain</mat-icon>
+          <span class="parent-label">Land Management</span>
+        </a>
+        <button type="button" class="expand-btn" (click)="toggleLand($event)" matTooltip="Toggle Sub-menu">
+          <mat-icon class="expand-icon">{{ landExpanded() ? 'expand_less' : 'expand_more' }}</mat-icon>
+        </button>
+      </div>
+
+      <!-- Nested Sub-Categories -->
+      <div class="sub-nav-list" *ngIf="landExpanded()">
+        <a routerLink="/land/dashboard" routerLinkActive="active-sub-link" class="sub-nav-item">
+          <mat-icon class="sub-icon">insights</mat-icon>
+          <span class="sub-title">Dashboard</span>
+        </a>
+        <a routerLink="/land/jobs" routerLinkActive="active-sub-link" class="sub-nav-item">
+          <mat-icon class="sub-icon">format_list_bulleted</mat-icon>
+          <span class="sub-title">Job List</span>
+        </a>
+        <a routerLink="/land/reports" routerLinkActive="active-sub-link" class="sub-nav-item">
+          <mat-icon class="sub-icon">summarize</mat-icon>
+          <span class="sub-title">Reports</span>
+        </a>
+        <a routerLink="/land/audit" routerLinkActive="active-sub-link" class="sub-nav-item">
+          <mat-icon class="sub-icon">history</mat-icon>
+          <span class="sub-title">Audit</span>
+        </a>
+        <a routerLink="/land/settings" routerLinkActive="active-sub-link" class="sub-nav-item">
+          <mat-icon class="sub-icon">tune</mat-icon>
+          <span class="sub-title">Settings</span>
+        </a>
+      </div>
+    </div>
     <!-- Work Plans with Sub-categories -->
     <div class="nav-expandable-group" *ngIf="rbacService.canAccessModule('work-plans')">
       <div class="nav-parent-item" [class.expanded]="workPlansExpanded()" [class.parent-active]="isWorkPlansActive()">
