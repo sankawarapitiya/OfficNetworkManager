@@ -40,6 +40,7 @@ export interface LandJobDocument {
   docTypeId: string;
   docTypeName: string;
   isMandatory: boolean;
+  received?: boolean; // Checkbox indicating document received or not
   status: 'Pending' | 'Uploaded' | 'Verified' | 'Exempted';
   fileName?: string;
   fileUrl?: string;

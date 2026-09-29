@@ -291,6 +291,51 @@
 }
 
 /* Documentation Stage */
+.docs-toolbar-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 10px 18px;
+  margin-bottom: 14px;
+
+  .docs-summary-stat {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+
+    .stat-tag {
+      font-size: 0.825rem;
+      color: #334155;
+      background: #f1f5f9;
+      padding: 3px 10px;
+      border-radius: 12px;
+
+      &.mandatory {
+        background: #fef3c7;
+        color: #b45309;
+        &.complete {
+          background: #dcfce7;
+          color: #15803d;
+        }
+      }
+    }
+  }
+
+  .docs-quick-actions {
+    display: flex;
+    gap: 6px;
+    .sm-txt-btn {
+      font-size: 0.775rem;
+      height: 28px;
+      line-height: 28px;
+      .sm-icon { font-size: 14px; width: 14px; height: 14px; }
+    }
+  }
+}
+
 .doc-checklist-container {
   display: flex;
   flex-direction: column;
@@ -300,7 +345,7 @@
 
 .doc-item-row {
   display: grid;
-  grid-template-columns: 1.6fr 1fr 1fr;
+  grid-template-columns: auto 1.5fr 1fr 1fr;
   gap: 16px;
   align-items: center;
   background: #ffffff;
@@ -312,6 +357,21 @@
 
   &.mandatory {
     border-left: 4px solid #f59e0b;
+  }
+  &.received-row {
+    background: #fafffc;
+    border-color: #bbf7d0;
+  }
+
+  .doc-check-col {
+    display: flex;
+    align-items: center;
+
+    .doc-check-label {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: #64748b;
+    }
   }
 
   .doc-meta-col {
@@ -622,4 +682,5 @@
 .text-amber { color: #d97706; }
 .text-teal { color: #0d9488; }
 .text-green { color: #16a34a; }
+.text-green-bold { color: #16a34a !important; font-weight: 700; }
 .text-gray { color: #64748b; }

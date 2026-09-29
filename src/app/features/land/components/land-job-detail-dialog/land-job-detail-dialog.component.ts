@@ -181,6 +181,12 @@ import { LandJobDialogComponent } from '../land-job-dialog/land-job-dialog.compo
             <div class="tab-pane">
               <div class="docs-list">
                 <div *ngFor="let doc of job.documents; let i = index" class="doc-card">
+                  <div class="doc-check-side">
+                    <mat-checkbox [checked]="doc.received || false" (change)="toggleDocReceivedInDetail(i, $event.checked)" color="primary">
+                      <span class="text-xs font-semibold" [class.text-green]="doc.received">{{ doc.received ? 'Received' : 'Not Received' }}</span>
+                    </mat-checkbox>
+                  </div>
+
                   <div class="doc-main">
                     <div class="doc-title-row">
                       <span class="doc-title">{{ doc.docTypeName }}</span>
@@ -189,7 +195,7 @@ import { LandJobDialogComponent } from '../land-job-dialog/land-job-dialog.compo
 
                     <div class="doc-meta-row">
                       <span class="doc-status" [ngClass]="doc.status.toLowerCase()">
-                        <mat-icon>{{ doc.status === 'Uploaded' ? 'check_circle' : 'hourglass_top' }}</mat-icon>
+                        <mat-icon>{{ (doc.status === 'Uploaded' || doc.received) ? 'check_circle' : 'hourglass_top' }}</mat-icon>
                         {{ doc.status }}
                       </span>
                       <span *ngIf="doc.fileName" class="doc-filename">
@@ -527,6 +533,26 @@ export class LandJobDetailDialogComponent {
   async onStageSelectChange(newStage: LandJobStatus) {
     if (newStage === this.job.status) return;
     await this.advanceStage(newStage);
+  }
+
+  async toggleDocReceivedInDetail(idx: number, received: boolean) {
+    if (!this.job.id || !this.job.documents) return;
+    this.job.documents[idx].received = received;
+    if (received && this.job.documents[idx].status === 'Pending') {
+      this.job.documents[idx].status = this.job.documents[idx].fileName ? 'Uploaded' : 'Verified';
+    } else if (!received && !this.job.documents[idx].fileName) {
+      this.job.documents[idx].status = 'Pending';
+    }
+    try {
+      await this.landService.updateLandJob(
+        this.job.id, 
+        { documents: this.job.documents },
+        `Updated document receipt: ${this.job.documents[idx].docTypeName} -> ${received ? 'Received' : 'Not Received'}`
+      );
+      this.notif.info(`Marked "${this.job.documents[idx].docTypeName}" as ${received ? 'Received' : 'Not Received'}`);
+    } catch (e: any) {
+      this.notif.error('Failed to update receipt status: ' + (e?.message || 'Server error'));
+    }
   }
 
   private dialog = inject(MatDialog);

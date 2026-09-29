@@ -252,13 +252,42 @@
             </div>
           </div>
 
+          <!-- Document Toolbar & Quick Actions -->
+          <div class="docs-toolbar-row">
+            <div class="docs-summary-stat">
+              <span class="stat-tag">
+                Documents Received: <strong>{{ receivedDocsCount() }}</strong> / {{ totalDocsCount() }}
+              </span>
+              <span class="stat-tag mandatory" [class.complete]="allMandatoryUploaded()">
+                Mandatory: <strong>{{ uploadedMandatoryCount() }}</strong> / {{ mandatoryDocsCount() }}
+              </span>
+            </div>
+            <div class="docs-quick-actions">
+              <button mat-button color="primary" type="button" class="sm-txt-btn" (click)="toggleAllDocsReceived(true)">
+                <mat-icon class="sm-icon">done_all</mat-icon> Mark All Received
+              </button>
+              <button mat-button type="button" class="sm-txt-btn text-gray" (click)="toggleAllDocsReceived(false)">
+                Clear All
+              </button>
+            </div>
+          </div>
+
           <div class="doc-checklist-container">
             <div *ngIf="dynamicDocuments().length === 0" class="empty-docs-alert">
               <mat-icon>info</mat-icon>
               <span>No document requirements configured for this job type. You may proceed to verification.</span>
             </div>
 
-            <div *ngFor="let doc of dynamicDocuments(); let i = index" class="doc-item-row" [class.mandatory]="doc.isMandatory">
+            <div *ngFor="let doc of dynamicDocuments(); let i = index" class="doc-item-row" [class.mandatory]="doc.isMandatory" [class.received-row]="doc.received">
+              <!-- Checkbox: Document Received or Not -->
+              <div class="doc-check-col">
+                <mat-checkbox [checked]="doc.received || false" (change)="toggleDocReceived(i, $event.checked)" color="primary">
+                  <span class="doc-check-label" [class.text-green-bold]="doc.received">
+                    {{ doc.received ? 'Received' : 'Not Received' }}
+                  </span>
+                </mat-checkbox>
+              </div>
+
               <div class="doc-meta-col">
                 <div class="doc-header-line">
                   <span class="doc-name">{{ doc.docTypeName }}</span>
@@ -269,7 +298,7 @@
                 <!-- Status indicator -->
                 <div class="doc-status-line">
                   <span class="status-indicator" [ngClass]="doc.status.toLowerCase()">
-                    <mat-icon>{{ doc.status === 'Uploaded' ? 'check_circle' : 'hourglass_empty' }}</mat-icon>
+                    <mat-icon>{{ (doc.status === 'Uploaded' || doc.received) ? 'check_circle' : 'hourglass_empty' }}</mat-icon>
                     {{ doc.status }}
                   </span>
                   <span *ngIf="doc.fileName" class="file-name-text">

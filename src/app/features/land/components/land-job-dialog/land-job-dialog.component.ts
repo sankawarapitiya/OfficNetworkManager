@@ -94,9 +94,11 @@ export class LandJobDialogComponent implements OnInit {
     ).slice(0, 20);
   });
 
-  // Stage 4 summary metrics
+  // Stage 2 & 4 summary metrics
+  totalDocsCount = computed(() => this.dynamicDocuments().length);
   mandatoryDocsCount = computed(() => this.dynamicDocuments().filter(d => d.isMandatory).length);
-  uploadedMandatoryCount = computed(() => this.dynamicDocuments().filter(d => d.isMandatory && d.status === 'Uploaded').length);
+  receivedDocsCount = computed(() => this.dynamicDocuments().filter(d => d.received || d.status === 'Uploaded').length);
+  uploadedMandatoryCount = computed(() => this.dynamicDocuments().filter(d => d.isMandatory && (d.received || d.status === 'Uploaded')).length);
   allMandatoryUploaded = computed(() => this.mandatoryDocsCount() === 0 || this.uploadedMandatoryCount() >= this.mandatoryDocsCount());
 
   currentStageName = computed(() => {
@@ -215,6 +217,7 @@ export class LandJobDialogComponent implements OnInit {
           docTypeId: dt.id,
           docTypeName: dt.name,
           isMandatory: dt.isMandatory,
+          received: false,
           status: 'Pending',
           remarks: ''
         }));
@@ -301,6 +304,31 @@ export class LandJobDialogComponent implements OnInit {
       fileUrl: undefined,
       status: 'Pending'
     };
+    this.dynamicDocuments.set(docs);
+  }
+
+  toggleDocReceived(docIndex: number, received: boolean) {
+    const docs = [...this.dynamicDocuments()];
+    const doc = { ...docs[docIndex], received };
+    if (received && doc.status === 'Pending') {
+      doc.status = doc.fileName ? 'Uploaded' : 'Verified';
+    } else if (!received && !doc.fileName) {
+      doc.status = 'Pending';
+    }
+    docs[docIndex] = doc;
+    this.dynamicDocuments.set(docs);
+  }
+
+  toggleAllDocsReceived(received: boolean) {
+    const docs = this.dynamicDocuments().map(doc => {
+      const updated = { ...doc, received };
+      if (received && updated.status === 'Pending') {
+        updated.status = updated.fileName ? 'Uploaded' : 'Verified';
+      } else if (!received && !updated.fileName) {
+        updated.status = 'Pending';
+      }
+      return updated;
+    });
     this.dynamicDocuments.set(docs);
   }
 
