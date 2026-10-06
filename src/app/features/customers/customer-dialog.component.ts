@@ -1,4 +1,4 @@
-import { Component, Inject, inject, signal } from '@angular/core';
+import { Component, Inject, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
 import { MAT_DIALOG_DATA, MatDialogRef, MatDialogModule } from '@angular/material/dialog';
@@ -6,12 +6,13 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatButtonModule } from '@angular/material/button';
+import { MatAutocompleteModule } from '@angular/material/autocomplete';
 import { Division } from '../settings/settings.service';
 
 @Component({
   selector: 'app-customer-dialog',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, MatDialogModule, MatFormFieldModule, MatInputModule, MatSelectModule, MatButtonModule],
+  imports: [CommonModule, ReactiveFormsModule, MatDialogModule, MatFormFieldModule, MatInputModule, MatSelectModule, MatButtonModule, MatAutocompleteModule],
   template: `
     <h2 mat-dialog-title>Customer Registration</h2>
     <mat-dialog-content>
@@ -38,9 +39,15 @@ import { Division } from '../settings/settings.service';
 
         <mat-form-field appearance="outline" class="full-width">
           <mat-label>Division</mat-label>
-          <mat-select formControlName="division" required>
-            <mat-option *ngFor="let div of data.divisions" [value]="div.name">{{ div.name }}</mat-option>
-          </mat-select>
+          <input matInput formControlName="division" required placeholder="Search Division..."
+                 [matAutocomplete]="divAuto"
+                 (keyup)="divisionFilterText.set($any($event.target).value)"
+                 (focus)="divisionFilterText.set($any($event.target).value)">
+          <mat-autocomplete #divAuto="matAutocomplete">
+            <mat-option *ngFor="let div of filteredDivisions()" [value]="div.name">
+              {{ div.name }} <small style="color: #666;" *ngIf="div.gnCode">({{ div.gnCode }})</small>
+            </mat-option>
+          </mat-autocomplete>
           <mat-error *ngIf="data.divisions.length === 0">No divisions available. Add them in Settings.</mat-error>
         </mat-form-field>
       </form>
@@ -66,6 +73,17 @@ export class CustomerDialogComponent {
   private fb = inject(FormBuilder);
   
   customerForm: FormGroup;
+  divisionFilterText = signal<string>('');
+
+  filteredDivisions = computed(() => {
+    const filter = this.divisionFilterText().toLowerCase().trim();
+    const all = this.data.divisions || [];
+    if (!filter) return all.slice(0, 50);
+    return all.filter(d => 
+      (d.name && d.name.toLowerCase().includes(filter)) ||
+      (d.gnCode && d.gnCode.toLowerCase().includes(filter))
+    ).slice(0, 50);
+  });
 
   constructor(
     @Inject(MAT_DIALOG_DATA) public data: { customer?: any, divisions: Division[] },

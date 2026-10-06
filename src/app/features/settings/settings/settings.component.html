@@ -321,47 +321,152 @@
             </div>
           </mat-card>
 
-          <!-- Card: Office Divisions -->
+          <!-- Card: Regional Settings & GN Divisions -->
           <mat-card class="settings-card">
             <div class="card-header">
               <div class="header-left">
                 <div class="icon-avatar slate"><mat-icon>location_city</mat-icon></div>
                 <div>
-                  <h2>Office Divisions</h2>
-                  <p>Operational regional administrative divisions across customer branches, parcels, and land files</p>
+                  <h2>Regional Settings & GN Divisions</h2>
+                  <p>Configure system default region and import GN Division lists for administration</p>
                 </div>
               </div>
               <div class="header-right">
-                <span class="count-badge">{{ divisions().length }} Divisions</span>
+                <span class="count-badge">{{ divisions().length }} GN Divisions</span>
               </div>
             </div>
 
             <div class="card-body">
-              <div class="add-division-row">
-                <mat-form-field appearance="outline" class="division-input">
-                  <mat-label>New Division Name</mat-label>
-                  <input matInput [(ngModel)]="newDivisionName" placeholder="e.g. Central Capital District">
-                </mat-form-field>
-                <button mat-flat-button color="primary" (click)="addDivision()" [disabled]="!newDivisionName.trim()" class="add-div-btn">
-                  <mat-icon>add</mat-icon> Add Division
-                </button>
-              </div>
+              
+              <div class="defaults-section">
+                <h4 style="margin-bottom: 12px; font-weight: 500;">System Regional Defaults</h4>
+                <div class="form-grid-row" style="display: flex; gap: 16px; align-items: flex-start;">
+                  <mat-form-field appearance="outline" style="flex: 1;">
+                    <mat-label>Default Province</mat-label>
+                    <mat-select [ngModel]="defaultProvince()" (ngModelChange)="defaultProvince.set($event); defaultDistrict.set(''); defaultDS.set('')">
+                      <mat-option value="">-- None --</mat-option>
+                      <mat-option *ngFor="let p of availableProvinces()" [value]="p">{{ p }}</mat-option>
+                    </mat-select>
+                  </mat-form-field>
 
-              <div class="divisions-chips-list">
-                <div class="division-chip-item" *ngFor="let div of divisions()">
-                  <div class="div-info">
-                    <mat-icon class="div-icon">domain</mat-icon>
-                    <span class="div-name">{{ div.name }}</span>
+                  <mat-form-field appearance="outline" style="flex: 1;">
+                    <mat-label>Default District</mat-label>
+                    <mat-select [ngModel]="defaultDistrict()" (ngModelChange)="defaultDistrict.set($event); defaultDS.set('')" [disabled]="!defaultProvince()">
+                      <mat-option value="">-- None --</mat-option>
+                      <mat-option *ngFor="let d of availableDistricts()" [value]="d">{{ d }}</mat-option>
+                    </mat-select>
+                  </mat-form-field>
+
+                  <mat-form-field appearance="outline" style="flex: 1;">
+                    <mat-label>Default Divisional Secretariat</mat-label>
+                    <mat-select [ngModel]="defaultDS()" (ngModelChange)="defaultDS.set($event)" [disabled]="!defaultDistrict()">
+                      <mat-option value="">-- None --</mat-option>
+                      <mat-option *ngFor="let ds of availableDS()" [value]="ds">{{ ds }}</mat-option>
+                    </mat-select>
+                  </mat-form-field>
+                  
+                  <div class="default-save-col" style="padding-top: 8px;">
+                    <button mat-flat-button color="primary" (click)="saveSystemDefaults()" [disabled]="isSavingDefaults">
+                      <mat-icon>save</mat-icon> Save Defaults
+                    </button>
                   </div>
-                  <button mat-icon-button (click)="deleteDivision(div)" matTooltip="Remove Division" class="remove-div-btn">
-                    <mat-icon>close</mat-icon>
+                </div>
+              </div>
+              
+              <hr style="margin: 24px 0; border: none; border-top: 1px solid #e0e0e0;" />
+
+              <div class="gn-divisions-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 16px; flex-wrap: wrap; gap: 16px;">
+                <h4 style="margin: 0; font-weight: 500;">GN Divisions List</h4>
+                
+                <mat-form-field appearance="outline" style="width: 300px; margin-bottom: -1.25em;">
+                  <mat-label>Filter/Search GN Divisions</mat-label>
+                  <input matInput (keyup)="applyFilter($event)" placeholder="e.g. Colombo" #input>
+                  <mat-icon matSuffix>search</mat-icon>
+                </mat-form-field>
+
+                <div class="actions" style="display: flex; gap: 8px;">
+                  <button mat-stroked-button color="warn" (click)="clearAllDivisions()" [disabled]="isUploadingExcel || divisions().length === 0">
+                    <mat-icon>delete_sweep</mat-icon> Clear All
+                  </button>
+                  <input type="file" #excelUpload style="display: none" accept=".xlsx, .xls" (change)="onExcelFileUpload($event)">
+                  <button mat-stroked-button color="primary" (click)="excelUpload.click()" [disabled]="isUploadingExcel">
+                    <mat-icon>upload_file</mat-icon> {{ isUploadingExcel ? 'Processing...' : 'Bulk Import from Excel' }}
                   </button>
                 </div>
               </div>
 
+              <div class="add-division-row" style="display: flex; gap: 16px; margin-bottom: 16px;">
+                <mat-form-field appearance="outline" class="division-input" style="flex: 1;">
+                  <mat-label>Quick Add GN Division (Name)</mat-label>
+                  <input matInput [(ngModel)]="newDivisionName" placeholder="e.g. Cinnamon Gardens">
+                </mat-form-field>
+                <div style="padding-top: 8px;">
+                  <button mat-flat-button color="primary" (click)="addDivision()" [disabled]="!newDivisionName.trim()" class="add-div-btn">
+                    <mat-icon>add</mat-icon> Add Single
+                  </button>
+                </div>
+              </div>
+
+              <div class="mat-elevation-z2" style="border-radius: 8px; overflow: hidden; margin-bottom: 16px;" *ngIf="divisions().length > 0">
+                <table mat-table [dataSource]="dataSource" matSort style="width: 100%;">
+
+                  <!-- GN Code Column -->
+                  <ng-container matColumnDef="gnCode">
+                    <th mat-header-cell *matHeaderCellDef mat-sort-header> GN Code </th>
+                    <td mat-cell *matCellDef="let element"> {{element.gnCode || '-'}} </td>
+                  </ng-container>
+
+                  <!-- Name Column -->
+                  <ng-container matColumnDef="name">
+                    <th mat-header-cell *matHeaderCellDef mat-sort-header> Name </th>
+                    <td mat-cell *matCellDef="let element"> 
+                      <strong>{{element.name}}</strong> 
+                    </td>
+                  </ng-container>
+
+                  <!-- Province Column -->
+                  <ng-container matColumnDef="province">
+                    <th mat-header-cell *matHeaderCellDef mat-sort-header> Province </th>
+                    <td mat-cell *matCellDef="let element"> {{element.province || '-'}} </td>
+                  </ng-container>
+
+                  <!-- District Column -->
+                  <ng-container matColumnDef="district">
+                    <th mat-header-cell *matHeaderCellDef mat-sort-header> District </th>
+                    <td mat-cell *matCellDef="let element"> {{element.district || '-'}} </td>
+                  </ng-container>
+
+                  <!-- DS Column -->
+                  <ng-container matColumnDef="divisionalSecretariat">
+                    <th mat-header-cell *matHeaderCellDef mat-sort-header> Div. Secretariat </th>
+                    <td mat-cell *matCellDef="let element"> {{element.divisionalSecretariat || '-'}} </td>
+                  </ng-container>
+
+                  <!-- Actions Column -->
+                  <ng-container matColumnDef="actions">
+                    <th mat-header-cell *matHeaderCellDef></th>
+                    <td mat-cell *matCellDef="let element" style="text-align: right;">
+                      <button mat-icon-button (click)="deleteDivision(element)" matTooltip="Remove Division" color="warn">
+                        <mat-icon>delete</mat-icon>
+                      </button>
+                    </td>
+                  </ng-container>
+
+                  <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+                  <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+                  
+                  <!-- Row shown when there is no matching data. -->
+                  <tr class="mat-row" *matNoDataRow>
+                    <td class="mat-cell" colspan="6" style="padding: 16px; text-align: center;">No data matching the filter</td>
+                  </tr>
+                </table>
+
+                <mat-paginator [pageSizeOptions]="[10, 25, 50, 100]" [pageSize]="25" aria-label="Select page of GN Divisions"></mat-paginator>
+              </div>
+
               <div class="empty-state-box mini" *ngIf="divisions().length === 0">
                 <mat-icon>domain_disabled</mat-icon>
-                <span>No divisions configured. Type a division name above and click Add Division.</span>
+                <span>No GN Divisions configured. Upload an Excel file or add one manually.</span>
               </div>
             </div>
           </mat-card>

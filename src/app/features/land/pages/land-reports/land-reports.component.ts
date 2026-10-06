@@ -13,6 +13,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 
 import { LandService } from '../../services/land.service';
 import { LandJob, LandSettings, DEFAULT_LAND_SETTINGS } from '../../models/land.model';
+import { SettingsService, Division } from '../../../settings/settings.service';
 
 @Component({
   selector: 'app-land-reports',
@@ -69,10 +70,9 @@ import { LandJob, LandSettings, DEFAULT_LAND_SETTINGS } from '../../models/land.
 
           <!-- Division Filter -->
           <mat-form-field appearance="outline" class="compact-field" subscriptSizing="dynamic">
-            <mat-label>Division</mat-label>
-            <mat-select [ngModel]="selectedDivision()" (ngModelChange)="selectedDivision.set($event)">
-              <mat-option value="ALL">All Divisions</mat-option>
-              <mat-option *ngFor="let div of settings().divisions" [value]="div">
+            <mat-label>DS Division</mat-label>
+            <mat-select multiple placeholder="All DS Divisions" [ngModel]="selectedDivisions()" (ngModelChange)="selectedDivisions.set($event)">
+              <mat-option *ngFor="let div of uniqueAdminDivisions()" [value]="div">
                 {{ div }}
               </mat-option>
             </mat-select>
@@ -325,23 +325,45 @@ import { LandJob, LandSettings, DEFAULT_LAND_SETTINGS } from '../../models/land.
 })
 export class LandReportsComponent implements OnInit {
   private landService = inject(LandService);
+  private settingsService = inject(SettingsService);
 
   jobs = signal<LandJob[]>([]);
   settings = signal<LandSettings>(DEFAULT_LAND_SETTINGS);
+  allDivisions = signal<Division[]>([]);
 
   dateFrom = signal<Date | null>(null);
   dateTo = signal<Date | null>(null);
-  selectedDivision = signal<string>('ALL');
+  selectedDivisions = signal<string[]>([]);
   selectedJobType = signal<string>('ALL');
   selectedStage = signal<string>('ALL');
 
   todayStr = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
 
+  uniqueAdminDivisions = computed(() => {
+    const divs = this.allDivisions();
+    const set = new Set<string>();
+    
+    const enOnly = (s?: string) => {
+      if (!s) return '';
+      return s.replace(/[^\x20-\x7E]/g, '')
+              .replace(/\//g, '')
+              .replace(/(^[\s-]+|[\s-]+$)/g, '')
+              .replace(/\s{2,}/g, ' ')
+              .trim();
+    };
+
+    for (const d of divs) {
+      const ds = enOnly(d.divisionalSecretariat);
+      if (ds) set.add(ds);
+    }
+    return Array.from(set).sort();
+  });
+
   filteredJobs = computed(() => {
     let list = this.jobs();
     const from = this.dateFrom();
     const to = this.dateTo();
-    const div = this.selectedDivision();
+    const divs = this.selectedDivisions();
     const jt = this.selectedJobType();
     const st = this.selectedStage();
 
@@ -353,8 +375,8 @@ export class LandReportsComponent implements OnInit {
       const toMs = new Date(to).setHours(23, 59, 59, 999);
       list = list.filter(j => j.createdAt <= toMs);
     }
-    if (div !== 'ALL') {
-      list = list.filter(j => j.division === div);
+    if (divs && divs.length > 0) {
+      list = list.filter(j => divs.includes(j.division));
     }
     if (jt !== 'ALL') {
       list = list.filter(j => j.jobTypeId === jt);
@@ -385,12 +407,15 @@ export class LandReportsComponent implements OnInit {
     this.landService.getLandJobs().subscribe({
       next: (data) => this.jobs.set(data || [])
     });
+    this.settingsService.getDivisions().subscribe({
+      next: (data) => this.allDivisions.set(data || [])
+    });
   }
 
   resetFilters() {
     this.dateFrom.set(null);
     this.dateTo.set(null);
-    this.selectedDivision.set('ALL');
+    this.selectedDivisions.set([]);
     this.selectedJobType.set('ALL');
     this.selectedStage.set('ALL');
   }

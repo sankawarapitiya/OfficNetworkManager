@@ -89,7 +89,7 @@
 
             <!-- Existing Customer Autocomplete -->
             <div class="customer-picker-row" *ngIf="!selectedCustomerName()">
-              <mat-form-field appearance="outline" class="w-full search-cust-field">
+              <mat-form-field appearance="outline" class="w-full search-cust-field" style="flex: 1;">
                 <mat-label>Search & Select Registered Citizen (Auto-fills form)</mat-label>
                 <input matInput 
                        [ngModel]="customerFilterText()" 
@@ -106,6 +106,10 @@
                   </mat-option>
                 </mat-autocomplete>
               </mat-form-field>
+
+              <button mat-flat-button color="primary" type="button" style="height: 54px; padding: 0 24px;" (click)="openNewCustomerDialog()">
+                <mat-icon>person_add</mat-icon> Add
+              </button>
             </div>
 
             <!-- Active Selected Customer Pill -->
@@ -163,14 +167,19 @@
             </div>
 
             <div class="grid-3-col">
-              <!-- Division Dropdown (Dynamic from Settings) -->
+              <!-- Administrative Division Typeahead -->
               <mat-form-field appearance="outline">
                 <mat-label>Administrative Division {{ isFieldRequired('division') ? '*' : '' }}</mat-label>
-                <mat-select formControlName="division">
-                  <mat-option *ngFor="let div of settings().divisions" [value]="div">
-                    {{ div }}
+                <input matInput formControlName="division" placeholder="Search Divisional Secretariat..." 
+                       [matAutocomplete]="adminAuto" 
+                       (keyup)="adminFilterText.set($any($event.target).value)" 
+                       (focus)="adminFilterText.set($any($event.target).value)">
+                <mat-autocomplete #adminAuto="matAutocomplete">
+                  <mat-option *ngFor="let admin of filteredAdminDivisions()" [value]="admin">
+                    {{ admin }}
                   </mat-option>
-                </mat-select>
+                </mat-autocomplete>
+                <mat-hint>Pre-filled from Regional Defaults</mat-hint>
                 <mat-error *ngIf="initialForm.get('division')?.invalid">Division is required</mat-error>
               </mat-form-field>
 
@@ -210,9 +219,15 @@
                 <mat-error *ngIf="initialForm.get('landName')?.invalid">Parcel name is required</mat-error>
               </mat-form-field>
 
+              <!-- GN Division Typeahead -->
               <mat-form-field appearance="outline">
                 <mat-label>Grama Niladhari (GN) Division {{ isFieldRequired('gramaNiladhariDivision') ? '*' : '' }}</mat-label>
-                <input matInput formControlName="gramaNiladhariDivision" placeholder="e.g. GN-542 Malabe North">
+                <input matInput formControlName="gramaNiladhariDivision" placeholder="Search GN Division..." [matAutocomplete]="gnAuto" (keyup)="gnFilterText.set($any($event.target).value)" (focus)="gnFilterText.set($any($event.target).value)">
+                <mat-autocomplete #gnAuto="matAutocomplete">
+                  <mat-option *ngFor="let div of filteredGNDivisions()" [value]="div.gnCode ? div.gnCode + ' - ' + div.name : div.name">
+                    {{ div.name }} <small style="color: #666;" *ngIf="div.gnCode">({{ div.gnCode }})</small>
+                  </mat-option>
+                </mat-autocomplete>
                 <mat-error *ngIf="initialForm.get('gramaNiladhariDivision')?.invalid">GN Division is required</mat-error>
               </mat-form-field>
 

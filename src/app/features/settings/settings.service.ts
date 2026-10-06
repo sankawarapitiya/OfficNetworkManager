@@ -24,7 +24,22 @@ export interface IssueType {
 
 export interface Division {
   id?: string;
-  name: string;
+  name: string; // Used as display name (could be English)
+  lifeCode?: string;
+  gnCode?: string;
+  nameSinhala?: string;
+  nameTamil?: string;
+  nameEnglish?: string;
+  mpaCode?: string;
+  province?: string;
+  district?: string;
+  divisionalSecretariat?: string;
+}
+
+export interface SystemDefaults {
+  province?: string;
+  district?: string;
+  divisionalSecretariat?: string;
 }
 
 export interface Department {
@@ -199,5 +214,14 @@ export class SettingsService {
     } else {
       await this.firestoreService.addDocument('settings_issue_types', issueType);
     }
+  }
+
+  // -- System Defaults --
+  getSystemDefaults(): Observable<SystemDefaults | undefined> {
+    return this.firestoreService.getDocument<SystemDefaults>('settings/system_defaults');
+  }
+
+  async saveSystemDefaults(defaults: SystemDefaults): Promise<void> {
+    await this.firestoreService.setDocument('settings', 'system_defaults', defaults);
   }
 }

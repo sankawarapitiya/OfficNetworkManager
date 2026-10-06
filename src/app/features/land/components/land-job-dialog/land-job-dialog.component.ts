@@ -1,7 +1,7 @@
 import { Component, Inject, OnInit, ViewChild, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule, FormsModule } from '@angular/forms';
-import { MAT_DIALOG_DATA, MatDialogRef, MatDialogModule } from '@angular/material/dialog';
+import { MAT_DIALOG_DATA, MatDialogRef, MatDialogModule, MatDialog } from '@angular/material/dialog';
 import { MatStepper, MatStepperModule } from '@angular/material/stepper';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
@@ -16,6 +16,8 @@ import { MatProgressBarModule } from '@angular/material/progress-bar';
 
 import { LandService } from '../../services/land.service';
 import { CustomerService, Customer } from '../../../customers/services/customer.service';
+import { CustomerDialogComponent } from '../../../customers/customer-dialog.component';
+import { SettingsService, Division, SystemDefaults } from '../../../settings/settings.service';
 import { NotificationService } from '../../../../core/services/notification.service';
 import { 
   LandJob, 
@@ -57,11 +59,73 @@ export class LandJobDialogComponent implements OnInit {
   private fb = inject(FormBuilder);
   private landService = inject(LandService);
   private customerService = inject(CustomerService);
+  private settingsService = inject(SettingsService);
   private notif = inject(NotificationService);
   private dialogRef = inject(MatDialogRef<LandJobDialogComponent>);
+  private dialog = inject(MatDialog);
 
   existingJob: LandJob | null = null;
   isEditMode = signal<boolean>(false);
+
+  // Administrative Divisions mapping
+  systemDefaults = signal<SystemDefaults | null>(null);
+  allDivisions = signal<Division[]>([]);
+  gnFilterText = signal<string>('');
+  filteredGNDivisions = computed(() => {
+    const filter = this.gnFilterText().toLowerCase().trim();
+    let divs = this.allDivisions();
+
+    const enOnly = (s?: string) => {
+      if (!s) return '';
+      return s.replace(/[^\x20-\x7E]/g, '').replace(/\//g, '').replace(/(^[\s-]+|[\s-]+$)/g, '').replace(/\s{2,}/g, ' ').trim();
+    };
+
+    const adminDiv = this.initialForm?.get('division')?.value || '';
+    
+    // Filter by DS if adminDiv is set
+    if (adminDiv) {
+      divs = divs.filter(d => enOnly(d.divisionalSecretariat) === adminDiv);
+    }
+
+    if (filter) {
+      divs = divs.filter(d => 
+        (d.name && d.name.toLowerCase().includes(filter)) ||
+        (d.gnCode && d.gnCode.toLowerCase().includes(filter))
+      );
+    }
+    return divs.slice(0, 50); // Limit dropdown size
+  });
+
+  adminFilterText = signal<string>('');
+  
+  uniqueAdminDivisions = computed(() => {
+    const divs = this.allDivisions();
+    const set = new Set<string>();
+    
+    const enOnly = (s?: string) => {
+      if (!s) return '';
+      return s.replace(/[^\x20-\x7E]/g, '')
+              .replace(/\//g, '')
+              .replace(/(^[\s-]+|[\s-]+$)/g, '')
+              .replace(/\s{2,}/g, ' ')
+              .trim();
+    };
+
+    for (const d of divs) {
+      const ds = enOnly(d.divisionalSecretariat);
+      if (ds) {
+        set.add(ds);
+      }
+    }
+    return Array.from(set).sort();
+  });
+
+  filteredAdminDivisions = computed(() => {
+    const filter = this.adminFilterText().toLowerCase().trim();
+    const all = this.uniqueAdminDivisions();
+    if (!filter) return all.slice(0, 50);
+    return all.filter(a => a.toLowerCase().includes(filter)).slice(0, 50);
+  });
 
   settings = signal<LandSettings>(DEFAULT_LAND_SETTINGS);
   availableCustomers = signal<Customer[]>([]);
@@ -167,7 +231,7 @@ export class LandJobDialogComponent implements OnInit {
       sizeSqm: [ej?.sizeSqm || null],
       extentText: [ej?.extentText || ''],
       locationAddress: [ej?.locationAddress || ''],
-      division: [ej?.division || ''],
+      division: [ej?.division ? ej.division.split('/').pop()?.trim() : ''],
       gramaNiladhariDivision: [ej?.gramaNiladhariDivision || ''],
       gpsCoordinates: [ej?.gpsCoordinates || ''],
       priority: [ej?.priority || 'Normal'],
@@ -226,6 +290,20 @@ export class LandJobDialogComponent implements OnInit {
         this.availableCustomers.set(custs || []);
       }
     });
+
+    this.settingsService.getSystemDefaults().subscribe(defaults => {
+      this.systemDefaults.set(defaults || null);
+      if (defaults && !this.existingJob) {
+        if (defaults.divisionalSecretariat) {
+          const enOnly = (s: string) => s.replace(/[^\x20-\x7E]/g, '').replace(/\//g, '').replace(/(^[\s-]+|[\s-]+$)/g, '').replace(/\s{2,}/g, ' ').trim();
+          this.initialForm.patchValue({ division: enOnly(defaults.divisionalSecretariat) });
+        }
+      }
+    });
+
+    this.settingsService.getDivisions().subscribe(divs => {
+      this.allDivisions.set(divs);
+    });
   }
 
   onStepChange(event: any) {
@@ -278,7 +356,7 @@ export class LandJobDialogComponent implements OnInit {
       customerNic: customer.nic || '',
       customerPhone: customer.tpno || '',
       customerAddress: customer.address || '',
-      division: customer.division || this.initialForm.get('division')?.value || ''
+      gramaNiladhariDivision: customer.division || ''
     });
     this.notif.info(`Loaded citizen profile: ${customer.name}`);
   }
@@ -292,6 +370,35 @@ export class LandJobDialogComponent implements OnInit {
       customerNic: '',
       customerPhone: '',
       customerAddress: ''
+    });
+  }
+
+  async openNewCustomerDialog() {
+    const dialogRef = this.dialog.open(CustomerDialogComponent, {
+      width: '500px',
+      data: { divisions: this.allDivisions() }
+    });
+
+    dialogRef.afterClosed().subscribe(async (result) => {
+      if (result) {
+        try {
+          const id = await this.customerService.addCustomer(result);
+          this.notif.success('Citizen registered successfully');
+          
+          this.selectedCustomerName.set(result.name);
+          this.initialForm.patchValue({
+            customerId: id,
+            customerName: result.name,
+            customerNic: result.nic,
+            customerPhone: result.tpno,
+            customerAddress: result.address,
+            gramaNiladhariDivision: result.division || ''
+          });
+        } catch (error) {
+          console.error('Error creating customer:', error);
+          this.notif.error('Failed to register citizen');
+        }
+      }
     });
   }
 

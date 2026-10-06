@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, signal, computed } from '@angular/core';
+import { Component, inject, OnInit, signal, computed, ViewChild, AfterViewInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { SettingsService, Division, Department, DynamicSchema, DynamicField } from './../settings.service';
@@ -16,6 +16,10 @@ import { MatTabsModule } from '@angular/material/tabs';
 import { MatExpansionModule } from '@angular/material/expansion';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatSelectModule } from '@angular/material/select';
+import { MatPaginatorModule, MatPaginator } from '@angular/material/paginator';
+import { MatTableModule, MatTableDataSource } from '@angular/material/table';
+import { MatSortModule, MatSort } from '@angular/material/sort';
+import * as XLSX from 'xlsx';
 
 import { EventLogService } from '../../../core/services/event-log.service';
 import { FirestoreService } from '../../../core/services/firestore.service';
@@ -54,12 +58,15 @@ export interface SystemUserOption {
     MatTabsModule,
     MatExpansionModule,
     MatCheckboxModule,
-    MatSelectModule
+    MatSelectModule,
+    MatPaginatorModule,
+    MatTableModule,
+    MatSortModule
   ],
   templateUrl: './settings.component.html',
   styleUrl: './settings.component.scss'
 })
-export class SettingsComponent implements OnInit {
+export class SettingsComponent implements OnInit, AfterViewInit {
   private settingsService = inject(SettingsService);
   private firestoreService = inject(FirestoreService);
   private eventLogService = inject(EventLogService);
@@ -93,7 +100,53 @@ export class SettingsComponent implements OnInit {
 
   // Divisions state
   divisions = signal<Division[]>([]);
+  displayedColumns = ['gnCode', 'name', 'province', 'district', 'divisionalSecretariat', 'actions'];
+  dataSource = new MatTableDataSource<Division>([]);
+  
+  @ViewChild(MatPaginator) paginator!: MatPaginator;
+  @ViewChild(MatSort) sort!: MatSort;
+
   newDivisionName = '';
+  isUploadingExcel = false;
+  searchFilter = '';
+
+  // System Defaults state
+  defaultProvince = signal<string>('');
+  defaultDistrict = signal<string>('');
+  defaultDS = signal<string>('');
+  isSavingDefaults = false;
+
+  // Computed available choices for defaults based on data
+  availableProvinces = computed(() => {
+    const divs = this.divisions();
+    const set = new Set(divs.map(d => this.enOnly(d.province)).filter(p => !!p));
+    return Array.from(set).sort();
+  });
+
+  availableDistricts = computed(() => {
+    const divs = this.divisions();
+    const currentProv = this.defaultProvince();
+    const filtered = currentProv ? divs.filter(d => this.enOnly(d.province) === currentProv) : divs;
+    const set = new Set(filtered.map(d => this.enOnly(d.district)).filter(p => !!p));
+    return Array.from(set).sort();
+  });
+
+  availableDS = computed(() => {
+    const divs = this.divisions();
+    const currentDist = this.defaultDistrict();
+    const filtered = currentDist ? divs.filter(d => this.enOnly(d.district) === currentDist) : divs;
+    const set = new Set(filtered.map(d => this.enOnly(d.divisionalSecretariat)).filter(p => !!p));
+    return Array.from(set).sort();
+  });
+
+  private enOnly(s?: string): string {
+    if (!s) return '';
+    return s.replace(/[^\x20-\x7E]/g, '')
+            .replace(/\//g, '')
+            .replace(/(^[\s-]+|[\s-]+$)/g, '')
+            .replace(/\s{2,}/g, ' ')
+            .trim();
+  }
 
   // Departments state
   departments = signal<Department[]>([]);
@@ -152,6 +205,7 @@ export class SettingsComponent implements OnInit {
 
   ngOnInit() {
     this.loadDivisions();
+    this.loadSystemDefaults();
     this.loadDepartments();
     this.loadSystemUsers();
     this.loadRolePermissions();
@@ -381,12 +435,166 @@ export class SettingsComponent implements OnInit {
   }
 
   // --- Department & Division Operations ---
+  
+  ngAfterViewInit() {
+    this.dataSource.paginator = this.paginator;
+    this.dataSource.sort = this.sort;
+  }
+
+  applyFilter(event: Event) {
+    const filterValue = (event.target as HTMLInputElement).value;
+    this.dataSource.filter = filterValue.trim().toLowerCase();
+    
+    if (this.dataSource.paginator) {
+      this.dataSource.paginator.firstPage();
+    }
+  }
+
+  loadSystemDefaults() {
+    this.settingsService.getSystemDefaults().subscribe({
+      next: (defaults) => {
+        if (defaults) {
+          this.defaultProvince.set(defaults.province || '');
+          this.defaultDistrict.set(defaults.district || '');
+          this.defaultDS.set(defaults.divisionalSecretariat || '');
+        }
+      },
+      error: (err) => console.error('Error loading system defaults', err)
+    });
+  }
+
+  async saveSystemDefaults() {
+    this.isSavingDefaults = true;
+    try {
+      await this.settingsService.saveSystemDefaults({
+        province: this.defaultProvince(),
+        district: this.defaultDistrict(),
+        divisionalSecretariat: this.defaultDS()
+      });
+      this.snackBar.open('System defaults saved successfully', 'Dismiss', { duration: 3000 });
+    } catch (error) {
+      console.error('Error saving system defaults', error);
+      this.snackBar.open('Error saving system defaults', 'Dismiss', { duration: 3000 });
+    } finally {
+      this.isSavingDefaults = false;
+    }
+  }
 
   loadDivisions() {
     this.settingsService.getDivisions().subscribe({
-      next: (data) => this.divisions.set(data),
+      next: (data) => {
+        this.divisions.set(data);
+        this.dataSource.data = data;
+      },
       error: (err) => console.error('Error loading divisions', err)
     });
+  }
+
+  async clearAllDivisions() {
+    if (!confirm('Are you sure you want to delete ALL GN Divisions? This cannot be undone.')) return;
+    
+    this.isUploadingExcel = true;
+    try {
+      const all = this.divisions();
+      let count = 0;
+      const chunkSize = 50;
+      for (let i = 0; i < all.length; i += chunkSize) {
+        const chunk = all.slice(i, i + chunkSize);
+        await Promise.all(chunk.map(div => {
+          if (div.id) {
+            return this.settingsService.deleteDivision(div.id);
+          }
+          return Promise.resolve();
+        }));
+        count += chunk.length;
+      }
+      this.snackBar.open(`Successfully deleted ${count} GN Divisions`, 'Dismiss', { duration: 3000 });
+      this.eventLogService.logAction('DELETED', 'Settings', 'Cleared all GN Divisions');
+    } catch (e) {
+      console.error(e);
+      this.snackBar.open('Error deleting divisions', 'Dismiss', { duration: 3000 });
+    } finally {
+      this.isUploadingExcel = false;
+    }
+  }
+
+  async onExcelFileUpload(event: any) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    this.isUploadingExcel = true;
+    const reader = new FileReader();
+    reader.onload = async (e: any) => {
+      try {
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const firstSheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheetName];
+        
+        // Convert Excel data to JSON
+        const jsonData = XLSX.utils.sheet_to_json(worksheet) as any[];
+
+        const importedDivisions: Division[] = [];
+        const normalizeKey = (key: string) => key ? key.toLowerCase().replace(/[^a-z0-9]/g, '') : '';
+        const enOnly = (s: any) => {
+          if (!s) return undefined;
+          return String(s).replace(/[^\x20-\x7E]/g, '')
+                          .replace(/\//g, '')
+                          .replace(/(^[\s-]+|[\s-]+$)/g, '')
+                          .replace(/\s{2,}/g, ' ')
+                          .trim() || undefined;
+        };
+
+        for (const rawRow of jsonData) {
+          const row: any = {};
+          for (const key of Object.keys(rawRow)) {
+            row[normalizeKey(key)] = rawRow[key];
+          }
+
+          const gnCodeStr = row['gncode'] ? String(row['gncode']).trim() : undefined;
+          const lifeCodeStr = row['lifecode'] ? String(row['lifecode']).trim() : undefined;
+          const mpaCodeStr = row['mpacode'] ? String(row['mpacode']).trim() : undefined;
+          
+          if (!gnCodeStr && !row['nameinenglish']) continue;
+
+          importedDivisions.push({
+            name: enOnly(row['nameinenglish']) || 'Unknown GN Division',
+            lifeCode: lifeCodeStr,
+            gnCode: gnCodeStr,
+            nameEnglish: enOnly(row['nameinenglish']),
+            mpaCode: mpaCodeStr,
+            province: enOnly(row['province']),
+            district: enOnly(row['district']),
+            divisionalSecretariat: enOnly(row['divisionalsecretariat'])
+          });
+        }
+
+        if (importedDivisions.length === 0) {
+          this.snackBar.open('No valid data found in Excel. Check headers!', 'Dismiss', { duration: 4000 });
+          return;
+        }
+
+        // Process in chunks to prevent UI freeze and network timeout
+        let addedCount = 0;
+        const chunkSize = 50;
+        for (let i = 0; i < importedDivisions.length; i += chunkSize) {
+          const chunk = importedDivisions.slice(i, i + chunkSize);
+          await Promise.all(chunk.map(div => this.settingsService.addDivision(div)));
+          addedCount += chunk.length;
+        }
+        
+        this.eventLogService.logAction('CREATED', 'Settings', `Imported ${addedCount} GN Divisions from Excel`);
+        this.snackBar.open(`Successfully imported ${addedCount} GN Divisions`, 'Dismiss', { duration: 4000 });
+        
+      } catch (error) {
+        console.error('Error processing Excel file', error);
+        this.snackBar.open('Failed to import Excel file. Please check the format.', 'Dismiss', { duration: 4000 });
+      } finally {
+        this.isUploadingExcel = false;
+        event.target.value = null;
+      }
+    };
+    reader.readAsArrayBuffer(file);
   }
 
   loadDepartments() {
