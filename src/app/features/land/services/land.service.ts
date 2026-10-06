@@ -1,5 +1,5 @@
 import { Injectable, inject } from '@angular/core';
-import { Observable, from, of, firstValueFrom } from 'rxjs';
+import { Observable, from, of, firstValueFrom, BehaviorSubject } from 'rxjs';
 import { map, catchError } from 'rxjs/operators';
 import { Storage, ref, uploadBytes, getDownloadURL } from '@angular/fire/storage';
 import { FirestoreService } from '../../../core/services/firestore.service';
@@ -13,6 +13,8 @@ import {
   DEFAULT_LAND_SETTINGS, 
   generateLandJobRef 
 } from '../models/land.model';
+
+const LAND_SETTINGS_STORAGE_KEY = 'donm_land_settings';
 
 export interface LandRecord {
   id?: string;
@@ -48,6 +50,42 @@ export class LandService {
   private readonly jobsCollection = 'land_jobs';
   private readonly auditCollection = 'land_audit';
   private readonly settingsDoc = 'settings/land_config';
+
+  private settingsSubject = new BehaviorSubject<LandSettings>(this.loadLocalSettings());
+
+  constructor() {
+    this.initSettingsListener();
+  }
+
+  private loadLocalSettings(): LandSettings {
+    try {
+      const saved = localStorage.getItem(LAND_SETTINGS_STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return { ...DEFAULT_LAND_SETTINGS, ...parsed };
+      }
+    } catch (e) {
+      console.warn('Failed to read land settings from local storage:', e);
+    }
+    return { ...DEFAULT_LAND_SETTINGS };
+  }
+
+  private initSettingsListener() {
+    this.firestoreService.getDocument<LandSettings>(this.settingsDoc).subscribe({
+      next: (s) => {
+        if (s) {
+          const merged: LandSettings = { ...DEFAULT_LAND_SETTINGS, ...s };
+          this.settingsSubject.next(merged);
+          try {
+            localStorage.setItem(LAND_SETTINGS_STORAGE_KEY, JSON.stringify(merged));
+          } catch {}
+        }
+      },
+      error: (err) => {
+        console.warn('Firestore settings fetch issue, using local settings:', err);
+      }
+    });
+  }
 
   // ----------------------------------------------------
   // Legacy compatibility methods
@@ -100,17 +138,8 @@ export class LandService {
     const officerName = user?.displayName || user?.email || 'Land Officer';
     const officerId = user?.uid || 'system';
 
-    // Retrieve settings to generate sequence reference
-    let settings = DEFAULT_LAND_SETTINGS;
-    try {
-      const dbSettings = await firstValueFrom(this.firestoreService.getDocument<LandSettings>(this.settingsDoc));
-      if (dbSettings) {
-        settings = { ...DEFAULT_LAND_SETTINGS, ...dbSettings };
-      }
-    } catch {
-      // Fallback to default settings
-    }
-
+    // Retrieve current settings from reactive cache / subject
+    const settings = this.settingsSubject.getValue() || DEFAULT_LAND_SETTINGS;
     const jobRef = generateLandJobRef(settings);
     const now = Date.now();
 
@@ -125,9 +154,9 @@ export class LandService {
 
     const docId = await this.firestoreService.addDocument(this.jobsCollection, newJob);
 
-    // Increment nextSeq in settings
+    // Increment nextSeq in settings and persist
     try {
-      await this.firestoreService.setDocument('settings', 'land_config', {
+      await this.saveSettings({
         ...settings,
         nextSeq: (settings.nextSeq || 1) + 1
       });
@@ -314,14 +343,38 @@ export class LandService {
   // ----------------------------------------------------
 
   getSettings(): Observable<LandSettings> {
-    return this.firestoreService.getDocument<LandSettings>(this.settingsDoc).pipe(
-      map(s => s ? { ...DEFAULT_LAND_SETTINGS, ...s } : DEFAULT_LAND_SETTINGS),
-      catchError(() => of(DEFAULT_LAND_SETTINGS))
-    );
+    return this.settingsSubject.asObservable();
+  }
+
+  getSettingsSnapshot(): LandSettings {
+    return this.settingsSubject.getValue() || DEFAULT_LAND_SETTINGS;
   }
 
   async saveSettings(settings: LandSettings): Promise<void> {
-    await this.firestoreService.setDocument('settings', 'land_config', settings);
+    const cleanSettings: LandSettings = {
+      ...DEFAULT_LAND_SETTINGS,
+      ...settings,
+      jobTypes: settings.jobTypes || DEFAULT_LAND_SETTINGS.jobTypes,
+      divisions: settings.divisions || DEFAULT_LAND_SETTINGS.divisions
+    };
+
+    // 1. Immediately emit to all subscribers in application
+    this.settingsSubject.next(cleanSettings);
+
+    // 2. Persist to localStorage synchronously
+    try {
+      localStorage.setItem(LAND_SETTINGS_STORAGE_KEY, JSON.stringify(cleanSettings));
+    } catch (e) {
+      console.warn('Failed to write land settings to localStorage:', e);
+    }
+
+    // 3. Persist to Firestore
+    try {
+      await this.firestoreService.setDocument('settings', 'land_config', cleanSettings);
+    } catch (err) {
+      console.error('Failed to sync land settings to Firestore:', err);
+    }
+
     this.eventLogService.logAction('UPDATED', 'land', 'Updated Land Management configuration and job types');
   }
 }

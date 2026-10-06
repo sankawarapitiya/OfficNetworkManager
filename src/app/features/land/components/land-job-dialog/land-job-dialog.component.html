@@ -34,21 +34,22 @@
             <span class="stage-badge">STAGE 1</span>
             <div class="stage-desc-text">
               <h3>Select Job Type & Enter Initial Details</h3>
-              <p>Documentation requirements and verification checklists will automatically configure based on your selected Job Type. You can save and exit at any time.</p>
+              <p>First select the Land Job Type from the dropdown, then enter citizen and cadastral parcel information. Documentation and verification stages will configure dynamically.</p>
             </div>
           </div>
 
-          <!-- Section 1A: Job Type Selector -->
+          <!-- Section 1A: Select Land Job Type (FIRST - DROPDOWN) -->
           <div class="form-card highlight-card">
             <div class="card-title-row">
               <mat-icon class="sec-icon text-indigo">category</mat-icon>
               <h4 class="card-heading">1. Select Land Job Type</h4>
             </div>
+            <p class="section-subtext">Select the official land cadastral job type. Documentation requirements and verification checklists will automatically configure based on your selected job type.</p>
 
             <div class="job-type-selection-grid">
               <mat-form-field appearance="outline" class="w-full">
                 <mat-label>Select Land Job Type *</mat-label>
-                <mat-select formControlName="jobTypeId" (selectionChange)="onJobTypeChange($event.value)">
+                <mat-select formControlName="jobTypeId" (selectionChange)="onJobTypeChange($event.value)" panelClass="land-job-type-dropdown">
                   <mat-option *ngFor="let jt of settings().jobTypes" [value]="jt.id" [disabled]="!jt.isActive">
                     <span class="font-semibold">{{ jt.name }}</span>
                     <span class="jt-code-tag">[{{ jt.code }}]</span>
@@ -58,21 +59,23 @@
                 <mat-hint *ngIf="selectedJobType()">
                   {{ selectedJobType()?.description }}
                 </mat-hint>
+                <mat-error *ngIf="initialForm.get('jobTypeId')?.invalid">Job Type is required</mat-error>
               </mat-form-field>
             </div>
 
+            <!-- Selected Job Type Summary Bar -->
             <div *ngIf="selectedJobType()" class="selected-jt-summary">
               <div class="jt-metric-pill">
                 <mat-icon>description</mat-icon>
-                <span><strong>{{ selectedJobType()?.requiredDocumentTypes?.length || 0 }}</strong> Required Documents</span>
+                <span><strong>{{ selectedJobType()?.requiredDocumentTypes?.length || 0 }}</strong> Required Documents for Stage 2</span>
               </div>
               <div class="jt-metric-pill">
                 <mat-icon>fact_check</mat-icon>
-                <span><strong>{{ selectedJobType()?.verificationStages?.length || 0 }}</strong> Verification Stages</span>
+                <span><strong>{{ selectedJobType()?.verificationStages?.length || 0 }}</strong> Verification Stages for Stage 3</span>
               </div>
               <div class="jt-metric-pill">
                 <mat-icon>schedule</mat-icon>
-                <span>Target: <strong>{{ selectedJobType()?.estimatedDays }}</strong> Working Days</span>
+                <span>Target SLA: <strong>{{ selectedJobType()?.estimatedDays }}</strong> Working Days</span>
               </div>
             </div>
           </div>
@@ -121,30 +124,31 @@
 
             <div class="grid-2-col">
               <mat-form-field appearance="outline">
-                <mat-label>Customer Full Name *</mat-label>
+                <mat-label>Customer Full Name {{ isFieldRequired('customerName') ? '*' : '' }}</mat-label>
                 <input matInput formControlName="customerName" placeholder="e.g. S. M. Gunasekara">
                 <mat-error *ngIf="initialForm.get('customerName')?.invalid">Customer name is required</mat-error>
               </mat-form-field>
 
               <mat-form-field appearance="outline">
-                <mat-label>National Identity Card (NIC) *</mat-label>
+                <mat-label>National Identity Card (NIC) {{ isFieldRequired('customerNic') ? '*' : '' }}</mat-label>
                 <input matInput formControlName="customerNic" placeholder="e.g. 198512345678 or 851234567V">
                 <mat-error *ngIf="initialForm.get('customerNic')?.invalid">NIC is required</mat-error>
               </mat-form-field>
 
               <mat-form-field appearance="outline">
-                <mat-label>Contact Phone Number *</mat-label>
+                <mat-label>Contact Phone Number {{ isFieldRequired('customerPhone') ? '*' : '' }}</mat-label>
                 <input matInput formControlName="customerPhone" placeholder="e.g. 077 123 4567">
                 <mat-error *ngIf="initialForm.get('customerPhone')?.invalid">Phone is required</mat-error>
               </mat-form-field>
 
               <mat-form-field appearance="outline">
-                <mat-label>Email Address</mat-label>
+                <mat-label>Email Address {{ isFieldRequired('customerEmail') ? '*' : '' }}</mat-label>
                 <input matInput formControlName="customerEmail" placeholder="e.g. customer@example.com">
+                <mat-error *ngIf="initialForm.get('customerEmail')?.invalid">Email is required</mat-error>
               </mat-form-field>
 
               <mat-form-field appearance="outline" class="col-span-2">
-                <mat-label>Customer Postal Address *</mat-label>
+                <mat-label>Customer Postal Address {{ isFieldRequired('customerAddress') ? '*' : '' }}</mat-label>
                 <input matInput formControlName="customerAddress" placeholder="Street, Village / Town, City">
                 <mat-error *ngIf="initialForm.get('customerAddress')?.invalid">Address is required</mat-error>
               </mat-form-field>
@@ -161,7 +165,7 @@
             <div class="grid-3-col">
               <!-- Division Dropdown (Dynamic from Settings) -->
               <mat-form-field appearance="outline">
-                <mat-label>Administrative Division *</mat-label>
+                <mat-label>Administrative Division {{ isFieldRequired('division') ? '*' : '' }}</mat-label>
                 <mat-select formControlName="division">
                   <mat-option *ngFor="let div of settings().divisions" [value]="div">
                     {{ div }}
@@ -171,68 +175,75 @@
               </mat-form-field>
 
               <mat-form-field appearance="outline">
-                <mat-label>Deed Number *</mat-label>
+                <mat-label>Deed Number {{ isFieldRequired('deedNumber') ? '*' : '' }}</mat-label>
                 <input matInput formControlName="deedNumber" placeholder="e.g. DEED-4829/2018">
                 <mat-error *ngIf="initialForm.get('deedNumber')?.invalid">Deed # is required</mat-error>
               </mat-form-field>
 
               <mat-form-field appearance="outline">
-                <mat-label>Cadastral Plan Number *</mat-label>
+                <mat-label>Cadastral Plan Number {{ isFieldRequired('planNumber') ? '*' : '' }}</mat-label>
                 <input matInput formControlName="planNumber" placeholder="e.g. PLAN-9204A">
                 <mat-error *ngIf="initialForm.get('planNumber')?.invalid">Plan # is required</mat-error>
               </mat-form-field>
 
               <mat-form-field appearance="outline">
-                <mat-label>Lot / Parcel Number *</mat-label>
+                <mat-label>Lot / Parcel Number {{ isFieldRequired('lotNumber') ? '*' : '' }}</mat-label>
                 <input matInput formControlName="lotNumber" placeholder="e.g. Lot 12-B">
                 <mat-error *ngIf="initialForm.get('lotNumber')?.invalid">Lot # is required</mat-error>
               </mat-form-field>
 
               <mat-form-field appearance="outline">
-                <mat-label>Extent / Land Size</mat-label>
+                <mat-label>Extent / Land Size {{ isFieldRequired('extentText') ? '*' : '' }}</mat-label>
                 <input matInput formControlName="extentText" placeholder="e.g. 0A-1R-20P or 500 sq.m">
+                <mat-error *ngIf="initialForm.get('extentText')?.invalid">Extent / Land size is required</mat-error>
               </mat-form-field>
 
               <mat-form-field appearance="outline">
-                <mat-label>Size in Sq. Meters</mat-label>
+                <mat-label>Size in Sq. Meters {{ isFieldRequired('sizeSqm') ? '*' : '' }}</mat-label>
                 <input matInput type="number" formControlName="sizeSqm" placeholder="e.g. 505.8">
+                <mat-error *ngIf="initialForm.get('sizeSqm')?.invalid">Size in Sq. meters is required</mat-error>
               </mat-form-field>
 
               <mat-form-field appearance="outline">
-                <mat-label>Parcel / Estate Name</mat-label>
+                <mat-label>Parcel / Estate Name {{ isFieldRequired('landName') ? '*' : '' }}</mat-label>
                 <input matInput formControlName="landName" placeholder="e.g. Delgahawatta">
+                <mat-error *ngIf="initialForm.get('landName')?.invalid">Parcel name is required</mat-error>
               </mat-form-field>
 
               <mat-form-field appearance="outline">
-                <mat-label>Grama Niladhari (GN) Division</mat-label>
+                <mat-label>Grama Niladhari (GN) Division {{ isFieldRequired('gramaNiladhariDivision') ? '*' : '' }}</mat-label>
                 <input matInput formControlName="gramaNiladhariDivision" placeholder="e.g. GN-542 Malabe North">
+                <mat-error *ngIf="initialForm.get('gramaNiladhariDivision')?.invalid">GN Division is required</mat-error>
               </mat-form-field>
 
               <mat-form-field appearance="outline">
-                <mat-label>GPS Coordinates</mat-label>
+                <mat-label>GPS Coordinates {{ isFieldRequired('gpsCoordinates') ? '*' : '' }}</mat-label>
                 <input matInput formControlName="gpsCoordinates" placeholder="e.g. 6.9012, 79.9234">
+                <mat-error *ngIf="initialForm.get('gpsCoordinates')?.invalid">GPS Coordinates are required</mat-error>
               </mat-form-field>
             </div>
 
             <mat-form-field appearance="outline" class="w-full">
-              <mat-label>Land Physical Location / Boundary Address *</mat-label>
+              <mat-label>Land Physical Location / Boundary Address {{ isFieldRequired('locationAddress') ? '*' : '' }}</mat-label>
               <input matInput formControlName="locationAddress" placeholder="Exact address / road where land is situated">
               <mat-error *ngIf="initialForm.get('locationAddress')?.invalid">Land address is required</mat-error>
             </mat-form-field>
 
             <div class="grid-2-col">
               <mat-form-field appearance="outline">
-                <mat-label>Priority Level</mat-label>
+                <mat-label>Priority Level {{ isFieldRequired('priority') ? '*' : '' }}</mat-label>
                 <mat-select formControlName="priority">
                   <mat-option value="Normal">Normal</mat-option>
                   <mat-option value="Urgent">Urgent</mat-option>
                   <mat-option value="Immediate">Immediate / Expedited</mat-option>
                 </mat-select>
+                <mat-error *ngIf="initialForm.get('priority')?.invalid">Priority is required</mat-error>
               </mat-form-field>
 
               <mat-form-field appearance="outline">
-                <mat-label>Initial Notes / Application Remarks</mat-label>
+                <mat-label>Initial Notes / Application Remarks {{ isFieldRequired('initialNotes') ? '*' : '' }}</mat-label>
                 <input matInput formControlName="initialNotes" placeholder="Special applicant notes or instructions...">
+                <mat-error *ngIf="initialForm.get('initialNotes')?.invalid">Initial notes are required</mat-error>
               </mat-form-field>
             </div>
           </div>

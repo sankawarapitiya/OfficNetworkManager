@@ -24,7 +24,8 @@ import {
   LandJobVerificationStage, 
   JobTypeConfig, 
   LandSettings, 
-  DEFAULT_LAND_SETTINGS 
+  DEFAULT_LAND_SETTINGS,
+  DEFAULT_FORM_REQUIRED_FIELDS
 } from '../../models/land.model';
 
 @Component({
@@ -123,6 +124,29 @@ export class LandJobDialogComponent implements OnInit {
     this.loadSettingsAndData();
   }
 
+  isFieldRequired(fieldKey: string): boolean {
+    const reqMap = this.settings().formRequiredFields || DEFAULT_FORM_REQUIRED_FIELDS;
+    return reqMap[fieldKey] === true;
+  }
+
+  private updateFormValidators() {
+    if (!this.initialForm) return;
+    const reqMap = this.settings().formRequiredFields || DEFAULT_FORM_REQUIRED_FIELDS;
+    const fields = Object.keys(DEFAULT_FORM_REQUIRED_FIELDS);
+
+    fields.forEach(fieldKey => {
+      const control = this.initialForm.get(fieldKey);
+      if (control) {
+        if (reqMap[fieldKey] === true) {
+          control.setValidators([Validators.required]);
+        } else {
+          control.clearValidators();
+        }
+        control.updateValueAndValidity({ emitEvent: false });
+      }
+    });
+  }
+
   private initForms() {
     const ej = this.existingJob;
 
@@ -130,25 +154,27 @@ export class LandJobDialogComponent implements OnInit {
       jobTypeId: [ej?.jobTypeId || '', Validators.required],
       // Customer
       customerId: [ej?.customerId || ''],
-      customerName: [ej?.customerName || '', Validators.required],
-      customerNic: [ej?.customerNic || '', Validators.required],
-      customerPhone: [ej?.customerPhone || '', Validators.required],
-      customerAddress: [ej?.customerAddress || '', Validators.required],
+      customerName: [ej?.customerName || ''],
+      customerNic: [ej?.customerNic || ''],
+      customerPhone: [ej?.customerPhone || ''],
+      customerAddress: [ej?.customerAddress || ''],
       customerEmail: [ej?.customerEmail || ''],
       // Land
-      deedNumber: [ej?.deedNumber || '', Validators.required],
-      planNumber: [ej?.planNumber || '', Validators.required],
-      lotNumber: [ej?.lotNumber || '', Validators.required],
+      deedNumber: [ej?.deedNumber || ''],
+      planNumber: [ej?.planNumber || ''],
+      lotNumber: [ej?.lotNumber || ''],
       landName: [ej?.landName || ''],
       sizeSqm: [ej?.sizeSqm || null],
       extentText: [ej?.extentText || ''],
-      locationAddress: [ej?.locationAddress || '', Validators.required],
-      division: [ej?.division || '', Validators.required],
+      locationAddress: [ej?.locationAddress || ''],
+      division: [ej?.division || ''],
       gramaNiladhariDivision: [ej?.gramaNiladhariDivision || ''],
       gpsCoordinates: [ej?.gpsCoordinates || ''],
-      priority: [ej?.priority || 'Normal', Validators.required],
+      priority: [ej?.priority || 'Normal'],
       initialNotes: [ej?.initialNotes || '']
     });
+
+    this.updateFormValidators();
 
     if (ej?.customerName) {
       this.selectedCustomerName.set(ej.customerName);
@@ -173,6 +199,7 @@ export class LandJobDialogComponent implements OnInit {
     this.landService.getSettings().subscribe({
       next: (s) => {
         this.settings.set(s);
+        this.updateFormValidators();
         const ej = this.existingJob;
 
         if (ej && ej.jobTypeId) {

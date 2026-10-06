@@ -17,7 +17,10 @@ import {
   DEFAULT_LAND_SETTINGS, 
   JobTypeConfig, 
   LandDocTypeConfig, 
-  LandVerificationStageConfig 
+  LandVerificationStageConfig,
+  FORM_FIELD_DEFINITIONS,
+  DEFAULT_FORM_REQUIRED_FIELDS,
+  FormFieldDefinition
 } from '../../models/land.model';
 import { NotificationService } from '../../../../core/services/notification.service';
 
@@ -215,6 +218,98 @@ import { NotificationService } from '../../../../core/services/notification.serv
                 <span class="label">Sample Next Generated Reference:</span>
                 <span class="sample-ref font-mono font-bold">{{ sampleGeneratedRef }}</span>
               </div>
+            </div>
+          </mat-tab>
+
+          <!-- ============================================== -->
+          <!-- TAB 4: FORM REQUIRED FIELDS SELECTION          -->
+          <!-- ============================================== -->
+          <mat-tab>
+            <ng-template mat-tab-label>
+              <mat-icon class="mr-2">checklist_rtl</mat-icon> Form Required Fields
+            </ng-template>
+
+            <div class="tab-content">
+              <div class="section-intro">
+                <div>
+                  <h3 class="sec-title">Task Registration Required Field Selection</h3>
+                  <p class="sec-desc">Choose which fields are mandatory (required) versus optional in the "Register New Land Task / Job" intake form.</p>
+                </div>
+                <div class="quick-bulk-actions">
+                  <button mat-stroked-button color="primary" (click)="resetFieldRequirementsToDefault()" matTooltip="Reset all fields to recommended system defaults">
+                    <mat-icon>restart_alt</mat-icon> Reset Defaults
+                  </button>
+                  <button mat-button color="primary" (click)="setAllFieldsRequirement(true)">
+                    Mark All Required
+                  </button>
+                  <button mat-button class="text-gray" (click)="setAllFieldsRequirement(false)">
+                    Mark All Optional
+                  </button>
+                </div>
+              </div>
+
+              <!-- Customer Fields Group -->
+              <div class="fields-category-section">
+                <div class="category-header">
+                  <div class="cat-title-wrap">
+                    <mat-icon class="cat-icon text-blue">person</mat-icon>
+                    <h4>1. Citizen / Customer Information Fields</h4>
+                  </div>
+                  <span class="count-tag">{{ customerFields.length }} fields</span>
+                </div>
+
+                <div class="fields-toggle-grid">
+                  <div *ngFor="let field of customerFields" class="field-toggle-card" [class.field-required]="isFieldRequired(field.key)">
+                    <div class="field-info">
+                      <div class="field-title-row">
+                        <mat-icon class="field-icon">{{ getFieldIcon(field.key) }}</mat-icon>
+                        <span class="field-label">{{ field.label }}</span>
+                      </div>
+                      <p class="field-hint">{{ field.hint }}</p>
+                    </div>
+
+                    <div class="field-toggle-ctrl">
+                      <span class="req-badge" [ngClass]="isFieldRequired(field.key) ? 'badge-required' : 'badge-optional'">
+                        {{ isFieldRequired(field.key) ? 'Required *' : 'Optional' }}
+                      </span>
+                      <mat-slide-toggle [checked]="isFieldRequired(field.key)" (change)="toggleFieldRequired(field.key, $event.checked)" color="primary">
+                      </mat-slide-toggle>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Cadastral Parcel Fields Group -->
+              <div class="fields-category-section mt-6">
+                <div class="category-header">
+                  <div class="cat-title-wrap">
+                    <mat-icon class="cat-icon text-amber">terrain</mat-icon>
+                    <h4>2. Cadastral Parcel & Location Details Fields</h4>
+                  </div>
+                  <span class="count-tag">{{ parcelFields.length }} fields</span>
+                </div>
+
+                <div class="fields-toggle-grid">
+                  <div *ngFor="let field of parcelFields" class="field-toggle-card" [class.field-required]="isFieldRequired(field.key)">
+                    <div class="field-info">
+                      <div class="field-title-row">
+                        <mat-icon class="field-icon">{{ getFieldIcon(field.key) }}</mat-icon>
+                        <span class="field-label">{{ field.label }}</span>
+                      </div>
+                      <p class="field-hint">{{ field.hint }}</p>
+                    </div>
+
+                    <div class="field-toggle-ctrl">
+                      <span class="req-badge" [ngClass]="isFieldRequired(field.key) ? 'badge-required' : 'badge-optional'">
+                        {{ isFieldRequired(field.key) ? 'Required *' : 'Optional' }}
+                      </span>
+                      <mat-slide-toggle [checked]="isFieldRequired(field.key)" (change)="toggleFieldRequired(field.key, $event.checked)" color="primary">
+                      </mat-slide-toggle>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
             </div>
           </mat-tab>
 
@@ -656,6 +751,144 @@ import { NotificationService } from '../../../../core/services/notification.serv
       display: flex;
       align-items: center;
     }
+
+    .quick-bulk-actions {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .fields-category-section {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 16px 20px;
+      margin-bottom: 20px;
+
+      &.mt-6 {
+        margin-top: 24px;
+      }
+
+      .category-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 14px;
+        padding-bottom: 10px;
+        border-bottom: 1px solid #e2e8f0;
+
+        .cat-title-wrap {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+
+          .cat-icon {
+            font-size: 22px;
+            width: 22px;
+            height: 22px;
+          }
+
+          h4 {
+            margin: 0;
+            font-size: 1rem;
+            font-weight: 700;
+            color: #0f172a;
+          }
+        }
+
+        .count-tag {
+          font-size: 0.75rem;
+          background: #e2e8f0;
+          color: #475569;
+          padding: 2px 8px;
+          border-radius: 10px;
+          font-weight: 600;
+        }
+      }
+    }
+
+    .fields-toggle-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+
+      @media (max-width: 900px) {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .field-toggle-card {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #ffffff;
+      border: 1.5px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 12px 16px;
+      transition: all 0.2s ease;
+
+      &.field-required {
+        border-color: #cbd5e1;
+        background: #ffffff;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+      }
+
+      .field-info {
+        flex: 1;
+        margin-right: 12px;
+
+        .field-title-row {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+
+          .field-icon {
+            font-size: 18px;
+            width: 18px;
+            height: 18px;
+            color: #64748b;
+          }
+
+          .field-label {
+            font-weight: 700;
+            font-size: 0.88rem;
+            color: #1e293b;
+          }
+        }
+
+        .field-hint {
+          margin: 2px 0 0 26px;
+          font-size: 0.775rem;
+          color: #64748b;
+          line-height: 1.3;
+        }
+      }
+
+      .field-toggle-ctrl {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+
+        .req-badge {
+          font-size: 0.7rem;
+          font-weight: 700;
+          padding: 2px 8px;
+          border-radius: 12px;
+          white-space: nowrap;
+
+          &.badge-required {
+            background: #fee2e2;
+            color: #b91c1c;
+          }
+
+          &.badge-optional {
+            background: #f1f5f9;
+            color: #64748b;
+          }
+        }
+      }
+    }
   `]
 })
 export class LandSettingsComponent implements OnInit {
@@ -694,7 +927,7 @@ export class LandSettingsComponent implements OnInit {
   }
 
   // --- Divisions ---
-  addDivision() {
+  async addDivision() {
     const val = this.newDivisionName.trim();
     if (!val) return;
     if (this.settings.divisions.includes(val)) {
@@ -703,20 +936,27 @@ export class LandSettingsComponent implements OnInit {
     }
     this.settings.divisions.push(val);
     this.newDivisionName = '';
+    await this.saveSettings(true, `Division "${val}" added and saved!`);
   }
 
-  removeDivision(idx: number) {
+  async removeDivision(idx: number) {
+    const removed = this.settings.divisions[idx];
     this.settings.divisions.splice(idx, 1);
+    await this.saveSettings(true, `Division "${removed}" removed and saved.`);
   }
 
   // --- Job Types ---
-  toggleJobTypeActive(idx: number) {
-    this.settings.jobTypes[idx].isActive = !this.settings.jobTypes[idx].isActive;
+  async toggleJobTypeActive(idx: number) {
+    const jt = this.settings.jobTypes[idx];
+    jt.isActive = !jt.isActive;
+    await this.saveSettings(true, `Job Type "${jt.name}" marked as ${jt.isActive ? 'Active' : 'Disabled'}.`);
   }
 
-  deleteJobType(idx: number) {
-    if (confirm(`Delete job type "${this.settings.jobTypes[idx].name}"?`)) {
+  async deleteJobType(idx: number) {
+    const jt = this.settings.jobTypes[idx];
+    if (confirm(`Delete job type "${jt.name}"?`)) {
       this.settings.jobTypes.splice(idx, 1);
+      await this.saveSettings(true, `Job Type "${jt.name}" deleted.`);
     }
   }
 
@@ -774,7 +1014,7 @@ export class LandSettingsComponent implements OnInit {
     this.currentModalJobType.verificationStages[stageIdx].checklist.splice(itemIdx, 1);
   }
 
-  saveJobTypeModal() {
+  async saveJobTypeModal() {
     if (!this.currentModalJobType.name.trim()) {
       this.notif.warning('Please enter a Job Type Title');
       return;
@@ -783,6 +1023,8 @@ export class LandSettingsComponent implements OnInit {
       this.notif.warning('Please enter a Short Code');
       return;
     }
+
+    const savedName = this.currentModalJobType.name.trim();
 
     if (this.editingJobTypeIndex !== null) {
       this.settings.jobTypes[this.editingJobTypeIndex] = { ...this.currentModalJobType };
@@ -794,6 +1036,9 @@ export class LandSettingsComponent implements OnInit {
     }
 
     this.closeJobTypeModal();
+
+    // Persist immediately to database & local cache
+    await this.saveSettings(true, `Job Type "${savedName}" saved and persisted successfully!`);
   }
 
   private getEmptyJobType(): JobTypeConfig {
@@ -813,15 +1058,82 @@ export class LandSettingsComponent implements OnInit {
     };
   }
 
-  async saveSettings() {
+  async saveSettings(showToast = true, customMsg?: string) {
     this.isSaving.set(true);
     try {
       await this.landService.saveSettings(this.settings);
-      this.notif.success('Land Management configuration saved successfully!');
+      if (showToast) {
+        this.notif.success(customMsg || 'Land Management configuration saved successfully!');
+      }
     } catch (e: any) {
       this.notif.error('Failed to save settings: ' + (e?.message || 'Server error'));
     } finally {
       this.isSaving.set(false);
+    }
+  }
+
+  // --- Form Required Fields Management ---
+  formFieldDefs = FORM_FIELD_DEFINITIONS;
+
+  get customerFields(): FormFieldDefinition[] {
+    return this.formFieldDefs.filter(f => f.category === 'Customer');
+  }
+
+  get parcelFields(): FormFieldDefinition[] {
+    return this.formFieldDefs.filter(f => f.category === 'Parcel');
+  }
+
+  isFieldRequired(key: string): boolean {
+    if (!this.settings.formRequiredFields) {
+      this.settings.formRequiredFields = { ...DEFAULT_FORM_REQUIRED_FIELDS };
+    }
+    return this.settings.formRequiredFields[key] !== false;
+  }
+
+  async toggleFieldRequired(key: string, required: boolean) {
+    if (!this.settings.formRequiredFields) {
+      this.settings.formRequiredFields = { ...DEFAULT_FORM_REQUIRED_FIELDS };
+    }
+    this.settings.formRequiredFields[key] = required;
+    const def = this.formFieldDefs.find(f => f.key === key);
+    const label = def?.label || key;
+    await this.saveSettings(true, `Field "${label}" marked as ${required ? 'Required' : 'Optional'}`);
+  }
+
+  async resetFieldRequirementsToDefault() {
+    this.settings.formRequiredFields = { ...DEFAULT_FORM_REQUIRED_FIELDS };
+    await this.saveSettings(true, 'Form field requirements reset to standard defaults');
+  }
+
+  async setAllFieldsRequirement(required: boolean) {
+    const updated: Record<string, boolean> = {};
+    this.formFieldDefs.forEach(f => {
+      updated[f.key] = required;
+    });
+    this.settings.formRequiredFields = updated;
+    await this.saveSettings(true, `All fields set to ${required ? 'Required' : 'Optional'}`);
+  }
+
+  getFieldIcon(key: string): string {
+    switch (key) {
+      case 'customerName': return 'person';
+      case 'customerNic': return 'badge';
+      case 'customerPhone': return 'phone';
+      case 'customerAddress': return 'home';
+      case 'customerEmail': return 'email';
+      case 'division': return 'place';
+      case 'deedNumber': return 'description';
+      case 'planNumber': return 'map';
+      case 'lotNumber': return 'domain';
+      case 'locationAddress': return 'location_on';
+      case 'extentText': return 'straighten';
+      case 'sizeSqm': return 'square_foot';
+      case 'landName': return 'label';
+      case 'gramaNiladhariDivision': return 'holiday_village';
+      case 'gpsCoordinates': return 'gps_fixed';
+      case 'priority': return 'flag';
+      case 'initialNotes': return 'edit_note';
+      default: return 'help_outline';
     }
   }
 }

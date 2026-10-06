@@ -194,6 +194,31 @@
   }
 }
 
+.section-subtext {
+  font-size: 0.85rem;
+  color: #64748b;
+  margin: -8px 0 14px 0;
+  line-height: 1.4;
+}
+
+.jt-code-tag {
+  font-family: monospace;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #4f46e5;
+  background: #eef2ff;
+  padding: 1px 6px;
+  border-radius: 4px;
+  margin-left: 6px;
+}
+
+.sla-text {
+  font-size: 0.775rem;
+  color: #0369a1;
+  font-weight: 500;
+  margin-left: 4px;
+}
+
 .selected-jt-summary {
   display: flex;
   flex-wrap: wrap;

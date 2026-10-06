@@ -142,7 +142,61 @@ export interface LandSettings {
   nextSeq: number;
   priorities: LandPriority[];
   defaultSlaDays: number;
+  formRequiredFields?: Record<string, boolean>;
 }
+
+export interface FormFieldDefinition {
+  key: string;
+  label: string;
+  category: 'Customer' | 'Parcel';
+  hint: string;
+}
+
+export const DEFAULT_FORM_REQUIRED_FIELDS: Record<string, boolean> = {
+  // Customer Details
+  customerName: true,
+  customerNic: true,
+  customerPhone: true,
+  customerAddress: true,
+  customerEmail: false,
+
+  // Cadastral Parcel & Location Details
+  division: true,
+  deedNumber: true,
+  planNumber: true,
+  lotNumber: true,
+  locationAddress: true,
+  extentText: false,
+  sizeSqm: false,
+  landName: false,
+  gramaNiladhariDivision: false,
+  gpsCoordinates: false,
+  priority: true,
+  initialNotes: false
+};
+
+export const FORM_FIELD_DEFINITIONS: FormFieldDefinition[] = [
+  // Customer Information
+  { key: 'customerName', label: 'Customer Full Name', category: 'Customer', hint: 'Full legal name of the applicant / landowner' },
+  { key: 'customerNic', label: 'National Identity Card (NIC)', category: 'Customer', hint: 'Official government NIC or passport identification' },
+  { key: 'customerPhone', label: 'Contact Phone Number', category: 'Customer', hint: 'Primary mobile or daytime contact number' },
+  { key: 'customerAddress', label: 'Customer Postal Address', category: 'Customer', hint: 'Permanent residential or postal address' },
+  { key: 'customerEmail', label: 'Email Address', category: 'Customer', hint: 'Electronic mail address for digital notifications' },
+
+  // Cadastral Parcel & Location Details
+  { key: 'division', label: 'Administrative Division', category: 'Parcel', hint: 'Divisional Secretariat regional jurisdiction' },
+  { key: 'deedNumber', label: 'Deed Number', category: 'Parcel', hint: 'Registered deed volume or folio registration number' },
+  { key: 'planNumber', label: 'Cadastral Plan Number', category: 'Parcel', hint: 'Licensed surveyor plan number' },
+  { key: 'lotNumber', label: 'Lot / Parcel Number', category: 'Parcel', hint: 'Allotment number of the parcel' },
+  { key: 'locationAddress', label: 'Land Physical Location Address', category: 'Parcel', hint: 'Exact street or locality where land is situated' },
+  { key: 'extentText', label: 'Extent / Land Size Description', category: 'Parcel', hint: 'Cadastral measurement (e.g. 0A-1R-20P)' },
+  { key: 'sizeSqm', label: 'Size in Square Meters', category: 'Parcel', hint: 'Numeric square meter extent' },
+  { key: 'landName', label: 'Parcel / Estate Name', category: 'Parcel', hint: 'Traditional land name or estate denomination' },
+  { key: 'gramaNiladhariDivision', label: 'Grama Niladhari (GN) Division', category: 'Parcel', hint: 'Village administrative division' },
+  { key: 'gpsCoordinates', label: 'GPS Coordinates', category: 'Parcel', hint: 'Latitude & longitude coordinates' },
+  { key: 'priority', label: 'Priority Level', category: 'Parcel', hint: 'Processing urgency classification' },
+  { key: 'initialNotes', label: 'Initial Notes / Remarks', category: 'Parcel', hint: 'Intake remarks or applicant instructions' }
+];
 
 export const DEFAULT_DIVISIONS: string[] = [
   'West Division',
@@ -327,7 +381,8 @@ export const DEFAULT_LAND_SETTINGS: LandSettings = {
   refFormat: '{PREFIX}-{YYYY}-{SEQ}',
   nextSeq: 1,
   priorities: ['Normal', 'Urgent', 'Immediate'],
-  defaultSlaDays: 21
+  defaultSlaDays: 21,
+  formRequiredFields: { ...DEFAULT_FORM_REQUIRED_FIELDS }
 };
 
 export function generateLandJobRef(settings: LandSettings): string {
