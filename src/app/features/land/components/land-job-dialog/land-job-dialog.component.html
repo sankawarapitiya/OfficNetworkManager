@@ -86,20 +86,16 @@
               <mat-icon class="sec-icon text-teal">tag</mat-icon>
               <div class="title-with-pill">
                 <h4 class="card-heading">2. Reference Series & Numbering</h4>
-                <span class="ref-preview-badge">
-                  <mat-icon>pin</mat-icon>
-                  Ref Preview: <strong>{{ generatedRefPreview }}</strong>
-                </span>
               </div>
             </div>
             <p class="section-subtext">Select the reference series prefix or adjust file identifiers. The reference number is formatted automatically based on the Land Management Configuration.</p>
 
-            <div class="grid-4-col">
+            <div class="ref-series-container" style="display: flex; gap: 16px; align-items: flex-start; margin-top: 12px;">
               <!-- Series / Prefix Selector -->
-              <mat-form-field appearance="outline">
+              <mat-form-field appearance="outline" style="flex: 1;">
                 <mat-label>Reference Prefix / Series</mat-label>
                 <mat-select formControlName="prefixCode" (selectionChange)="onReferencePrefixChange($event.value)">
-                  <mat-option *ngFor="let pfx of settings().refPrefixes || []" [value]="pfx.code">
+                  <mat-option *ngFor="let pfx of settings().refPrefixes || []" [value]="pfx.id || pfx.code">
                     <span class="font-bold">{{ pfx.code }}</span>
                     <span class="text-xs text-slate-500"> — {{ pfx.label }}</span>
                   </mat-option>
@@ -109,24 +105,12 @@
                   </mat-option>
                 </mat-select>
               </mat-form-field>
-
-              <!-- Subject Code -->
-              <mat-form-field appearance="outline">
-                <mat-label>Subject Code</mat-label>
-                <input matInput formControlName="subjectCode" placeholder="e.g. 04" (input)="updateGeneratedJobRef()">
-              </mat-form-field>
-
-              <!-- File Number -->
-              <mat-form-field appearance="outline">
-                <mat-label>File Number</mat-label>
-                <input matInput formControlName="fileNumber" placeholder="e.g. FN-01" (input)="updateGeneratedJobRef()">
-              </mat-form-field>
-
-              <!-- File Version -->
-              <mat-form-field appearance="outline">
-                <mat-label>File Version</mat-label>
-                <input matInput formControlName="fileVersion" placeholder="e.g. V1" (input)="updateGeneratedJobRef()">
-              </mat-form-field>
+              
+              <!-- Live Preview box -->
+              <div class="ref-preview-box" style="flex: 1; padding: 12px 16px; background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 6px; display: flex; flex-direction: column; justify-content: center;">
+                <span style="font-size: 0.75rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px;">Generated Reference</span>
+                <span style="font-size: 1.1rem; font-weight: 700; color: #0284c7; font-family: monospace;">{{ generatedRefPreview }}</span>
+              </div>
             </div>
           </div>
 

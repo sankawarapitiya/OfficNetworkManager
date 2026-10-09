@@ -332,10 +332,10 @@ export class LandJobDialogComponent implements OnInit {
 
   onReferencePrefixChange(prefixCode: string) {
     const s = this.settings();
-    const pfx = s.refPrefixes?.find(p => p.code === prefixCode);
+    const pfx = s.refPrefixes?.find(p => (p.id || p.code) === prefixCode);
     if (pfx) {
       this.initialForm.patchValue({
-        prefixCode: pfx.code,
+        prefixCode: pfx.id || pfx.code,
         subjectCode: pfx.subjectCode || s.subjectCode || '04',
         fileNumber: pfx.fileNumber || s.fileNumber || 'FN-01',
         fileVersion: pfx.fileVersion || s.fileVersion || 'V1'

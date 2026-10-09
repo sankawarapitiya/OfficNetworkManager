@@ -139,6 +139,7 @@ export interface LandAuditRecord {
 }
 
 export interface LandRefPrefix {
+  id?: string;                // Unique identifier for the series
   code: string;               // Prefix e.g. 'LND', 'PAR', 'CAD'
   label: string;              // Classification e.g. 'General Land Affairs', 'Cadastral Survey'
   subjectCode?: string;       // Subject code e.g. '04', 'LND-SUB'
@@ -425,9 +426,9 @@ export function generateLandJobRef(
   }
 ): string {
   const chosenPrefixCode = customOptions?.prefixCode || settings.defaultJobPrefix || 'LND';
-  const prefixObj = settings.refPrefixes?.find(p => p.code === chosenPrefixCode);
+  const prefixObj = settings.refPrefixes?.find(p => (p.id || p.code) === chosenPrefixCode);
 
-  const prefix = chosenPrefixCode;
+  const prefix = prefixObj ? prefixObj.code : chosenPrefixCode;
   const subjectCode = customOptions?.subjectCode || prefixObj?.subjectCode || settings.subjectCode || '04';
   const fileNumber = customOptions?.fileNumber || prefixObj?.fileNumber || settings.fileNumber || 'FN-01';
   const fileVersion = customOptions?.fileVersion || prefixObj?.fileVersion || settings.fileVersion || 'V1';
