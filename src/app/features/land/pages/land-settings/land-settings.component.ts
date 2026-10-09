@@ -10,11 +10,15 @@ import { MatTabsModule } from '@angular/material/tabs';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatSelectModule } from '@angular/material/select';
 
 import { LandService } from '../../services/land.service';
 import { 
   LandSettings, 
   DEFAULT_LAND_SETTINGS, 
+  DEFAULT_LAND_REF_PREFIXES,
+  LandRefPrefix,
+  generateLandJobRef,
   JobTypeConfig, 
   LandDocTypeConfig, 
   LandVerificationStageConfig,
@@ -38,7 +42,8 @@ import { NotificationService } from '../../../../core/services/notification.serv
     MatTabsModule,
     MatSlideToggleModule,
     MatCheckboxModule,
-    MatTooltipModule
+    MatTooltipModule,
+    MatSelectModule
   ],
   template: `
     <div class="page-container w-full">
@@ -46,7 +51,7 @@ import { NotificationService } from '../../../../core/services/notification.serv
       <div class="page-header">
         <div>
           <h1 class="page-title">Land Management Configuration</h1>
-          <p class="page-desc">Configure dynamic Job Types, required document types, verification stages & checklists, and administrative divisions.</p>
+          <p class="page-desc">Configure dynamic Job Types, required document types, verification stages & checklists, and reference numbering.</p>
         </div>
         <div class="actions-group">
           <button mat-flat-button color="primary" class="save-btn" [disabled]="isSaving()" (click)="saveSettings()">
@@ -138,86 +143,215 @@ import { NotificationService } from '../../../../core/services/notification.serv
             </div>
           </mat-tab>
 
+
+
           <!-- ============================================== -->
-          <!-- TAB 2: ADMINISTRATIVE DIVISIONS               -->
+          <!-- TAB 2: REFERENCE NUMBERING & MULTIPLE SERIES   -->
           <!-- ============================================== -->
           <mat-tab>
             <ng-template mat-tab-label>
-              <mat-icon class="mr-2">holiday_village</mat-icon> Administrative Divisions
+              <mat-icon class="mr-2">pin</mat-icon> Reference Numbering & Series
             </ng-template>
 
-            <div class="tab-content">
+            <div class="tab-content max-w-4xl">
               <div class="section-intro">
                 <div>
-                  <h3 class="sec-title">Divisional Secretariats / Boundaries</h3>
-                  <p class="sec-desc">Manage regional divisions available during Stage 1 parcel filing and reporting.</p>
+                  <h3 class="sec-title">Task Reference Auto-Generation Rules</h3>
+                  <p class="sec-desc">Configure reference format with Prefix, Subject Code, Year, File Number, File Version, and Sequential Number. Define multiple reference series with independent sequence counters.</p>
                 </div>
               </div>
 
-              <!-- Add New Division Box -->
-              <div class="add-division-box">
-                <mat-form-field appearance="outline" class="w-full" subscriptSizing="dynamic">
-                  <mat-label>New Administrative Division Name</mat-label>
-                  <input matInput [(ngModel)]="newDivisionName" placeholder="e.g. Northern Central Division">
-                </mat-form-field>
-                <button mat-flat-button color="primary" [disabled]="!newDivisionName.trim()" (click)="addDivision()">
-                  <mat-icon>add_location</mat-icon> Add Division
-                </button>
+              <!-- Live Preview Card -->
+              <div class="preview-banner">
+                <div class="preview-info">
+                  <div class="preview-line">
+                    <span class="preview-label">Live Generated Reference Preview:</span>
+                    <span class="preview-value">{{ sampleGeneratedRef }}</span>
+                  </div>
+                  <div class="preview-prefix-pills" *ngIf="settings.refPrefixes && settings.refPrefixes.length > 0">
+                    <span class="test-prefix-lbl">Test Series:</span>
+                    <button type="button" 
+                            *ngFor="let p of settings.refPrefixes" 
+                            class="preview-pill" 
+                            [class.active]="previewPrefixCode === p.code"
+                            (click)="previewPrefixCode = p.code">
+                      {{ p.code }} <span class="pill-seq">(#{{ p.nextSeq || 1 }})</span>
+                    </button>
+                  </div>
+                </div>
+                <div class="preview-extra">
+                  <span class="preview-tag font-mono">Format: {{ settings.refFormat }}</span>
+                </div>
               </div>
 
-              <!-- Divisions List -->
-              <div class="divisions-list">
-                <div *ngFor="let div of settings.divisions; let dIdx = index" class="division-item">
-                  <div class="div-left">
-                    <mat-icon class="div-icon">place</mat-icon>
-                    <span class="div-name">{{ div }}</span>
-                  </div>
-                  <button mat-icon-button color="warn" (click)="removeDivision(dIdx)" matTooltip="Remove Division">
-                    <mat-icon>delete_outline</mat-icon>
+              <!-- General Reference Generation Form -->
+              <div class="ref-fields-grid">
+                <mat-form-field appearance="outline" class="compact-field" subscriptSizing="dynamic">
+                  <mat-label>Default Prefix</mat-label>
+                  <mat-select [(ngModel)]="settings.defaultJobPrefix" (selectionChange)="onDefaultPrefixChange($event.value)">
+                    <mat-option *ngFor="let p of settings.refPrefixes" [value]="p.code">
+                      <strong>{{ p.code }}</strong> - {{ p.label }}
+                    </mat-option>
+                  </mat-select>
+                </mat-form-field>
+
+                <mat-form-field appearance="outline" class="compact-field" subscriptSizing="dynamic">
+                  <mat-label>Subject Code</mat-label>
+                  <input matInput [(ngModel)]="settings.subjectCode" placeholder="e.g. 04, LND-SUB">
+                </mat-form-field>
+
+                <mat-form-field appearance="outline" class="compact-field" subscriptSizing="dynamic">
+                  <mat-label>File Number</mat-label>
+                  <input matInput [(ngModel)]="settings.fileNumber" placeholder="e.g. FN-01">
+                </mat-form-field>
+
+                <mat-form-field appearance="outline" class="compact-field" subscriptSizing="dynamic">
+                  <mat-label>File Version</mat-label>
+                  <input matInput [(ngModel)]="settings.fileVersion" placeholder="e.g. V1">
+                </mat-form-field>
+
+                <mat-form-field appearance="outline" class="compact-field" subscriptSizing="dynamic">
+                  <mat-label>Seq Digits (Padding)</mat-label>
+                  <mat-select [(ngModel)]="settings.seqDigits">
+                    <mat-option [value]="2">2 Digits (01, 02..)</mat-option>
+                    <mat-option [value]="3">3 Digits (001, 002..)</mat-option>
+                    <mat-option [value]="4">4 Digits (0001, 0002..)</mat-option>
+                    <mat-option [value]="5">5 Digits (00001..)</mat-option>
+                    <mat-option [value]="6">6 Digits (000001..)</mat-option>
+                  </mat-select>
+                </mat-form-field>
+
+                <mat-form-field appearance="outline" class="compact-field" subscriptSizing="dynamic">
+                  <mat-label>Global Sequence Counter</mat-label>
+                  <input matInput type="number" min="1" [(ngModel)]="settings.nextSeq">
+                </mat-form-field>
+              </div>
+
+              <!-- Format Template String -->
+              <mat-form-field appearance="outline" class="w-full mt-3">
+                <mat-label>Reference Format Template</mat-label>
+                <input matInput [(ngModel)]="settings.refFormat" placeholder="e.g. {PREFIX}/{SUBJECT_CODE}/{YYYY}/{FILE_NUMBER}/{FILE_VERSION}/{SEQ}">
+                <mat-hint>Tokens will automatically be replaced upon saving or registering new land tasks.</mat-hint>
+              </mat-form-field>
+
+              <!-- Available Tokens & Quick Insert -->
+              <div class="token-helper-block">
+                <span class="helper-title">Click token to append:</span>
+                <div class="token-chips">
+                  <button type="button" class="token-btn" (click)="insertToken('{PREFIX}')">&#123;PREFIX&#125;</button>
+                  <button type="button" class="token-btn" (click)="insertToken('{SUBJECT_CODE}')">&#123;SUBJECT_CODE&#125;</button>
+                  <button type="button" class="token-btn" (click)="insertToken('{YYYY}')">&#123;YYYY&#125;</button>
+                  <button type="button" class="token-btn" (click)="insertToken('{FILE_NUMBER}')">&#123;FILE_NUMBER&#125;</button>
+                  <button type="button" class="token-btn" (click)="insertToken('{FILE_VERSION}')">&#123;FILE_VERSION&#125;</button>
+                  <button type="button" class="token-btn" (click)="insertToken('{SEQ}')">&#123;SEQ&#125;</button>
+                </div>
+              </div>
+
+              <!-- Presets -->
+              <div class="preset-helper-block">
+                <span class="helper-title">Format Presets:</span>
+                <div class="preset-chips">
+                  <button type="button" class="preset-btn" (click)="setFormat('{PREFIX}/{SUBJECT_CODE}/{YYYY}/{FILE_NUMBER}/{FILE_VERSION}/{SEQ}')">
+                    Full Slash: &#123;PREFIX&#125;/&#123;SUBJECT_CODE&#125;/&#123;YYYY&#125;/&#123;FILE_NUMBER&#125;/&#123;FILE_VERSION&#125;/&#123;SEQ&#125;
+                  </button>
+                  <button type="button" class="preset-btn" (click)="setFormat('{PREFIX}-{SUBJECT_CODE}-{YYYY}-{FILE_NUMBER}-{FILE_VERSION}-{SEQ}')">
+                    Hyphenated: &#123;PREFIX&#125;-&#123;SUBJECT_CODE&#125;-&#123;YYYY&#125;-&#123;FILE_NUMBER&#125;-&#123;FILE_VERSION&#125;-&#123;SEQ&#125;
+                  </button>
+                  <button type="button" class="preset-btn" (click)="setFormat('{PREFIX}/{YYYY}/{FILE_NUMBER}/{SEQ}')">
+                    Standard: &#123;PREFIX&#125;/&#123;YYYY&#125;/&#123;FILE_NUMBER&#125;/&#123;SEQ&#125;
+                  </button>
+                  <button type="button" class="preset-btn" (click)="setFormat('{PREFIX}-{YYYY}-{SEQ}')">
+                    Simple: &#123;PREFIX&#125;-&#123;YYYY&#125;-&#123;SEQ&#125;
                   </button>
                 </div>
               </div>
-            </div>
-          </mat-tab>
 
-          <!-- ============================================== -->
-          <!-- TAB 3: REFERENCE NUMBERING & GENERAL           -->
-          <!-- ============================================== -->
-          <mat-tab>
-            <ng-template mat-tab-label>
-              <mat-icon class="mr-2">pin</mat-icon> Reference Numbering & General
-            </ng-template>
+              <!-- Multiple Reference Prefixes Section -->
+              <div class="prefixes-section">
+                <div class="prefixes-header">
+                  <div>
+                    <h4 class="sub-heading">Configured Multiple Reference Series</h4>
+                    <p class="tip-text">Define separate reference numbers and prefixes with dedicated subject codes, file numbers, file versions, and running sequence counters. Users can select any configured reference series when creating a task.</p>
+                  </div>
+                </div>
 
-            <div class="tab-content max-w-2xl">
-              <div class="section-intro">
-                <div>
-                  <h3 class="sec-title">Reference Auto-Generation Rules</h3>
-                  <p class="sec-desc">Format syntax for assigning cadastral task reference numbers.</p>
+                <!-- Prefix Cards Grid -->
+                <div class="prefixes-grid">
+                  <div *ngFor="let p of settings.refPrefixes; let pIdx = index" class="prefix-card" [class.is-default]="p.code === settings.defaultJobPrefix">
+                    <div class="prefix-card-top">
+                      <span class="prefix-code-badge">{{ p.code }}</span>
+                      <div class="prefix-actions">
+                        <span *ngIf="p.code === settings.defaultJobPrefix" class="default-badge">
+                          <mat-icon>verified</mat-icon> Default
+                        </span>
+                        <button *ngIf="p.code !== settings.defaultJobPrefix" 
+                                mat-button 
+                                class="set-default-btn" 
+                                (click)="setDefaultPrefix(p.code)"
+                                matTooltip="Make this the default prefix">
+                          Set Default
+                        </button>
+                        <button mat-icon-button color="warn" (click)="removePrefix(pIdx)" class="sm-del-btn" matTooltip="Remove reference series" [disabled]="settings.refPrefixes && settings.refPrefixes.length <= 1">
+                          <mat-icon>delete</mat-icon>
+                        </button>
+                      </div>
+                    </div>
+
+                    <div class="prefix-details">
+                      <div class="pfx-detail-row">
+                        <span class="pfx-label-title">{{ p.label }}</span>
+                      </div>
+                      <div class="pfx-meta-chips">
+                        <span class="meta-tag">Sub: <strong>{{ p.subjectCode || '-' }}</strong></span>
+                        <span class="meta-tag">File: <strong>{{ p.fileNumber || '-' }}</strong></span>
+                        <span class="meta-tag">Ver: <strong>{{ p.fileVersion || '-' }}</strong></span>
+                      </div>
+                      <div class="prefix-seq-row">
+                        <span class="seq-lbl">Next Seq No:</span>
+                        <input type="number" min="1" [(ngModel)]="p.nextSeq" class="inline-seq-input" matTooltip="Next running sequential number for this series">
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Add New Reference Series Form -->
+                <div class="add-prefix-row">
+                  <mat-form-field appearance="outline" class="compact-field" subscriptSizing="dynamic">
+                    <mat-label>Prefix Code</mat-label>
+                    <input matInput [(ngModel)]="newPrefixCode" placeholder="e.g. LND-SUR">
+                  </mat-form-field>
+
+                  <mat-form-field appearance="outline" class="compact-field flex-2" subscriptSizing="dynamic">
+                    <mat-label>Series / Classification Label</mat-label>
+                    <input matInput [(ngModel)]="newPrefixLabel" placeholder="e.g. Cadastral Survey & Demarcation">
+                  </mat-form-field>
+
+                  <mat-form-field appearance="outline" class="compact-field" subscriptSizing="dynamic">
+                    <mat-label>Subject Code</mat-label>
+                    <input matInput [(ngModel)]="newPrefixSubjectCode" placeholder="e.g. 04-SUR">
+                  </mat-form-field>
+
+                  <mat-form-field appearance="outline" class="compact-field" subscriptSizing="dynamic">
+                    <mat-label>File Number</mat-label>
+                    <input matInput [(ngModel)]="newPrefixFileNumber" placeholder="e.g. FN-05">
+                  </mat-form-field>
+
+                  <mat-form-field appearance="outline" class="compact-field" subscriptSizing="dynamic">
+                    <mat-label>File Version</mat-label>
+                    <input matInput [(ngModel)]="newPrefixFileVersion" placeholder="e.g. V1">
+                  </mat-form-field>
+
+                  <mat-form-field appearance="outline" class="compact-field w-24" subscriptSizing="dynamic">
+                    <mat-label>Start Seq</mat-label>
+                    <input matInput type="number" min="1" [(ngModel)]="newPrefixSeq">
+                  </mat-form-field>
+
+                  <button mat-flat-button color="primary" [disabled]="!newPrefixCode.trim()" (click)="addPrefix()" class="add-pfx-btn">
+                    <mat-icon>add</mat-icon> Add Series
+                  </button>
                 </div>
               </div>
 
-              <div class="grid-2-col">
-                <mat-form-field appearance="outline">
-                  <mat-label>Prefix Code</mat-label>
-                  <input matInput [(ngModel)]="settings.defaultJobPrefix" placeholder="e.g. LND">
-                </mat-form-field>
-
-                <mat-form-field appearance="outline">
-                  <mat-label>Default SLA Days</mat-label>
-                  <input matInput type="number" [(ngModel)]="settings.defaultSlaDays" placeholder="e.g. 21">
-                </mat-form-field>
-              </div>
-
-              <mat-form-field appearance="outline" class="w-full">
-                <mat-label>Reference Format Template</mat-label>
-                <input matInput [(ngModel)]="settings.refFormat" placeholder="e.g. {PREFIX}-{YYYY}-{SEQ}">
-                <mat-hint>Supported tokens: &#123;PREFIX&#125;, &#123;YYYY&#125;, &#123;SEQ&#125;</mat-hint>
-              </mat-form-field>
-
-              <div class="sample-ref-box">
-                <span class="label">Sample Next Generated Reference:</span>
-                <span class="sample-ref font-mono font-bold">{{ sampleGeneratedRef }}</span>
-              </div>
             </div>
           </mat-tab>
 
@@ -580,55 +714,295 @@ import { NotificationService } from '../../../../core/services/notification.serv
       }
     }
 
-    /* Divisions Management */
-    .add-division-box {
+
+
+    /* General & Reference Setting Styles */
+    .max-w-4xl { max-width: 56rem; }
+    .grid-2-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .max-w-2xl { max-width: 48rem; }
+
+    .preview-banner {
       display: flex;
-      gap: 12px;
       align-items: center;
-      max-width: 600px;
-      margin-bottom: 20px;
-    }
-
-    .divisions-list {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
+      justify-content: space-between;
+      flex-wrap: wrap;
       gap: 12px;
+      background: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%);
+      border: 1.5px solid #a7f3d0;
+      border-radius: 10px;
+      padding: 14px 18px;
+      margin-bottom: 18px;
 
-      @media (max-width: 768px) { grid-template-columns: 1fr; }
-
-      .division-item {
+      .preview-info {
         display: flex;
-        justify-content: space-between;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .preview-line {
+        display: flex;
         align-items: center;
-        background: #ffffff;
-        border: 1px solid #e2e8f0;
-        border-radius: 8px;
-        padding: 10px 14px;
-
-        .div-left {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          .div-icon { color: #0284c7; }
-          .div-name { font-weight: 600; font-size: 0.9rem; color: #1e293b; }
+        gap: 10px;
+        flex-wrap: wrap;
+        .preview-label { font-size: 11.5px; font-weight: 700; color: #065f46; }
+        .preview-value {
+          font-family: monospace;
+          font-size: 15px;
+          font-weight: 800;
+          color: #047857;
+          background: #ffffff;
+          padding: 4px 12px;
+          border-radius: 6px;
+          border: 1px solid #6ee7b7;
+          letter-spacing: 0.05em;
+        }
+      }
+      .preview-prefix-pills {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex-wrap: wrap;
+        .test-prefix-lbl { font-size: 10.5px; font-weight: 600; color: #047857; }
+        .preview-pill {
+          background: white;
+          border: 1px solid #a7f3d0;
+          color: #065f46;
+          border-radius: 4px;
+          padding: 2px 8px;
+          font-size: 11px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.15s;
+          .pill-seq { font-size: 9.5px; opacity: 0.75; }
+          &:hover { border-color: #059669; color: #059669; }
+          &.active { background: #059669; color: white; border-color: #059669; }
+        }
+      }
+      .preview-extra {
+        .preview-tag {
+          font-size: 11px;
+          color: #065f46;
+          background: #d1fae5;
+          padding: 4px 10px;
+          border-radius: 6px;
         }
       }
     }
 
-    /* General */
-    .grid-2-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-    .max-w-2xl { max-width: 48rem; }
-    .sample-ref-box {
-      margin-top: 14px;
-      background: #f8fafc;
-      border: 1px solid #e2e8f0;
-      padding: 12px 16px;
-      border-radius: 8px;
+    .ref-fields-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 12px;
+    }
+
+    .token-helper-block, .preset-helper-block {
       display: flex;
       align-items: center;
       gap: 10px;
-      .label { font-size: 0.85rem; color: #64748b; }
-      .sample-ref { font-size: 1.1rem; color: #0f172a; }
+      flex-wrap: wrap;
+      margin-top: 10px;
+      .helper-title {
+        font-size: 11px;
+        font-weight: 700;
+        color: #64748b;
+        min-width: 120px;
+      }
+    }
+
+    .token-chips, .preset-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .token-btn {
+      background: #f1f5f9;
+      border: 1px solid #cbd5e1;
+      border-radius: 4px;
+      padding: 3px 8px;
+      font-size: 11px;
+      font-family: monospace;
+      font-weight: 600;
+      color: #334155;
+      cursor: pointer;
+      transition: all 0.15s;
+      &:hover {
+        background: #0284c7;
+        color: white;
+        border-color: #0284c7;
+      }
+    }
+
+    .preset-btn {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      padding: 4px 10px;
+      font-size: 11px;
+      font-weight: 600;
+      color: #475569;
+      cursor: pointer;
+      transition: all 0.15s;
+      &:hover {
+        background: #eff6ff;
+        color: #1d4ed8;
+        border-color: #93c5fd;
+      }
+    }
+
+    /* Prefixes Section */
+    .prefixes-section {
+      margin-top: 24px;
+      padding-top: 18px;
+      border-top: 1px dashed #cbd5e1;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+
+      .sub-heading {
+        margin: 0;
+        font-size: 1.05rem;
+        font-weight: 700;
+        color: #0f172a;
+      }
+      .tip-text {
+        margin: 3px 0 0 0;
+        font-size: 0.8rem;
+        color: #64748b;
+      }
+    }
+
+    .prefixes-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 12px;
+    }
+
+    .prefix-card {
+      background: #f8fafc;
+      border: 1.5px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 10px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      transition: all 0.15s;
+
+      &.is-default {
+        background: #f0fdf4;
+        border-color: #86efac;
+      }
+
+      .prefix-card-top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+
+        .prefix-code-badge {
+          font-family: monospace;
+          font-size: 13px;
+          font-weight: 800;
+          color: #0f172a;
+          background: #ffffff;
+          border: 1px solid #cbd5e1;
+          padding: 2px 8px;
+          border-radius: 4px;
+        }
+
+        .prefix-actions {
+          display: flex;
+          align-items: center;
+          gap: 4px;
+
+          .default-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+            font-size: 11px;
+            font-weight: 700;
+            color: #15803d;
+            background: #dcfce7;
+            padding: 2px 7px;
+            border-radius: 999px;
+            mat-icon { font-size: 14px; width: 14px; height: 14px; }
+          }
+
+          .set-default-btn {
+            font-size: 11px;
+            color: #64748b;
+            padding: 0 6px;
+            height: 24px;
+            line-height: 24px;
+          }
+
+          .sm-del-btn {
+            width: 28px;
+            height: 28px;
+            line-height: 28px;
+            mat-icon { font-size: 16px; width: 16px; height: 16px; }
+          }
+        }
+      }
+
+      .prefix-details {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+
+        .pfx-label-title {
+          font-size: 0.85rem;
+          font-weight: 600;
+          color: #1e293b;
+        }
+
+        .pfx-meta-chips {
+          display: flex;
+          gap: 6px;
+          flex-wrap: wrap;
+
+          .meta-tag {
+            font-size: 10px;
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            padding: 2px 6px;
+            border-radius: 4px;
+            color: #475569;
+          }
+        }
+
+        .prefix-seq-row {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          font-size: 11px;
+          color: #64748b;
+
+          .inline-seq-input {
+            width: 70px;
+            padding: 2px 6px;
+            border: 1px solid #cbd5e1;
+            border-radius: 4px;
+            font-size: 11px;
+            font-family: monospace;
+            font-weight: 700;
+            color: #0f172a;
+          }
+        }
+      }
+    }
+
+    .add-prefix-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 12px;
+
+      .flex-2 { flex: 2; min-width: 180px; }
+      .w-24 { width: 90px; }
+      .add-pfx-btn { height: 42px; font-weight: 600; }
     }
 
     /* Modal Backdrop */
@@ -897,27 +1271,38 @@ export class LandSettingsComponent implements OnInit {
 
   settings: LandSettings = { ...DEFAULT_LAND_SETTINGS };
   isSaving = signal<boolean>(false);
-  newDivisionName: string = '';
 
   // Modal State
   showJobTypeModal = false;
   editingJobTypeIndex: number | null = null;
   currentModalJobType: JobTypeConfig = this.getEmptyJobType();
 
+  // Reference Series State
+  previewPrefixCode: string = '';
+  newPrefixCode: string = '';
+  newPrefixLabel: string = '';
+  newPrefixSubjectCode: string = '04';
+  newPrefixFileNumber: string = 'FN-01';
+  newPrefixFileVersion: string = 'V1';
+  newPrefixSeq: number = 1;
+
   get sampleGeneratedRef(): string {
-    const prefix = this.settings.defaultJobPrefix || 'LND';
-    const year = new Date().getFullYear();
-    const seq = String(this.settings.nextSeq || 1).padStart(4, '0');
-    return (this.settings.refFormat || '{PREFIX}-{YYYY}-{SEQ}')
-      .replace('{PREFIX}', prefix)
-      .replace('{YYYY}', String(year))
-      .replace('{SEQ}', seq);
+    const chosenPfx = this.previewPrefixCode || this.settings.defaultJobPrefix || 'LND';
+    return generateLandJobRef(this.settings, {
+      prefixCode: chosenPfx
+    });
   }
 
   ngOnInit() {
     this.landService.getSettings().subscribe({
       next: (s) => {
         this.settings = { ...DEFAULT_LAND_SETTINGS, ...s };
+        if (!this.settings.refPrefixes || this.settings.refPrefixes.length === 0) {
+          this.settings.refPrefixes = [...DEFAULT_LAND_REF_PREFIXES];
+        }
+        if (!this.previewPrefixCode) {
+          this.previewPrefixCode = this.settings.defaultJobPrefix || 'LND';
+        }
       }
     });
   }
@@ -926,24 +1311,91 @@ export class LandSettingsComponent implements OnInit {
     return index;
   }
 
-  // --- Divisions ---
-  async addDivision() {
-    const val = this.newDivisionName.trim();
-    if (!val) return;
-    if (this.settings.divisions.includes(val)) {
-      this.notif.warning('This division already exists.');
-      return;
+  // --- Reference Series & Tokens ---
+  insertToken(token: string) {
+    if (!this.settings.refFormat) {
+      this.settings.refFormat = token;
+    } else {
+      this.settings.refFormat += (this.settings.refFormat.endsWith('/') || this.settings.refFormat.endsWith('-') ? '' : '/') + token;
     }
-    this.settings.divisions.push(val);
-    this.newDivisionName = '';
-    await this.saveSettings(true, `Division "${val}" added and saved!`);
   }
 
-  async removeDivision(idx: number) {
-    const removed = this.settings.divisions[idx];
-    this.settings.divisions.splice(idx, 1);
-    await this.saveSettings(true, `Division "${removed}" removed and saved.`);
+  setFormat(format: string) {
+    this.settings.refFormat = format;
   }
+
+  onDefaultPrefixChange(code: string) {
+    this.previewPrefixCode = code;
+    const pfx = this.settings.refPrefixes?.find(p => p.code === code);
+    if (pfx) {
+      if (pfx.subjectCode) this.settings.subjectCode = pfx.subjectCode;
+      if (pfx.fileNumber) this.settings.fileNumber = pfx.fileNumber;
+      if (pfx.fileVersion) this.settings.fileVersion = pfx.fileVersion;
+    }
+  }
+
+  async setDefaultPrefix(code: string) {
+    this.settings.defaultJobPrefix = code;
+    this.onDefaultPrefixChange(code);
+    await this.saveSettings(true, `Prefix "${code}" set as default reference series.`);
+  }
+
+  async addPrefix() {
+    const code = this.newPrefixCode.trim().toUpperCase();
+    if (!code) return;
+
+    if (!this.settings.refPrefixes) {
+      this.settings.refPrefixes = [];
+    }
+
+    if (this.settings.refPrefixes.some(p => p.code === code)) {
+      this.notif.warning(`Reference prefix "${code}" already exists.`);
+      return;
+    }
+
+    const newPrefix: LandRefPrefix = {
+      code,
+      label: this.newPrefixLabel.trim() || code,
+      subjectCode: this.newPrefixSubjectCode.trim() || '04',
+      fileNumber: this.newPrefixFileNumber.trim() || 'FN-01',
+      fileVersion: this.newPrefixFileVersion.trim() || 'V1',
+      nextSeq: Number(this.newPrefixSeq) || 1
+    };
+
+    this.settings.refPrefixes.push(newPrefix);
+    this.previewPrefixCode = code;
+
+    // Reset inputs
+    this.newPrefixCode = '';
+    this.newPrefixLabel = '';
+    this.newPrefixSubjectCode = '04';
+    this.newPrefixFileNumber = 'FN-01';
+    this.newPrefixFileVersion = 'V1';
+    this.newPrefixSeq = 1;
+
+    await this.saveSettings(true, `Reference series "${code}" added and persisted!`);
+  }
+
+  async removePrefix(idx: number) {
+    if (!this.settings.refPrefixes || this.settings.refPrefixes.length <= 1) {
+      this.notif.warning('At least one reference prefix must remain configured.');
+      return;
+    }
+
+    const removed = this.settings.refPrefixes[idx];
+    this.settings.refPrefixes.splice(idx, 1);
+
+    if (this.settings.defaultJobPrefix === removed.code) {
+      this.settings.defaultJobPrefix = this.settings.refPrefixes[0].code;
+      this.previewPrefixCode = this.settings.defaultJobPrefix;
+    } else if (this.previewPrefixCode === removed.code) {
+      this.previewPrefixCode = this.settings.defaultJobPrefix;
+    }
+
+    await this.saveSettings(true, `Reference series "${removed.code}" removed.`);
+  }
+
+
 
   // --- Job Types ---
   async toggleJobTypeActive(idx: number) {

@@ -17,6 +17,7 @@ import { LandJobDialogComponent } from '../../components/land-job-dialog/land-jo
 import { LandJobDetailDialogComponent } from '../../components/land-job-detail-dialog/land-job-detail-dialog.component';
 import { NotificationService } from '../../../../core/services/notification.service';
 import { RbacService } from '../../../../auth/rbac.service';
+import { SettingsService, Division } from '../../../settings/settings.service';
 
 @Component({
   selector: 'app-land-jobs',
@@ -64,7 +65,7 @@ import { RbacService } from '../../../../auth/rbac.service';
             <mat-label>Division</mat-label>
             <mat-select [ngModel]="selectedDivision()" (ngModelChange)="selectedDivision.set($event)">
               <mat-option value="ALL">All Divisions</mat-option>
-              <mat-option *ngFor="let div of settings().divisions" [value]="div">
+              <mat-option *ngFor="let div of availableDivisions()" [value]="div">
                 {{ div }}
               </mat-option>
             </mat-select>
@@ -414,9 +415,36 @@ export class LandJobsComponent implements OnInit {
   private rbacService = inject(RbacService);
   private notif = inject(NotificationService);
   private dialog = inject(MatDialog);
+  private settingsService = inject(SettingsService);
 
   jobs = signal<LandJob[]>([]);
   settings = signal<LandSettings>(DEFAULT_LAND_SETTINGS);
+  allDivisions = signal<Division[]>([]);
+
+  availableDivisions = computed(() => {
+    const divs = this.allDivisions();
+    const set = new Set<string>();
+    const enOnly = (s?: string) => {
+      if (!s) return '';
+      return s.replace(/[^\x20-\x7E]/g, '')
+              .replace(/\//g, '')
+              .replace(/(^[\s-]+|[\s-]+$)/g, '')
+              .replace(/\s{2,}/g, ' ')
+              .trim();
+    };
+
+    for (const d of divs) {
+      const ds = enOnly(d.divisionalSecretariat);
+      if (ds) set.add(ds);
+    }
+
+    // Also include any divisions already present on existing jobs
+    for (const j of this.jobs()) {
+      if (j.division) set.add(j.division);
+    }
+
+    return Array.from(set).sort();
+  });
 
   searchQuery = signal<string>('');
   selectedDivision = signal<string>('ALL');
@@ -481,6 +509,10 @@ export class LandJobsComponent implements OnInit {
 
     this.landService.getLandJobs().subscribe({
       next: (data) => this.jobs.set(data || [])
+    });
+
+    this.settingsService.getDivisions().subscribe({
+      next: (divs) => this.allDivisions.set(divs || [])
     });
   }
 

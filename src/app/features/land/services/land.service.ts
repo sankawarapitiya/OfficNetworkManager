@@ -133,14 +133,22 @@ export class LandService {
   /**
    * Create a new land job from the 4-stage wizard
    */
-  async createLandJob(jobData: Omit<LandJob, 'id' | 'jobRef' | 'createdAt' | 'createdBy' | 'updatedAt' | 'updatedBy'>): Promise<string> {
+  async createLandJob(
+    jobData: Omit<LandJob, 'id' | 'createdAt' | 'createdBy' | 'updatedAt' | 'updatedBy'> & { jobRef?: string }
+  ): Promise<string> {
     const user = this.authService.currentUser();
     const officerName = user?.displayName || user?.email || 'Land Officer';
     const officerId = user?.uid || 'system';
 
     // Retrieve current settings from reactive cache / subject
     const settings = this.settingsSubject.getValue() || DEFAULT_LAND_SETTINGS;
-    const jobRef = generateLandJobRef(settings);
+    const chosenPrefix = jobData.prefixCode || settings.defaultJobPrefix || 'LND';
+    const jobRef = jobData.jobRef || generateLandJobRef(settings, {
+      prefixCode: chosenPrefix,
+      subjectCode: jobData.subjectCode,
+      fileNumber: jobData.fileNumber,
+      fileVersion: jobData.fileVersion
+    });
     const now = Date.now();
 
     const newJob: Omit<LandJob, 'id'> = {
@@ -154,11 +162,19 @@ export class LandService {
 
     const docId = await this.firestoreService.addDocument(this.jobsCollection, newJob);
 
-    // Increment nextSeq in settings and persist
+    // Increment nextSeq in settings and prefix counter and persist
     try {
+      const updatedPrefixes = (settings.refPrefixes || []).map(p => {
+        if (p.code === chosenPrefix) {
+          return { ...p, nextSeq: (p.nextSeq || 1) + 1 };
+        }
+        return p;
+      });
+
       await this.saveSettings({
         ...settings,
-        nextSeq: (settings.nextSeq || 1) + 1
+        nextSeq: (settings.nextSeq || 1) + 1,
+        refPrefixes: updatedPrefixes
       });
     } catch (e) {
       console.warn('Could not increment nextSeq in land settings:', e);

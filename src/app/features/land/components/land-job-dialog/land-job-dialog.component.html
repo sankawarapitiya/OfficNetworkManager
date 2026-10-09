@@ -80,11 +80,61 @@
             </div>
           </div>
 
-          <!-- Section 1B: Customer Information -->
+          <!-- Section 1B: Reference Numbering & Series Configuration -->
+          <div class="form-card ref-series-card">
+            <div class="card-title-row">
+              <mat-icon class="sec-icon text-teal">tag</mat-icon>
+              <div class="title-with-pill">
+                <h4 class="card-heading">2. Reference Series & Numbering</h4>
+                <span class="ref-preview-badge">
+                  <mat-icon>pin</mat-icon>
+                  Ref Preview: <strong>{{ generatedRefPreview }}</strong>
+                </span>
+              </div>
+            </div>
+            <p class="section-subtext">Select the reference series prefix or adjust file identifiers. The reference number is formatted automatically based on the Land Management Configuration.</p>
+
+            <div class="grid-4-col">
+              <!-- Series / Prefix Selector -->
+              <mat-form-field appearance="outline">
+                <mat-label>Reference Prefix / Series</mat-label>
+                <mat-select formControlName="prefixCode" (selectionChange)="onReferencePrefixChange($event.value)">
+                  <mat-option *ngFor="let pfx of settings().refPrefixes || []" [value]="pfx.code">
+                    <span class="font-bold">{{ pfx.code }}</span>
+                    <span class="text-xs text-slate-500"> — {{ pfx.label }}</span>
+                  </mat-option>
+                  <!-- Fallback if defaultJobPrefix is not in refPrefixes list -->
+                  <mat-option *ngIf="settings().defaultJobPrefix && (!settings().refPrefixes || settings().refPrefixes?.length === 0)" [value]="settings().defaultJobPrefix">
+                    {{ settings().defaultJobPrefix }} (Default)
+                  </mat-option>
+                </mat-select>
+              </mat-form-field>
+
+              <!-- Subject Code -->
+              <mat-form-field appearance="outline">
+                <mat-label>Subject Code</mat-label>
+                <input matInput formControlName="subjectCode" placeholder="e.g. 04" (input)="updateGeneratedJobRef()">
+              </mat-form-field>
+
+              <!-- File Number -->
+              <mat-form-field appearance="outline">
+                <mat-label>File Number</mat-label>
+                <input matInput formControlName="fileNumber" placeholder="e.g. FN-01" (input)="updateGeneratedJobRef()">
+              </mat-form-field>
+
+              <!-- File Version -->
+              <mat-form-field appearance="outline">
+                <mat-label>File Version</mat-label>
+                <input matInput formControlName="fileVersion" placeholder="e.g. V1" (input)="updateGeneratedJobRef()">
+              </mat-form-field>
+            </div>
+          </div>
+
+          <!-- Section 1C: Customer Information -->
           <div class="form-card">
             <div class="card-title-row">
               <mat-icon class="sec-icon text-blue">person</mat-icon>
-              <h4 class="card-heading">2. Customer / Landowner Information</h4>
+              <h4 class="card-heading">3. Customer / Landowner Information</h4>
             </div>
 
             <!-- Existing Customer Autocomplete -->
@@ -159,11 +209,11 @@
             </div>
           </div>
 
-          <!-- Section 1C: Land Details & Division -->
+          <!-- Section 1D: Land Details & Division -->
           <div class="form-card">
             <div class="card-title-row">
               <mat-icon class="sec-icon text-amber">terrain</mat-icon>
-              <h4 class="card-heading">3. Cadastral Parcel & Location Details</h4>
+              <h4 class="card-heading">4. Cadastral Parcel & Location Details</h4>
             </div>
 
             <div class="grid-3-col">

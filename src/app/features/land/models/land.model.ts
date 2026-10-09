@@ -71,7 +71,11 @@ export interface LandJobVerificationStage {
 
 export interface LandJob {
   id?: string;
-  jobRef: string; // e.g. LND-2026-0001
+  jobRef: string; // e.g. LND/04/2026/FN-01/V1/0001
+  prefixCode?: string;
+  subjectCode?: string;
+  fileNumber?: string;
+  fileVersion?: string;
   jobTypeId: string;
   jobTypeName: string;
   priority: LandPriority;
@@ -134,14 +138,29 @@ export interface LandAuditRecord {
   timestamp: number;
 }
 
+export interface LandRefPrefix {
+  code: string;               // Prefix e.g. 'LND', 'PAR', 'CAD'
+  label: string;              // Classification e.g. 'General Land Affairs', 'Cadastral Survey'
+  subjectCode?: string;       // Subject code e.g. '04', 'LND-SUB'
+  fileNumber?: string;        // File number e.g. 'FN-01'
+  fileVersion?: string;       // File version e.g. 'V1'
+  format?: string;            // Custom template override if any
+  nextSeq?: number;           // Independent sequence counter
+}
+
 export interface LandSettings {
   jobTypes: JobTypeConfig[];
   divisions: string[];
   defaultJobPrefix: string;
-  refFormat: string; // e.g. "{PREFIX}-{YYYY}-{SEQ}"
+  subjectCode?: string;
+  fileNumber?: string;
+  fileVersion?: string;
+  refFormat: string; // e.g. "{PREFIX}/{SUBJECT_CODE}/{YYYY}/{FILE_NUMBER}/{FILE_VERSION}/{SEQ}"
   nextSeq: number;
+  seqDigits?: number;
+  refPrefixes?: LandRefPrefix[];
   priorities: LandPriority[];
-  defaultSlaDays: number;
+  defaultSlaDays?: number;
   formRequiredFields?: Record<string, boolean>;
 }
 
@@ -374,25 +393,56 @@ export const DEFAULT_JOB_TYPES: JobTypeConfig[] = [
   }
 ];
 
+export const DEFAULT_LAND_REF_PREFIXES: LandRefPrefix[] = [
+  { code: 'LND', label: 'General Land Administration', subjectCode: '04', fileNumber: 'FN-01', fileVersion: 'V1', nextSeq: 1 },
+  { code: 'PAR', label: 'Cadastral Partition & Sub-division', subjectCode: '04-SUB', fileNumber: 'FN-02', fileVersion: 'V1', nextSeq: 1 },
+  { code: 'BND', label: 'Boundary Survey & Dispute', subjectCode: '04-BND', fileNumber: 'FN-03', fileVersion: 'V1', nextSeq: 1 },
+  { code: 'STT', label: 'State Crown Land Lease', subjectCode: '04-STT', fileNumber: 'FN-04', fileVersion: 'V1', nextSeq: 1 }
+];
+
 export const DEFAULT_LAND_SETTINGS: LandSettings = {
   jobTypes: DEFAULT_JOB_TYPES,
   divisions: DEFAULT_DIVISIONS,
   defaultJobPrefix: 'LND',
-  refFormat: '{PREFIX}-{YYYY}-{SEQ}',
+  subjectCode: '04',
+  fileNumber: 'FN-01',
+  fileVersion: 'V1',
+  refFormat: '{PREFIX}/{SUBJECT_CODE}/{YYYY}/{FILE_NUMBER}/{FILE_VERSION}/{SEQ}',
   nextSeq: 1,
+  seqDigits: 4,
+  refPrefixes: DEFAULT_LAND_REF_PREFIXES,
   priorities: ['Normal', 'Urgent', 'Immediate'],
-  defaultSlaDays: 21,
   formRequiredFields: { ...DEFAULT_FORM_REQUIRED_FIELDS }
 };
 
-export function generateLandJobRef(settings: LandSettings): string {
-  const prefix = settings.defaultJobPrefix || 'LND';
+export function generateLandJobRef(
+  settings: LandSettings, 
+  customOptions?: { 
+    prefixCode?: string; 
+    subjectCode?: string; 
+    fileNumber?: string; 
+    fileVersion?: string;
+  }
+): string {
+  const chosenPrefixCode = customOptions?.prefixCode || settings.defaultJobPrefix || 'LND';
+  const prefixObj = settings.refPrefixes?.find(p => p.code === chosenPrefixCode);
+
+  const prefix = chosenPrefixCode;
+  const subjectCode = customOptions?.subjectCode || prefixObj?.subjectCode || settings.subjectCode || '04';
+  const fileNumber = customOptions?.fileNumber || prefixObj?.fileNumber || settings.fileNumber || 'FN-01';
+  const fileVersion = customOptions?.fileVersion || prefixObj?.fileVersion || settings.fileVersion || 'V1';
+
+  const digits = settings.seqDigits || 4;
+  const seq = prefixObj?.nextSeq !== undefined ? prefixObj.nextSeq : (settings.nextSeq || 1);
+  const seqNum = String(seq).padStart(digits, '0');
   const year = new Date().getFullYear();
-  const seqNum = String(settings.nextSeq || 1).padStart(4, '0');
-  
-  const format = settings.refFormat || '{PREFIX}-{YYYY}-{SEQ}';
+
+  const format = prefixObj?.format || settings.refFormat || '{PREFIX}/{SUBJECT_CODE}/{YYYY}/{FILE_NUMBER}/{FILE_VERSION}/{SEQ}';
   return format
     .replace('{PREFIX}', prefix)
+    .replace('{SUBJECT_CODE}', subjectCode)
     .replace('{YYYY}', String(year))
+    .replace('{FILE_NUMBER}', fileNumber)
+    .replace('{FILE_VERSION}', fileVersion)
     .replace('{SEQ}', seqNum);
 }

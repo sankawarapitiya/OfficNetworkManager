@@ -27,7 +27,9 @@ import {
   JobTypeConfig, 
   LandSettings, 
   DEFAULT_LAND_SETTINGS,
-  DEFAULT_FORM_REQUIRED_FIELDS
+  DEFAULT_FORM_REQUIRED_FIELDS,
+  LandRefPrefix,
+  generateLandJobRef
 } from '../../models/land.model';
 
 @Component({
@@ -216,6 +218,12 @@ export class LandJobDialogComponent implements OnInit {
 
     this.initialForm = this.fb.group({
       jobTypeId: [ej?.jobTypeId || '', Validators.required],
+      // Reference Numbering Customization
+      prefixCode: [ej?.prefixCode || ''],
+      subjectCode: [ej?.subjectCode || ''],
+      fileNumber: [ej?.fileNumber || ''],
+      fileVersion: [ej?.fileVersion || ''],
+      customJobRef: [ej?.jobRef || ''],
       // Customer
       customerId: [ej?.customerId || ''],
       customerName: [ej?.customerName || ''],
@@ -266,6 +274,22 @@ export class LandJobDialogComponent implements OnInit {
         this.updateFormValidators();
         const ej = this.existingJob;
 
+        if (!ej) {
+          // Initialize default reference numbering values if not set
+          const currentPfx = this.initialForm.get('prefixCode')?.value;
+          if (!currentPfx) {
+            const defPrefix = s.defaultJobPrefix || (s.refPrefixes && s.refPrefixes[0]?.code) || 'LND';
+            const matchedPfxObj = s.refPrefixes?.find(p => p.code === defPrefix);
+            this.initialForm.patchValue({
+              prefixCode: defPrefix,
+              subjectCode: matchedPfxObj?.subjectCode || s.subjectCode || '04',
+              fileNumber: matchedPfxObj?.fileNumber || s.fileNumber || 'FN-01',
+              fileVersion: matchedPfxObj?.fileVersion || s.fileVersion || 'V1'
+            });
+            this.updateGeneratedJobRef();
+          }
+        }
+
         if (ej && ej.jobTypeId) {
           const matchedJt = s.jobTypes.find(j => j.id === ej.jobTypeId) || null;
           this.selectedJobType.set(matchedJt);
@@ -303,6 +327,49 @@ export class LandJobDialogComponent implements OnInit {
 
     this.settingsService.getDivisions().subscribe(divs => {
       this.allDivisions.set(divs);
+    });
+  }
+
+  onReferencePrefixChange(prefixCode: string) {
+    const s = this.settings();
+    const pfx = s.refPrefixes?.find(p => p.code === prefixCode);
+    if (pfx) {
+      this.initialForm.patchValue({
+        prefixCode: pfx.code,
+        subjectCode: pfx.subjectCode || s.subjectCode || '04',
+        fileNumber: pfx.fileNumber || s.fileNumber || 'FN-01',
+        fileVersion: pfx.fileVersion || s.fileVersion || 'V1'
+      });
+    } else {
+      this.initialForm.patchValue({ prefixCode });
+    }
+    this.updateGeneratedJobRef();
+  }
+
+  updateGeneratedJobRef() {
+    if (this.isEditMode()) return;
+    const s = this.settings();
+    const val = this.initialForm.value;
+    const generated = generateLandJobRef(s, {
+      prefixCode: val.prefixCode,
+      subjectCode: val.subjectCode,
+      fileNumber: val.fileNumber,
+      fileVersion: val.fileVersion
+    });
+    this.initialForm.patchValue({ customJobRef: generated });
+  }
+
+  get generatedRefPreview(): string {
+    if (this.isEditMode() && this.existingJob?.jobRef) {
+      return this.existingJob.jobRef;
+    }
+    const val = this.initialForm?.value;
+    if (val?.customJobRef) return val.customJobRef;
+    return generateLandJobRef(this.settings(), {
+      prefixCode: val?.prefixCode,
+      subjectCode: val?.subjectCode,
+      fileNumber: val?.fileNumber,
+      fileVersion: val?.fileVersion
     });
   }
 
@@ -566,7 +633,12 @@ export class LandJobDialogComponent implements OnInit {
     const initialVal = this.initialForm.value;
     const completionVal = this.completionForm.value;
 
-    const payload: Omit<LandJob, 'id' | 'jobRef' | 'createdAt' | 'createdBy' | 'updatedAt' | 'updatedBy'> = {
+    const payload: Omit<LandJob, 'id' | 'createdAt' | 'createdBy' | 'updatedAt' | 'updatedBy'> = {
+      jobRef: initialVal.customJobRef || undefined as any,
+      prefixCode: initialVal.prefixCode || undefined,
+      subjectCode: initialVal.subjectCode || undefined,
+      fileNumber: initialVal.fileNumber || undefined,
+      fileVersion: initialVal.fileVersion || undefined,
       jobTypeId: jt.id,
       jobTypeName: jt.name,
       priority: initialVal.priority,
