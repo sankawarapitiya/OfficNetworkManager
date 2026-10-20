@@ -27,6 +27,7 @@ import {
   FormFieldDefinition
 } from '../../models/land.model';
 import { NotificationService } from '../../../../core/services/notification.service';
+import { SmsService, SmsSettings, DEFAULT_SMS_SETTINGS } from '../../../../core/services/sms.service';
 
 @Component({
   selector: 'app-land-settings',
@@ -446,6 +447,115 @@ import { NotificationService } from '../../../../core/services/notification.serv
                       <mat-slide-toggle [checked]="isFieldRequired(field.key)" (change)="toggleFieldRequired(field.key, $event.checked)" color="primary">
                       </mat-slide-toggle>
                     </div>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </mat-tab>
+
+          <!-- ============================================== -->
+          <!-- TAB 4: CITIZEN SMS NOTIFICATIONS & GATEWAY     -->
+          <!-- ============================================== -->
+          <mat-tab>
+            <ng-template mat-tab-label>
+              <mat-icon class="mr-2">sms</mat-icon> SMS Notifications & Gateway
+            </ng-template>
+
+            <div class="tab-content">
+              <div class="section-intro">
+                <div>
+                  <h3 class="sec-title">send.lk SMS Gateway & Citizen Notifications</h3>
+                  <p class="sec-desc">Configure send.lk v3 REST API endpoint, API token, Sender ID, active status, and default pre-filled stage message templates.</p>
+                </div>
+                <div class="quick-bulk-actions">
+                  <button mat-flat-button color="primary" [disabled]="isSavingSms()" (click)="saveSmsSettings()">
+                    <mat-icon>{{ isSavingSms() ? 'sync' : 'save' }}</mat-icon>
+                    {{ isSavingSms() ? 'Saving...' : 'Save SMS Configuration' }}
+                  </button>
+                </div>
+              </div>
+
+              <!-- SMS Gateway Credentials Card -->
+              <div class="config-sub-section">
+                <div class="sub-sec-header">
+                  <h4><mat-icon>cell_tower</mat-icon> Gateway Configuration (send.lk)</h4>
+                  <mat-slide-toggle [checked]="smsSettings().enabled" (change)="updateSmsEnabled($event.checked)" color="primary">
+                    {{ smsSettings().enabled ? 'SMS Active' : 'SMS Disabled' }}
+                  </mat-slide-toggle>
+                </div>
+
+                <div class="grid-3-col">
+                  <mat-form-field appearance="outline">
+                    <mat-label>API Endpoint (send.lk Base URL)</mat-label>
+                    <input matInput [ngModel]="smsSettings().apiEndpoint" (ngModelChange)="updateSmsField('apiEndpoint', $event)" placeholder="https://sms.send.lk/api/v3/">
+                    <mat-hint>Resolved: {{ smsSettings().apiEndpoint }}sms/send</mat-hint>
+                  </mat-form-field>
+
+                  <mat-form-field appearance="outline">
+                    <mat-label>API Bearer Token</mat-label>
+                    <input matInput [type]="showSmsToken() ? 'text' : 'password'" [ngModel]="smsSettings().apiToken" (ngModelChange)="updateSmsField('apiToken', $event)">
+                    <button mat-icon-button matSuffix type="button" (click)="toggleSmsTokenVisibility()" [matTooltip]="showSmsToken() ? 'Hide token' : 'Show token'">
+                      <mat-icon>{{ showSmsToken() ? 'visibility_off' : 'visibility' }}</mat-icon>
+                    </button>
+                    <mat-hint>send.lk API Key</mat-hint>
+                  </mat-form-field>
+
+                  <mat-form-field appearance="outline">
+                    <mat-label>Sender ID (Masking Header)</mat-label>
+                    <input matInput [ngModel]="smsSettings().senderId" (ngModelChange)="updateSmsField('senderId', $event)" placeholder="DS-OfficeTM">
+                    <mat-hint>Sender ID header</mat-hint>
+                  </mat-form-field>
+                </div>
+              </div>
+
+              <!-- SMS Stage Templates -->
+              <div class="config-sub-section mt-4">
+                <div class="sub-sec-header">
+                  <h4><mat-icon>chat</mat-icon> Stage Pre-filled Message Templates</h4>
+                  <span class="text-xs text-gray">Placeholders: <code>&#123;CUSTOMER_NAME&#125;</code>, <code>&#123;JOB_REF&#125;</code>, <code>&#123;LOT_NUMBER&#125;</code>, <code>&#123;FILE_NUMBER&#125;</code></span>
+                </div>
+
+                <div class="templates-form-list">
+                  <mat-form-field appearance="outline" class="w-full mb-3">
+                    <mat-label>Stage 1: Initial Registration Template</mat-label>
+                    <textarea matInput rows="2" [ngModel]="smsSettings().templates?.initial" (ngModelChange)="updateSmsTemplate('initial', $event)"></textarea>
+                  </mat-form-field>
+
+                  <mat-form-field appearance="outline" class="w-full mb-3">
+                    <mat-label>Stage 2: Documentation Phase Template</mat-label>
+                    <textarea matInput rows="2" [ngModel]="smsSettings().templates?.documentation" (ngModelChange)="updateSmsTemplate('documentation', $event)"></textarea>
+                  </mat-form-field>
+
+                  <mat-form-field appearance="outline" class="w-full mb-3">
+                    <mat-label>Stage 3: Verification / Field Inspection Template</mat-label>
+                    <textarea matInput rows="2" [ngModel]="smsSettings().templates?.verification" (ngModelChange)="updateSmsTemplate('verification', $event)"></textarea>
+                  </mat-form-field>
+
+                  <mat-form-field appearance="outline" class="w-full mb-3">
+                    <mat-label>Stage 4: Completed / Final Approval Template</mat-label>
+                    <textarea matInput rows="2" [ngModel]="smsSettings().templates?.completed" (ngModelChange)="updateSmsTemplate('completed', $event)"></textarea>
+                  </mat-form-field>
+                </div>
+              </div>
+
+              <!-- Quick Dispatch Test -->
+              <div class="config-sub-section mt-4">
+                <div class="sub-sec-header">
+                  <h4><mat-icon>send</mat-icon> Test Gateway Connectivity</h4>
+                </div>
+
+                <div class="grid-2-col">
+                  <mat-form-field appearance="outline">
+                    <mat-label>Test Mobile Phone (TPNO)</mat-label>
+                    <input matInput [ngModel]="testPhone()" (ngModelChange)="testPhone.set($event)" placeholder="0771234567">
+                  </mat-form-field>
+
+                  <div class="flex-align-center">
+                    <button mat-flat-button color="accent" [disabled]="isSendingTest() || !testPhone().trim()" (click)="sendTestSms()">
+                      <mat-icon>{{ isSendingTest() ? 'sync' : 'send' }}</mat-icon>
+                      {{ isSendingTest() ? 'Dispatching...' : 'Send Live Test SMS' }}
+                    </button>
                   </div>
                 </div>
               </div>
@@ -1303,9 +1413,17 @@ import { NotificationService } from '../../../../core/services/notification.serv
 export class LandSettingsComponent implements OnInit {
   private landService = inject(LandService);
   private notif = inject(NotificationService);
+  private smsService = inject(SmsService);
 
   settings: LandSettings = { ...DEFAULT_LAND_SETTINGS };
   isSaving = signal<boolean>(false);
+
+  // SMS Gateway State
+  smsSettings = signal<SmsSettings>({ ...DEFAULT_SMS_SETTINGS });
+  isSavingSms = signal<boolean>(false);
+  showSmsToken = signal<boolean>(false);
+  testPhone = signal<string>('');
+  isSendingTest = signal<boolean>(false);
 
   // Modal State
   showJobTypeModal = false;
@@ -1338,6 +1456,18 @@ export class LandSettingsComponent implements OnInit {
         }
         if (!this.previewPrefixCode) {
           this.previewPrefixCode = this.settings.defaultJobPrefix || 'LND';
+        }
+      }
+    });
+
+    this.smsService.settings$.subscribe({
+      next: (cfg) => {
+        if (cfg) {
+          this.smsSettings.set({
+            ...DEFAULT_SMS_SETTINGS,
+            ...cfg,
+            templates: { ...DEFAULT_SMS_SETTINGS.templates, ...(cfg.templates || {}) }
+          });
         }
       }
     });
@@ -1642,6 +1772,67 @@ export class LandSettingsComponent implements OnInit {
       case 'priority': return 'flag';
       case 'initialNotes': return 'edit_note';
       default: return 'help_outline';
+    }
+  }
+
+  // --- SMS Notification Methods ---
+
+  toggleSmsTokenVisibility() {
+    this.showSmsToken.update(v => !v);
+  }
+
+  updateSmsField(field: 'apiEndpoint' | 'apiToken' | 'senderId', val: string) {
+    this.smsSettings.update(cfg => ({ ...cfg, [field]: val }));
+  }
+
+  updateSmsEnabled(enabled: boolean) {
+    this.smsSettings.update(cfg => ({ ...cfg, enabled }));
+  }
+
+  updateSmsTemplate(templateKey: 'initial' | 'documentation' | 'verification' | 'completed' | 'custom', val: string) {
+    this.smsSettings.update(cfg => ({
+      ...cfg,
+      templates: {
+        ...(cfg.templates || {}),
+        [templateKey]: val
+      }
+    }));
+  }
+
+  async saveSmsSettings() {
+    this.isSavingSms.set(true);
+    try {
+      await this.smsService.saveSettings(this.smsSettings());
+      this.notif.success('SMS Gateway configuration saved successfully');
+    } catch (e: any) {
+      this.notif.error('Failed to save SMS settings: ' + (e?.message || 'Error'));
+    } finally {
+      this.isSavingSms.set(false);
+    }
+  }
+
+  async sendTestSms() {
+    const phone = this.testPhone().trim();
+    if (!phone) {
+      this.notif.warning('Please enter a test mobile phone number (e.g. 0771234567)');
+      return;
+    }
+    this.isSendingTest.set(true);
+    try {
+      const res = await this.smsService.sendSms({
+        recipient: phone,
+        message: 'Test notification from Divisional Secretariat Land Administration.',
+        senderId: this.smsSettings().senderId
+      });
+      if (res.success) {
+        this.notif.success(`Test SMS delivered! ${res.message}`);
+      } else {
+        this.notif.error(`Failed to send test SMS: ${res.message}`);
+      }
+    } catch (e: any) {
+      this.notif.error(`Error sending test SMS: ${e?.message || 'Network error'}`);
+    } finally {
+      this.isSendingTest.set(false);
     }
   }
 }

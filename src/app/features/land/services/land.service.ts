@@ -4,6 +4,7 @@ import { map, catchError } from 'rxjs/operators';
 import { Storage, ref, uploadBytes, getDownloadURL } from '@angular/fire/storage';
 import { FirestoreService } from '../../../core/services/firestore.service';
 import { AuthService } from '../../../auth/auth.service';
+import { RbacService } from '../../../auth/rbac.service';
 import { EventLogService } from '../../../core/services/event-log.service';
 import { 
   LandJob, 
@@ -45,6 +46,7 @@ export class LandService {
   private firestoreService = inject(FirestoreService);
   private storage = inject(Storage, { optional: true });
   private authService = inject(AuthService);
+  private rbacService = inject(RbacService);
   private eventLogService = inject(EventLogService);
 
   private readonly jobsCollection = 'land_jobs';
@@ -139,6 +141,7 @@ export class LandService {
     const user = this.authService.currentUser();
     const officerName = user?.displayName || user?.email || 'Land Officer';
     const officerId = user?.uid || 'system';
+    const officerEmail = user?.email || '';
 
     // Retrieve current settings from reactive cache / subject
     const settings = this.settingsSubject.getValue() || DEFAULT_LAND_SETTINGS;
@@ -156,8 +159,12 @@ export class LandService {
       jobRef,
       createdAt: now,
       createdBy: officerName,
+      createdById: officerId,
+      createdByEmail: officerEmail,
       updatedAt: now,
-      updatedBy: officerName
+      updatedBy: officerName,
+      updatedById: officerId,
+      updatedByEmail: officerEmail
     };
 
     const docId = await this.firestoreService.addDocument(this.jobsCollection, newJob);
@@ -209,12 +216,15 @@ export class LandService {
     const user = this.authService.currentUser();
     const officerName = user?.displayName || user?.email || 'Land Officer';
     const officerId = user?.uid || 'system';
+    const officerEmail = user?.email || '';
     const now = Date.now();
 
     const updatePayload: Partial<LandJob> = {
       ...jobData,
       updatedAt: now,
-      updatedBy: officerName
+      updatedBy: officerName,
+      updatedById: officerId,
+      updatedByEmail: officerEmail
     };
 
     await this.firestoreService.updateDocument(this.jobsCollection, id, updatePayload);
@@ -392,5 +402,49 @@ export class LandService {
     }
 
     this.eventLogService.logAction('UPDATED', 'land', 'Updated Land Management configuration and job types');
+  }
+
+  /**
+   * Evaluates if the current user has permission to edit this land job in the wizard.
+   * Allowed ONLY if:
+   * 1. The user is an Administrator (Admin, Super Admin, Divisional Admin), OR
+   * 2. The user is the original creator who registered this job.
+   */
+  canEditJob(job: LandJob | null | undefined): boolean {
+    if (!job) return false;
+
+    // 1. Administrators and Super Admins have universal editing authority
+    if (this.rbacService.isAdmin() || this.rbacService.isSuperAdmin()) {
+      return true;
+    }
+
+    const user = this.authService.currentUser();
+    if (!user) return false;
+
+    const curUid = (user.uid || '').trim().toLowerCase();
+    const curEmail = (user.email || '').trim().toLowerCase();
+    const curDisplayName = (user.displayName || '').trim().toLowerCase();
+    const curEmailPrefix = curEmail ? curEmail.split('@')[0] : '';
+
+    // 2. Check explicit createdById (Firebase UID)
+    if (job.createdById && curUid && job.createdById.trim().toLowerCase() === curUid) {
+      return true;
+    }
+
+    // 3. Check explicit createdByEmail
+    if (job.createdByEmail && curEmail && job.createdByEmail.trim().toLowerCase() === curEmail) {
+      return true;
+    }
+
+    // 4. Check createdBy string (which may store displayName, email, UID, or prefix)
+    if (job.createdBy) {
+      const cb = job.createdBy.trim().toLowerCase();
+      if (curUid && cb === curUid) return true;
+      if (curEmail && cb === curEmail) return true;
+      if (curDisplayName && cb === curDisplayName) return true;
+      if (curEmailPrefix && (cb === curEmailPrefix || cb.includes(curEmailPrefix))) return true;
+    }
+
+    return false;
   }
 }

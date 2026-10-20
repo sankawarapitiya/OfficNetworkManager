@@ -334,6 +334,99 @@
   gap: 2px;
 }
 
+.license-status-sidebar-box {
+  background-color: var(--card-bg, #ffffff);
+  border: 1px solid var(--border-light, #e2e8f0);
+  border-radius: 8px;
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+
+  &:hover {
+    background-color: var(--border-light, #f1f5f9);
+    border-color: #cbd5e1;
+    transform: translateY(-1px);
+  }
+
+  &.active {
+    border-color: #a7f3d0;
+    background-color: #f0fdf4;
+  }
+
+  &.expiring_soon {
+    border-color: #fde68a;
+    background-color: #fffbeb;
+  }
+
+  &.expired {
+    border-color: #fca5a5;
+    background-color: #fef2f2;
+  }
+
+  &.not_activated {
+    border-color: #e2e8f0;
+    background-color: #f8fafc;
+  }
+
+  .license-sidebar-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+
+    .license-indicator-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      flex-shrink: 0;
+
+      &.active {
+        background-color: #16a34a;
+        box-shadow: 0 0 0 2px rgba(22, 163, 74, 0.2);
+      }
+      &.expiring_soon {
+        background-color: #d97706;
+        box-shadow: 0 0 0 2px rgba(217, 119, 6, 0.2);
+      }
+      &.expired {
+        background-color: #dc2626;
+        box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.2);
+      }
+      &.not_activated {
+        background-color: #94a3b8;
+        box-shadow: 0 0 0 2px rgba(148, 163, 184, 0.2);
+      }
+    }
+
+    .license-sidebar-title {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-primary);
+      flex: 1;
+    }
+
+    .license-badge-pill {
+      font-size: 10px;
+      font-weight: 700;
+      padding: 1px 6px;
+      border-radius: 10px;
+      background: rgba(16, 185, 129, 0.15);
+      color: #047857;
+    }
+  }
+
+  .license-sidebar-sub {
+    font-size: 10px;
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.2;
+  }
+}
+
 .status-box-header {
   display: flex;
   align-items: center;

@@ -5,6 +5,7 @@ import { filter, Subscription } from 'rxjs';
 import { AuthService } from '../../auth/auth.service';
 import { RbacService } from '../../auth/rbac.service';
 import { WorkPlanService } from '../../features/work-plans/services/work-plan.service';
+import { LicenseService } from '../../core/services/license.service';
 import { MatListModule } from '@angular/material/list';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
@@ -24,6 +25,7 @@ export class SidebarComponent implements OnInit, OnDestroy {
   rbacService = inject(RbacService);
   router = inject(Router);
   workPlanService = inject(WorkPlanService);
+  licenseService = inject(LicenseService);
 
   workPlansExpanded = signal<boolean>(false);
   lettersExpanded = signal<boolean>(false);

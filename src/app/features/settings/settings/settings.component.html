@@ -631,6 +631,531 @@
       </div>
     </mat-tab>
 
+    <!-- ============================================================ -->
+    <!-- TAB 4: APPLICATION ACTIVATION & EXPIRING LICENSE KEYS        -->
+    <!-- ============================================================ -->
+    <mat-tab>
+      <ng-template mat-tab-label>
+        <mat-icon class="tab-label-icon">vpn_key</mat-icon>
+        <span>License & Activation</span>
+      </ng-template>
+
+      <div class="tab-body-wrapper">
+
+        <!-- Banner: Current License Status -->
+        <mat-card class="settings-card license-hero-card" [ngClass]="licenseService.status().toLowerCase()">
+          <div class="card-header">
+            <div class="header-left">
+              <div class="icon-avatar" [ngClass]="{
+                'emerald': licenseService.status() === 'ACTIVE',
+                'amber': licenseService.status() === 'EXPIRING_SOON',
+                'red': licenseService.status() === 'EXPIRED',
+                'slate': licenseService.status() === 'NOT_ACTIVATED'
+              }">
+                <mat-icon>{{ licenseService.status() === 'ACTIVE' ? 'verified_user' : (licenseService.status() === 'EXPIRING_SOON' ? 'warning' : (licenseService.status() === 'EXPIRED' ? 'error' : 'lock')) }}</mat-icon>
+              </div>
+              <div>
+                <div class="license-status-badge" [ngClass]="licenseService.status().toLowerCase()">
+                  {{ licenseService.status() === 'ACTIVE' ? 'ACTIVE & LICENSED' : (licenseService.status() === 'EXPIRING_SOON' ? 'EXPIRING SOON' : (licenseService.status() === 'EXPIRED' ? 'EXPIRED' : 'NOT ACTIVATED')) }}
+                </div>
+                <h2>{{ licenseService.licenseRecord()?.payload?.issuedTo || 'Platform Activation Status' }}</h2>
+                <p>Official enterprise license validation and expiration countdown for this server instance.</p>
+              </div>
+            </div>
+
+            <div class="license-header-actions" *ngIf="licenseService.isActivated() && isSuperAdmin()">
+              <button mat-stroked-button color="warn" (click)="deactivatePlatform()" matTooltip="Deactivate or revoke the active license from this instance">
+                <mat-icon>power_settings_new</mat-icon> Revoke License
+              </button>
+            </div>
+          </div>
+
+          <div class="card-body">
+            <!-- Active License Details Grid -->
+            <div *ngIf="licenseService.licenseRecord() as record; else notActivatedHero" class="license-details-grid">
+              <div class="license-stat-card">
+                <span class="stat-label">Days Remaining</span>
+                <span class="stat-num" [ngClass]="{
+                  'text-emerald': licenseService.status() === 'ACTIVE',
+                  'text-amber': licenseService.status() === 'EXPIRING_SOON',
+                  'text-red': licenseService.status() === 'EXPIRED'
+                }">
+                  {{ licenseService.isExpired() ? '0' : licenseService.daysRemaining() }}
+                  <span class="unit-text">{{ licenseService.isExpired() ? 'Expired' : 'Days' }}</span>
+                </span>
+                <span class="stat-sub">Valid until {{ record.payload.expiresAt | date:'mediumDate' }}</span>
+              </div>
+
+              <div class="license-meta-block">
+                <div class="meta-row">
+                  <span class="meta-lbl">License ID:</span>
+                  <span class="meta-val font-mono">{{ record.payload.licenseId }}</span>
+                </div>
+                <div class="meta-row">
+                  <span class="meta-lbl">Edition Tier:</span>
+                  <span class="meta-val highlight">{{ record.payload.licenseType }}</span>
+                </div>
+                <div class="meta-row">
+                  <span class="meta-lbl">Issued To:</span>
+                  <span class="meta-val">{{ record.payload.issuedTo }}</span>
+                </div>
+                <div class="meta-row">
+                  <span class="meta-lbl">Issued Date:</span>
+                  <span class="meta-val">{{ record.payload.issuedAt | date:'mediumDate' }}</span>
+                </div>
+                <div class="meta-row">
+                  <span class="meta-lbl">Expiry Date:</span>
+                  <span class="meta-val font-semibold" [class.text-red]="licenseService.isExpired()">
+                    {{ record.payload.expiresAt | date:'yyyy-MM-dd HH:mm' }}
+                  </span>
+                </div>
+                <div class="meta-row">
+                  <span class="meta-lbl">Authorized By:</span>
+                  <span class="meta-val">{{ record.payload.issuerName || record.payload.issuerEmail }}</span>
+                </div>
+              </div>
+            </div>
+
+            <ng-template #notActivatedHero>
+              <div class="unactivated-notice-box">
+                <mat-icon class="notice-icon">lock</mat-icon>
+                <div class="notice-text">
+                  <h4>Application Not Activated</h4>
+                  <p>This instance does not currently possess an active license key. Please upload a signed <strong>.key</strong> file or enter an activation code below to activate platform capabilities.</p>
+                </div>
+              </div>
+            </ng-template>
+          </div>
+        </mat-card>
+
+        <!-- Two Column Actions: Apply License & Key Generator -->
+        <div class="license-actions-grid">
+
+          <!-- Left Card: Activate / Renew License -->
+          <mat-card class="settings-card activate-card">
+            <div class="card-header">
+              <div class="header-left">
+                <div class="icon-avatar purple"><mat-icon>lock_open</mat-icon></div>
+                <div>
+                  <h2>Apply Application Activation Key</h2>
+                  <p>Activate or renew this instance using a signed <code>.key</code> file or paste an activation code</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="card-body">
+              <!-- Method 1: Upload .key File -->
+              <div class="upload-dropzone">
+                <input type="file" #keyFileInput accept=".key,.json" (change)="onKeyFileSelected($event)" style="display: none;">
+                <mat-icon class="upload-icon">upload_file</mat-icon>
+                <div class="upload-info">
+                  <span class="upload-title">{{ selectedKeyFileName() ? selectedKeyFileName() : 'Upload Application Key File (.key)' }}</span>
+                  <span class="upload-hint">Select official .key file generated by Super Administrator</span>
+                </div>
+                <button mat-stroked-button color="primary" type="button" (click)="keyFileInput.click()">
+                  <mat-icon>folder_open</mat-icon> Browse Key File
+                </button>
+              </div>
+
+              <div class="divider-or">
+                <span>OR PASTE CODE</span>
+              </div>
+
+              <!-- Method 2: Paste Code -->
+              <mat-form-field appearance="outline" class="w-full">
+                <mat-label>Activation Code (ONM-ACT-... or Key Content)</mat-label>
+                <textarea matInput rows="3" [ngModel]="activationInput()" (ngModelChange)="activationInput.set($event)" placeholder="Paste ONM-ACT-XXXX activation code string or JSON key file contents here..."></textarea>
+                <mat-hint>Paste the base64 encoded token provided by Super Administrator</mat-hint>
+              </mat-form-field>
+
+              <!-- Feedback alert -->
+              <div *ngIf="activationFeedback() as fb" class="activation-alert" [ngClass]="fb.type">
+                <mat-icon>{{ fb.type === 'success' ? 'check_circle' : 'error' }}</mat-icon>
+                <span>{{ fb.message }}</span>
+              </div>
+
+              <div class="action-btn-row">
+                <button mat-flat-button color="primary" [disabled]="!activationInput().trim() || isActivatingKey()" (click)="applyActivationKey()" class="activate-btn">
+                  <mat-icon>{{ isActivatingKey() ? 'sync' : 'verified' }}</mat-icon>
+                  {{ isActivatingKey() ? 'Verifying & Activating...' : 'Verify & Activate Platform' }}
+                </button>
+              </div>
+            </div>
+          </mat-card>
+
+          <!-- Right Card: Super Admin Key Generator (Restricted) -->
+          <mat-card class="settings-card generator-card">
+            <div class="card-header">
+              <div class="header-left">
+                <div class="icon-avatar indigo"><mat-icon>vpn_key</mat-icon></div>
+                <div>
+                  <div class="super-admin-tag">
+                    <mat-icon>shield</mat-icon> SUPER ADMIN ONLY
+                  </div>
+                  <h2>Generate Expiring Activation Key</h2>
+                  <p>Issue tamper-proof signed license keys with custom expiration dates and downloadable .key files</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="card-body">
+              <!-- Super Admin View -->
+              <div *ngIf="isSuperAdmin(); else nonSuperAdminNotice" class="generator-form-wrap">
+                <div class="gen-form-grid">
+                  <mat-form-field appearance="outline" class="full-width">
+                    <mat-label>Licensee / Organization Name</mat-label>
+                    <input matInput [ngModel]="genIssuedTo()" (ngModelChange)="genIssuedTo.set($event)" placeholder="e.g. Lunugamwehera Divisional Secretariat">
+                  </mat-form-field>
+
+                  <mat-form-field appearance="outline" class="full-width">
+                    <mat-label>License Edition / Tier</mat-label>
+                    <mat-select [ngModel]="genLicenseType()" (ngModelChange)="genLicenseType.set($event)">
+                      <mat-option value="Government Platform Edition">Government Platform Edition (Full Access)</mat-option>
+                      <mat-option value="Enterprise Edition">Enterprise Edition</mat-option>
+                      <mat-option value="Standard Departmental Edition">Standard Departmental Edition</mat-option>
+                      <mat-option value="Pilot / Evaluation Trial">Pilot / Evaluation Trial</mat-option>
+                    </mat-select>
+                  </mat-form-field>
+                </div>
+
+                <!-- Expiry Duration Presets -->
+                <div class="duration-section">
+                  <label class="section-label">License Validity Period / Expiry</label>
+                  <div class="preset-pills-row">
+                    <button type="button" class="preset-pill" [class.active]="genDurationDays() === 30 && !genCustomExpiryDate()" (click)="setDurationPreset(30)">
+                      30 Days (1 Month)
+                    </button>
+                    <button type="button" class="preset-pill" [class.active]="genDurationDays() === 90 && !genCustomExpiryDate()" (click)="setDurationPreset(90)">
+                      90 Days (3 Months)
+                    </button>
+                    <button type="button" class="preset-pill" [class.active]="genDurationDays() === 180 && !genCustomExpiryDate()" (click)="setDurationPreset(180)">
+                      180 Days (6 Months)
+                    </button>
+                    <button type="button" class="preset-pill" [class.active]="genDurationDays() === 365 && !genCustomExpiryDate()" (click)="setDurationPreset(365)">
+                      1 Year (365 Days)
+                    </button>
+                    <button type="button" class="preset-pill" [class.active]="genDurationDays() === 730 && !genCustomExpiryDate()" (click)="setDurationPreset(730)">
+                      2 Years (730 Days)
+                    </button>
+                  </div>
+
+                  <!-- Custom Date Picker -->
+                  <mat-form-field appearance="outline" class="custom-date-field mt-3">
+                    <mat-label>Or Pick Custom Expiration Date</mat-label>
+                    <input matInput [matDatepicker]="expPicker" [ngModel]="genCustomExpiryDate()" (ngModelChange)="genCustomExpiryDate.set($event)" placeholder="Select exact expiry date">
+                    <mat-datepicker-toggle matIconSuffix [for]="expPicker"></mat-datepicker-toggle>
+                    <mat-datepicker #expPicker></mat-datepicker>
+                  </mat-form-field>
+
+                  <!-- Live Target Expiry Calculation -->
+                  <div class="target-expiry-banner">
+                    <mat-icon>event_available</mat-icon>
+                    <span>Target Expiry: <strong>{{ calculatedExpiryDate() | date:'fullDate' }}</strong></span>
+                  </div>
+                </div>
+
+                <mat-form-field appearance="outline" class="full-width mt-3">
+                  <mat-label>Internal Notes / Reference (Optional)</mat-label>
+                  <input matInput [ngModel]="genNotes()" (ngModelChange)="genNotes.set($event)" placeholder="e.g. Annual renewal for Head Office deployment">
+                </mat-form-field>
+
+                <div class="gen-action-bar">
+                  <button mat-flat-button color="primary" [disabled]="!genIssuedTo().trim() || isGeneratingKey()" (click)="generateLicenseKey()" class="generate-btn">
+                    <mat-icon>{{ isGeneratingKey() ? 'sync' : 'vpn_key' }}</mat-icon>
+                    {{ isGeneratingKey() ? 'Signing Key...' : 'Generate Signed License Key' }}
+                  </button>
+                </div>
+
+                <!-- Generated Key Output Panel -->
+                <div *ngIf="generatedKeyFile() as key" class="generated-output-card mt-4">
+                  <div class="output-header">
+                    <div class="output-title">
+                      <mat-icon class="text-emerald">task_alt</mat-icon>
+                      <h4>Generated License: {{ key.payload.licenseId }}</h4>
+                    </div>
+                    <span class="expiry-pill">Expires: {{ key.payload.expiresAt | date:'yyyy-MM-dd' }}</span>
+                  </div>
+
+                  <!-- Activation Code Box -->
+                  <div class="code-box-wrapper">
+                    <span class="code-box-label">Activation Code Token:</span>
+                    <div class="code-display-row">
+                      <input type="text" readonly [value]="generatedActivationCode()" class="code-input font-mono">
+                      <button mat-stroked-button (click)="copyToClipboard(generatedActivationCode(), 'Activation Code')" matTooltip="Copy activation code to clipboard">
+                        <mat-icon>content_copy</mat-icon> Copy
+                      </button>
+                    </div>
+                  </div>
+
+                  <!-- Key Actions -->
+                  <div class="output-actions">
+                    <button mat-flat-button color="accent" (click)="downloadGeneratedKey()">
+                      <mat-icon>download</mat-icon> Download .key File
+                    </button>
+                    <button mat-stroked-button color="primary" (click)="applyGeneratedKeyDirectly()" [disabled]="isActivatingKey()">
+                      <mat-icon>verified</mat-icon> Apply To This Instance Now
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Non-Super-Admin Notice -->
+              <ng-template #nonSuperAdminNotice>
+                <div class="restricted-notice-box">
+                  <div class="restricted-icon-wrap">
+                    <mat-icon>admin_panel_settings</mat-icon>
+                  </div>
+                  <h3>Restricted to Super Administrators</h3>
+                  <p>
+                    Only users possessing the <strong>Super Admin</strong> role have statutory authority to cryptographically sign and issue application activation keys and <code>.key</code> files.
+                  </p>
+                  <p class="restricted-sub">
+                    If this instance requires a license renewal or extension, contact your Super Administrator to generate and provide a renewed <code>.key</code> file or activation token.
+                  </p>
+                </div>
+              </ng-template>
+            </div>
+          </mat-card>
+
+        </div>
+
+      </div>
+    </mat-tab>
+
+    <!-- ============================================================ -->
+    <!-- TAB 5: SMS GATEWAY & NOTIFICATION SETTINGS                   -->
+    <!-- ============================================================ -->
+    <mat-tab>
+      <ng-template mat-tab-label>
+        <mat-icon class="tab-label-icon">sms</mat-icon>
+        <span>SMS Gateway</span>
+      </ng-template>
+
+      <div class="tab-body-wrapper">
+
+        <!-- Top Header & Actions Strip -->
+        <mat-card class="settings-card">
+          <div class="card-header">
+            <div class="header-left">
+              <div class="icon-avatar sky"><mat-icon>sms</mat-icon></div>
+              <div>
+                <h2>SMS Gateway & Citizen Notifications (send.lk)</h2>
+                <p>Configure send.lk v3 REST API endpoint, API bearer token, Sender ID, active status, default stage message templates, and test messaging.</p>
+              </div>
+            </div>
+            <div class="header-actions">
+              <button mat-stroked-button (click)="resetSmsSettingsToDefault()" matTooltip="Reset settings to system default send.lk configuration">
+                <mat-icon>restart_alt</mat-icon> Reset Defaults
+              </button>
+              <button mat-flat-button color="primary" [disabled]="isSavingSmsSettings()" (click)="saveSmsConfig()" class="save-sms-btn">
+                <mat-icon>{{ isSavingSmsSettings() ? 'sync' : 'save' }}</mat-icon>
+                {{ isSavingSmsSettings() ? 'Saving...' : 'Save SMS Gateway Configuration' }}
+              </button>
+            </div>
+          </div>
+
+          <div class="card-body">
+            <!-- Gateway Status Banner -->
+            <div class="sms-status-banner" [class.active]="smsSettings().enabled" [class.inactive]="!smsSettings().enabled">
+              <div class="banner-status-side">
+                <span class="status-indicator-dot"></span>
+                <div class="status-meta">
+                  <span class="status-title">{{ smsSettings().enabled ? 'SMS Gateway Active (send.lk v3)' : 'SMS Gateway Disabled' }}</span>
+                  <span class="status-sub">Target Endpoint: <code>{{ smsSettings().apiEndpoint }}sms/send</code> • Sender ID: <strong>{{ smsSettings().senderId || 'None' }}</strong></span>
+                </div>
+              </div>
+              <div class="banner-toggle-side">
+                <mat-slide-toggle [checked]="smsSettings().enabled" (change)="updateSmsEnabled($event.checked)" color="primary">
+                  {{ smsSettings().enabled ? 'Gateway Enabled' : 'Gateway Disabled' }}
+                </mat-slide-toggle>
+              </div>
+            </div>
+
+            <!-- Credentials Form Grid -->
+            <div class="sms-creds-grid mt-4">
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>API Endpoint (send.lk v3 Base URL)</mat-label>
+                <input matInput [ngModel]="smsSettings().apiEndpoint" (ngModelChange)="updateSmsField('apiEndpoint', $event)" placeholder="https://sms.send.lk/api/v3/">
+                <mat-icon matSuffix matTooltip="send.lk v3 REST endpoint root">link</mat-icon>
+                <mat-hint>Base URL for the send.lk API. Messages will be posted to <code>{{ smsSettings().apiEndpoint }}sms/send</code>.</mat-hint>
+              </mat-form-field>
+
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>API Bearer Token / Key</mat-label>
+                <input matInput [type]="showSmsToken() ? 'text' : 'password'" [ngModel]="smsSettings().apiToken" (ngModelChange)="updateSmsField('apiToken', $event)" placeholder="e.g. 960|Lo09lWIvQSKaZ2ZaqBrenryuVxLJPN6bxN6cH8SC">
+                <button mat-icon-button matSuffix type="button" (click)="toggleSmsTokenVisibility()" [matTooltip]="showSmsToken() ? 'Hide token' : 'Show token'">
+                  <mat-icon>{{ showSmsToken() ? 'visibility_off' : 'visibility' }}</mat-icon>
+                </button>
+                <mat-hint>Bearer token provided by send.lk portal for authorization.</mat-hint>
+              </mat-form-field>
+
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Sender ID (Masking Header)</mat-label>
+                <input matInput [ngModel]="smsSettings().senderId" (ngModelChange)="updateSmsField('senderId', $event)" placeholder="e.g. DS-OfficeTM">
+                <mat-icon matSuffix matTooltip="Sender ID registered with send.lk and TRCSL">badge</mat-icon>
+                <mat-hint>Mask name appearing on citizen's mobile phones (e.g. <code>DS-OfficeTM</code>).</mat-hint>
+              </mat-form-field>
+            </div>
+
+            <!-- Gateway Spec Strip -->
+            <div class="sms-spec-box mt-3">
+              <mat-icon class="spec-icon">info</mat-icon>
+              <div class="spec-text">
+                <strong>Automatic Citizen Phone Extraction:</strong>
+                When sending an SMS from any Land Task / Job or Citizen record, the recipient mobile number is automatically retrieved from the connecting customer's phone number (<code>customerPhone</code>) and normalized into Sri Lankan mobile format (<code>947XXXXXXXX</code>).
+              </div>
+            </div>
+          </div>
+        </mat-card>
+
+        <!-- Two Columns: Live Test SMS & Default Stage Templates -->
+        <div class="sms-two-col-grid">
+
+          <!-- Card 1: Interactive Test Dispatch Tool -->
+          <mat-card class="settings-card test-sms-card">
+            <div class="card-header">
+              <div class="header-left">
+                <div class="icon-avatar indigo"><mat-icon>send</mat-icon></div>
+                <div>
+                  <h3>Direct SMS Dispatch Test</h3>
+                  <p>Send an immediate test SMS to any mobile number to verify gateway connectivity and token validity.</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="card-body">
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Recipient Mobile Number (TPNO)</mat-label>
+                <input matInput [ngModel]="testSmsRecipient()" (ngModelChange)="testSmsRecipient.set($event)" placeholder="e.g. 0771234567 or 94771234567">
+                <mat-icon matSuffix>phone_iphone</mat-icon>
+                <mat-hint>Enter 10-digit Sri Lankan phone number (07X...) or international format (947X...).</mat-hint>
+              </mat-form-field>
+
+              <mat-form-field appearance="outline" class="full-width mt-3">
+                <mat-label>Test Message Body</mat-label>
+                <textarea matInput rows="3" [ngModel]="testSmsMessage()" (ngModelChange)="testSmsMessage.set($event)" placeholder="Type test message..."></textarea>
+                <mat-hint>{{ testSmsMessage().length }} characters</mat-hint>
+              </mat-form-field>
+
+              <div class="test-actions-bar mt-4">
+                <button mat-flat-button color="accent" [disabled]="isSendingTestSms() || !testSmsRecipient().trim() || !smsSettings().enabled" (click)="sendTestSms()" class="send-test-btn">
+                  <mat-icon>{{ isSendingTestSms() ? 'sync' : 'send' }}</mat-icon>
+                  {{ isSendingTestSms() ? 'Sending Test SMS...' : 'Send Live Test SMS' }}
+                </button>
+                <span *ngIf="!smsSettings().enabled" class="text-amber text-xs font-semibold">
+                  (Gateway is currently disabled above)
+                </span>
+              </div>
+            </div>
+          </mat-card>
+
+          <!-- Card 2: Default Stage Message Templates -->
+          <mat-card class="settings-card templates-card">
+            <div class="card-header">
+              <div class="header-left">
+                <div class="icon-avatar purple"><mat-icon>edit_note</mat-icon></div>
+                <div>
+                  <h3>Land Task Stage SMS Templates</h3>
+                  <p>Customize the default pre-filled notification messages for each workflow stage. Available placeholders: <code>&#123;CUSTOMER_NAME&#125;</code>, <code>&#123;JOB_REF&#125;</code>, <code>&#123;LOT_NUMBER&#125;</code>, <code>&#123;FILE_NUMBER&#125;</code>.</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="card-body">
+              <!-- Stage 1 Template -->
+              <mat-form-field appearance="outline" class="full-width mb-2">
+                <mat-label>Stage 1: Initial Registration Template</mat-label>
+                <textarea matInput rows="2" [ngModel]="smsSettings().templates?.initial" (ngModelChange)="updateSmsTemplate('initial', $event)"></textarea>
+              </mat-form-field>
+
+              <!-- Stage 2 Template -->
+              <mat-form-field appearance="outline" class="full-width mb-2">
+                <mat-label>Stage 2: Documentation Phase Template</mat-label>
+                <textarea matInput rows="2" [ngModel]="smsSettings().templates?.documentation" (ngModelChange)="updateSmsTemplate('documentation', $event)"></textarea>
+              </mat-form-field>
+
+              <!-- Stage 3 Template -->
+              <mat-form-field appearance="outline" class="full-width mb-2">
+                <mat-label>Stage 3: Verification Phase Template</mat-label>
+                <textarea matInput rows="2" [ngModel]="smsSettings().templates?.verification" (ngModelChange)="updateSmsTemplate('verification', $event)"></textarea>
+              </mat-form-field>
+
+              <!-- Stage 4 Template -->
+              <mat-form-field appearance="outline" class="full-width mb-2">
+                <mat-label>Stage 4: Completed / Final Approval Template</mat-label>
+                <textarea matInput rows="2" [ngModel]="smsSettings().templates?.completed" (ngModelChange)="updateSmsTemplate('completed', $event)"></textarea>
+              </mat-form-field>
+            </div>
+          </mat-card>
+
+        </div>
+
+        <!-- Recent SMS Dispatches Log Table -->
+        <mat-card class="settings-card">
+          <div class="card-header">
+            <div class="header-left">
+              <div class="icon-avatar amber"><mat-icon>history</mat-icon></div>
+              <div>
+                <h3>Recent SMS Dispatches</h3>
+                <p>Real-time audit log of citizen SMS notifications dispatched through the platform</p>
+              </div>
+            </div>
+            <div class="header-actions">
+              <button mat-stroked-button (click)="loadSmsLogs()" [disabled]="isLoadingSmsLogs()">
+                <mat-icon>{{ isLoadingSmsLogs() ? 'sync' : 'refresh' }}</mat-icon> Refresh Logs
+              </button>
+            </div>
+          </div>
+
+          <div class="card-body">
+            <div *ngIf="smsLogs().length === 0" class="no-logs-box">
+              <mat-icon>sms_failed</mat-icon>
+              <p>No SMS dispatch records found yet. Use the test tool above or send an SMS from any Land Job.</p>
+            </div>
+
+            <div *ngIf="smsLogs().length > 0" class="sms-logs-table-wrap">
+              <table class="sms-table">
+                <thead>
+                  <tr>
+                    <th>Time</th>
+                    <th>Recipient</th>
+                    <th>Customer / Reference</th>
+                    <th>Sender ID</th>
+                    <th>Message Text</th>
+                    <th>Status</th>
+                    <th>Delivered By</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let log of smsLogs()">
+                    <td class="font-mono text-xs">{{ log.sentAt | date:'medium' }}</td>
+                    <td class="font-mono font-semibold">{{ log.recipient }}</td>
+                    <td>
+                      <div class="log-job-meta">
+                        <span *ngIf="log.customerName" class="font-semibold">{{ log.customerName }}</span>
+                        <span *ngIf="log.jobRef" class="job-ref-tag">{{ log.jobRef }}</span>
+                        <span *ngIf="!log.customerName && !log.jobRef" class="text-xs text-muted">Test / Direct Dispatch</span>
+                      </div>
+                    </td>
+                    <td class="font-mono">{{ log.senderId }}</td>
+                    <td class="msg-col" [matTooltip]="log.message">{{ log.message }}</td>
+                    <td>
+                      <span class="sms-status-pill" [class.success]="log.status === 'SUCCESS'" [class.failed]="log.status === 'FAILED'">
+                        <mat-icon>{{ log.status === 'SUCCESS' ? 'check' : 'close' }}</mat-icon>
+                        {{ log.status }}
+                      </span>
+                    </td>
+                    <td class="text-xs">{{ log.sentBy || 'System' }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </mat-card>
+
+      </div>
+    </mat-tab>
+
   </mat-tab-group>
 
 </div>

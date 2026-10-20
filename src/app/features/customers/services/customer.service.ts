@@ -8,10 +8,13 @@ export interface Customer {
   address: string;
   tpno: string;
   division: string;
+  gnDivision?: string;
+  email?: string;
   nic: string;
   status: 'active' | 'inactive';
   dynamic_data?: Record<string, any>;
   createdAt: number;
+  updatedAt?: number;
 }
 
 @Injectable({
@@ -34,25 +37,31 @@ export class CustomerService {
   }
 
   async updateCustomer(id: string, customer: Partial<Customer>): Promise<void> {
-    return this.firestoreService.updateDocument(this.collectionName, id, customer);
+    return this.firestoreService.updateDocument(this.collectionName, id, {
+      ...customer,
+      updatedAt: Date.now()
+    });
   }
 
   async deleteCustomer(id: string): Promise<void> {
     return this.firestoreService.deleteDocument(this.collectionName, id);
   }
 
-  async isCustomerLinked(customerId: string): Promise<boolean> {
-    // Check if customer is referenced in 'land' or 'work_plans' or 'letters' or 'hr'
-    // To do this, we query these collections for docs where customerId === customerId
+  async isCustomerLinked(customerId: string, customerNic?: string): Promise<boolean> {
+    // Check if customer is referenced in 'land_jobs' (the primary land tasks collection)
     try {
-      const landDocs = await this.firestoreService.queryDocuments('land', 'customerId', '==', customerId);
-      if (landDocs.length > 0) return true;
-      
-      const workPlanDocs = await this.firestoreService.queryDocuments('work_plans', 'customerId', '==', customerId);
-      if (workPlanDocs.length > 0) return true;
-      
-      const letterDocs = await this.firestoreService.queryDocuments('letters', 'customerId', '==', customerId);
-      if (letterDocs.length > 0) return true;
+      if (customerId) {
+        const landJobs = await this.firestoreService.queryDocuments('land_jobs', 'customerId', '==', customerId);
+        if (landJobs && landJobs.length > 0) return true;
+
+        const legacyRecords = await this.firestoreService.queryDocuments('land_records', 'ownerCustomerId', '==', customerId);
+        if (legacyRecords && legacyRecords.length > 0) return true;
+      }
+
+      if (customerNic) {
+        const jobsByNic = await this.firestoreService.queryDocuments('land_jobs', 'customerNic', '==', customerNic.trim());
+        if (jobsByNic && jobsByNic.length > 0) return true;
+      }
 
       return false;
     } catch (e) {

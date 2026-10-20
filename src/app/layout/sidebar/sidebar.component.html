@@ -70,7 +70,7 @@
     <!-- Work Plans with Sub-categories -->
     <div class="nav-expandable-group" *ngIf="rbacService.canAccessModule('work-plans')">
       <div class="nav-parent-item" [class.expanded]="workPlansExpanded()" [class.parent-active]="isWorkPlansActive()">
-        <a routerLink="/work-plans/tasks" class="parent-link">
+        <a routerLink="/work-plans/dashboard" class="parent-link">
           <mat-icon class="parent-icon">calendar_month</mat-icon>
           <span class="parent-label">Work Plans</span>
         </a>
@@ -110,7 +110,7 @@
     <!-- Official Letters with Sub-categories -->
     <div class="nav-expandable-group" *ngIf="rbacService.canAccessModule('letters')">
       <div class="nav-parent-item" [class.expanded]="lettersExpanded()" [class.parent-active]="isLettersActive()">
-        <a routerLink="/letters/inbox" class="parent-link">
+        <a routerLink="/letters/dashboard" class="parent-link">
           <mat-icon class="parent-icon">mark_email_read</mat-icon>
           <span class="parent-label">Official Letters</span>
         </a>
@@ -177,6 +177,25 @@
 
 <!-- Sidebar Bottom / Footer -->
 <div class="sidebar-footer">
+  <!-- License / Activation Status Widget -->
+  <div class="license-status-sidebar-box" 
+       [ngClass]="licenseService.status().toLowerCase()" 
+       routerLink="/settings" 
+       [matTooltip]="licenseService.isActivated() ? ('License valid until ' + (licenseService.licenseRecord()?.payload?.expiresAt | date:'mediumDate') + ' • Click to manage') : 'Application is not activated • Click to activate'">
+    <div class="license-sidebar-header">
+      <span class="license-indicator-dot" [ngClass]="licenseService.status().toLowerCase()"></span>
+      <span class="license-sidebar-title">
+        {{ licenseService.status() === 'ACTIVE' ? 'License Active' : (licenseService.status() === 'EXPIRING_SOON' ? 'Expiring Soon' : (licenseService.status() === 'EXPIRED' ? 'License Expired' : 'Not Activated')) }}
+      </span>
+      <span class="license-badge-pill" *ngIf="licenseService.isActivated() && !licenseService.isExpired()">
+        {{ licenseService.daysRemaining() }}d
+      </span>
+    </div>
+    <span class="license-sidebar-sub">
+      {{ licenseService.isActivated() ? (licenseService.isExpired() ? 'Expired on ' + (licenseService.licenseRecord()?.payload?.expiresAt | date:'yyyy-MM-dd') : (licenseService.licenseRecord()?.payload?.issuedTo || 'Platform Licensed')) : 'System Unlicensed • Click to Activate' }}
+    </span>
+  </div>
+
   <div class="system-status-box">
     <div class="status-box-header">
       <span class="status-indicator-dot"></span>

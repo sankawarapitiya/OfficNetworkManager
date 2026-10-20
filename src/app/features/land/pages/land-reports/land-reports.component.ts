@@ -71,9 +71,19 @@ import { SettingsService, Division } from '../../../settings/settings.service';
           <!-- Division Filter -->
           <mat-form-field appearance="outline" class="compact-field" subscriptSizing="dynamic">
             <mat-label>DS Division</mat-label>
-            <mat-select multiple placeholder="All DS Divisions" [ngModel]="selectedDivisions()" (ngModelChange)="selectedDivisions.set($event)">
+            <mat-select multiple placeholder="All DS Divisions" [ngModel]="selectedDivisions()" (ngModelChange)="onDivisionsChange($event)">
               <mat-option *ngFor="let div of uniqueAdminDivisions()" [value]="div">
                 {{ div }}
+              </mat-option>
+            </mat-select>
+          </mat-form-field>
+
+          <!-- GN Division Filter -->
+          <mat-form-field appearance="outline" class="compact-field" subscriptSizing="dynamic">
+            <mat-label>GN Division</mat-label>
+            <mat-select multiple placeholder="All GN Divisions" [ngModel]="selectedGNDivisions()" (ngModelChange)="selectedGNDivisions.set($event)">
+              <mat-option *ngFor="let gn of availableGNDivisions()" [value]="gn">
+                {{ gn }}
               </mat-option>
             </mat-select>
           </mat-form-field>
@@ -173,7 +183,12 @@ import { SettingsService, Division } from '../../../settings/settings.service';
                 <td>{{ job.customerName }}</td>
                 <td class="font-mono">{{ job.customerNic }}</td>
                 <td>Lot {{ job.lotNumber }}, Plan {{ job.planNumber }} ({{ job.deedNumber }})</td>
-                <td>{{ job.division }}</td>
+                <td>
+                  <div>{{ job.division }}</div>
+                  <div *ngIf="job.gramaNiladhariDivision" class="text-xs text-slate-500 mt-0.5 font-medium">
+                    GN: {{ job.gramaNiladhariDivision }}
+                  </div>
+                </td>
                 <td>{{ job.jobTypeName }}</td>
                 <td>
                   <span class="stage-tag" [ngClass]="job.status.toLowerCase()">{{ job.status }}</span>
@@ -334,6 +349,7 @@ export class LandReportsComponent implements OnInit {
   dateFrom = signal<Date | null>(null);
   dateTo = signal<Date | null>(null);
   selectedDivisions = signal<string[]>([]);
+  selectedGNDivisions = signal<string[]>([]);
   selectedJobType = signal<string>('ALL');
   selectedStage = signal<string>('ALL');
 
@@ -359,11 +375,57 @@ export class LandReportsComponent implements OnInit {
     return Array.from(set).sort();
   });
 
+  availableGNDivisions = computed(() => {
+    const divs = this.allDivisions();
+    const selectedDivs = this.selectedDivisions();
+    const set = new Set<string>();
+
+    const enOnly = (s?: string) => {
+      if (!s) return '';
+      return s.replace(/[^\x20-\x7E]/g, '')
+              .replace(/\//g, '')
+              .replace(/(^[\s-]+|[\s-]+$)/g, '')
+              .replace(/\s{2,}/g, ' ')
+              .trim();
+    };
+
+    // Gather from master divisions (filtered by selected DS divisions if any are selected)
+    for (const d of divs) {
+      const ds = enOnly(d.divisionalSecretariat);
+      if (!selectedDivs.length || selectedDivs.includes(ds)) {
+        const val = d.gnCode ? `${d.gnCode} - ${d.name}` : d.name;
+        if (val && val.trim()) {
+          set.add(val.trim());
+        }
+      }
+    }
+
+    // Also include any GN divisions already present on existing jobs
+    for (const j of this.jobs()) {
+      if (j.gramaNiladhariDivision && j.gramaNiladhariDivision.trim()) {
+        if (!selectedDivs.length || (j.division && selectedDivs.includes(j.division))) {
+          set.add(j.gramaNiladhariDivision.trim());
+        }
+      }
+    }
+
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  });
+
+  onDivisionsChange(divs: string[]) {
+    this.selectedDivisions.set(divs || []);
+    if (divs && divs.length > 0) {
+      const available = new Set(this.availableGNDivisions());
+      this.selectedGNDivisions.update(current => current.filter(gn => available.has(gn)));
+    }
+  }
+
   filteredJobs = computed(() => {
     let list = this.jobs();
     const from = this.dateFrom();
     const to = this.dateTo();
     const divs = this.selectedDivisions();
+    const gns = this.selectedGNDivisions();
     const jt = this.selectedJobType();
     const st = this.selectedStage();
 
@@ -377,6 +439,16 @@ export class LandReportsComponent implements OnInit {
     }
     if (divs && divs.length > 0) {
       list = list.filter(j => divs.includes(j.division));
+    }
+    if (gns && gns.length > 0) {
+      list = list.filter(j => {
+        if (!j.gramaNiladhariDivision) return false;
+        const jGn = j.gramaNiladhariDivision.toLowerCase().trim();
+        return gns.some(gn => {
+          const filterGn = gn.toLowerCase().trim();
+          return jGn === filterGn || jGn.includes(filterGn) || filterGn.includes(jGn);
+        });
+      });
     }
     if (jt !== 'ALL') {
       list = list.filter(j => j.jobTypeId === jt);
@@ -416,6 +488,7 @@ export class LandReportsComponent implements OnInit {
     this.dateFrom.set(null);
     this.dateTo.set(null);
     this.selectedDivisions.set([]);
+    this.selectedGNDivisions.set([]);
     this.selectedJobType.set('ALL');
     this.selectedStage.set('ALL');
   }
@@ -428,7 +501,7 @@ export class LandReportsComponent implements OnInit {
     const data = this.filteredJobs();
     if (data.length === 0) return;
 
-    const headers = ['Job Ref', 'Customer Name', 'Customer NIC', 'Phone', 'Deed No', 'Plan No', 'Lot No', 'Division', 'Job Type', 'Stage', 'Registered Date'];
+    const headers = ['Job Ref', 'Customer Name', 'Customer NIC', 'Phone', 'Deed No', 'Plan No', 'Lot No', 'Division', 'GN Division', 'Job Type', 'Stage', 'Registered Date'];
     const rows = data.map(j => [
       `"${j.jobRef}"`,
       `"${j.customerName}"`,
@@ -438,6 +511,7 @@ export class LandReportsComponent implements OnInit {
       `"${j.planNumber}"`,
       `"${j.lotNumber}"`,
       `"${j.division}"`,
+      `"${j.gramaNiladhariDivision || ''}"`,
       `"${j.jobTypeName}"`,
       `"${j.status}"`,
       `"${new Date(j.createdAt).toLocaleDateString()}"`

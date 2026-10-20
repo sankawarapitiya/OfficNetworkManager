@@ -32,6 +32,14 @@ import {
   generateLandJobRef
 } from '../../models/land.model';
 
+export interface FileNumberOption {
+  fileNumber: string;
+  jobCount: number;
+  jobs: LandJob[];
+  customerNames: string[];
+  lastJob?: LandJob;
+}
+
 @Component({
   selector: 'app-land-job-dialog',
   standalone: true,
@@ -164,9 +172,77 @@ export class LandJobDialogComponent implements OnInit {
   // Stage 2 & 4 summary metrics
   totalDocsCount = computed(() => this.dynamicDocuments().length);
   mandatoryDocsCount = computed(() => this.dynamicDocuments().filter(d => d.isMandatory).length);
-  receivedDocsCount = computed(() => this.dynamicDocuments().filter(d => d.received || d.status === 'Uploaded').length);
-  uploadedMandatoryCount = computed(() => this.dynamicDocuments().filter(d => d.isMandatory && (d.received || d.status === 'Uploaded')).length);
+  receivedDocsCount = computed(() => this.dynamicDocuments().filter(d => d.received || d.status === 'Uploaded' || d.status === 'Verified' || d.status === 'Exempted' || !!d.fileName || !!d.fileUrl).length);
+  uploadedMandatoryCount = computed(() => this.dynamicDocuments().filter(d => d.isMandatory && (d.received || d.status === 'Uploaded' || d.status === 'Verified' || d.status === 'Exempted' || !!d.fileName || !!d.fileUrl)).length);
   allMandatoryUploaded = computed(() => this.mandatoryDocsCount() === 0 || this.uploadedMandatoryCount() >= this.mandatoryDocsCount());
+
+  // File Number Typeahead & Multi-Job Linking
+  existingJobsList = signal<LandJob[]>([]);
+  fileNumberFilterText = signal<string>('');
+
+  existingFileNumbers = computed<FileNumberOption[]>(() => {
+    const jobs = this.existingJobsList();
+    const map = new Map<string, { jobs: LandJob[]; customerNames: Set<string> }>();
+
+    // Include preset file numbers from reference prefixes
+    for (const pfx of this.settings().refPrefixes || []) {
+      const fn = pfx.fileNumber?.trim();
+      if (fn && !map.has(fn)) {
+        map.set(fn, { jobs: [], customerNames: new Set() });
+      }
+    }
+    const defaultFn = this.settings().fileNumber?.trim();
+    if (defaultFn && !map.has(defaultFn)) {
+      map.set(defaultFn, { jobs: [], customerNames: new Set() });
+    }
+
+    // Include all existing jobs
+    for (const j of jobs) {
+      const fn = j.fileNumber?.trim();
+      if (!fn) continue;
+      if (!map.has(fn)) {
+        map.set(fn, { jobs: [], customerNames: new Set() });
+      }
+      const entry = map.get(fn)!;
+      entry.jobs.push(j);
+      if (j.customerName) {
+        entry.customerNames.add(j.customerName);
+      }
+    }
+
+    return Array.from(map.entries()).map(([fileNumber, data]) => ({
+      fileNumber,
+      jobCount: data.jobs.length,
+      jobs: data.jobs,
+      customerNames: Array.from(data.customerNames),
+      lastJob: data.jobs.length > 0 ? data.jobs[0] : undefined
+    })).sort((a, b) => b.jobCount - a.jobCount || a.fileNumber.localeCompare(b.fileNumber));
+  });
+
+  filteredFileNumbers = computed(() => {
+    const filter = (this.fileNumberFilterText() || '').toLowerCase().trim();
+    const all = this.existingFileNumbers();
+    if (!filter) return all.slice(0, 30);
+    return all.filter(f => 
+      f.fileNumber.toLowerCase().includes(filter) ||
+      f.customerNames.some(c => c.toLowerCase().includes(filter)) ||
+      f.jobs.some(j => (j.jobRef && j.jobRef.toLowerCase().includes(filter)) || (j.lotNumber && j.lotNumber.toLowerCase().includes(filter)))
+    ).slice(0, 30);
+  });
+
+  isNewFileNumber = computed(() => {
+    const current = (this.fileNumberFilterText() || '').trim();
+    if (!current) return false;
+    return !this.existingFileNumbers().some(f => f.fileNumber.toLowerCase() === current.toLowerCase());
+  });
+
+  selectedFileNumberInfo = computed(() => {
+    const formFn = (this.initialForm?.get('fileNumber')?.value || '').trim();
+    const filterFn = (this.fileNumberFilterText() || '').trim();
+    const target = formFn || filterFn;
+    if (!target) return null;
+    return this.existingFileNumbers().find(f => f.fileNumber.toLowerCase() === target.toLowerCase()) || null;
+  });
 
   currentStageName = computed(() => {
     switch (this.currentStepIndex()) {
@@ -178,7 +254,12 @@ export class LandJobDialogComponent implements OnInit {
     }
   });
 
-  constructor(@Inject(MAT_DIALOG_DATA) public data: { existingJob?: LandJob }) {
+  canEdit = computed(() => {
+    if (!this.isEditMode() || !this.existingJob) return true;
+    return this.landService.canEditJob(this.existingJob);
+  });
+
+  constructor(@Inject(MAT_DIALOG_DATA) public data: { existingJob?: LandJob; initialCustomer?: Customer }) {
     if (data?.existingJob) {
       this.existingJob = data.existingJob;
       this.isEditMode.set(true);
@@ -215,6 +296,7 @@ export class LandJobDialogComponent implements OnInit {
 
   private initForms() {
     const ej = this.existingJob;
+    const ic = this.data?.initialCustomer;
 
     this.initialForm = this.fb.group({
       jobTypeId: [ej?.jobTypeId || '', Validators.required],
@@ -225,12 +307,12 @@ export class LandJobDialogComponent implements OnInit {
       fileVersion: [ej?.fileVersion || ''],
       customJobRef: [ej?.jobRef || ''],
       // Customer
-      customerId: [ej?.customerId || ''],
-      customerName: [ej?.customerName || ''],
-      customerNic: [ej?.customerNic || ''],
-      customerPhone: [ej?.customerPhone || ''],
-      customerAddress: [ej?.customerAddress || ''],
-      customerEmail: [ej?.customerEmail || ''],
+      customerId: [ej?.customerId || ic?.id || ''],
+      customerName: [ej?.customerName || ic?.name || ''],
+      customerNic: [ej?.customerNic || ic?.nic || ''],
+      customerPhone: [ej?.customerPhone || ic?.tpno || ''],
+      customerAddress: [ej?.customerAddress || ic?.address || ''],
+      customerEmail: [ej?.customerEmail || ic?.email || ''],
       // Land
       deedNumber: [ej?.deedNumber || ''],
       planNumber: [ej?.planNumber || ''],
@@ -239,8 +321,8 @@ export class LandJobDialogComponent implements OnInit {
       sizeSqm: [ej?.sizeSqm || null],
       extentText: [ej?.extentText || ''],
       locationAddress: [ej?.locationAddress || ''],
-      division: [ej?.division ? ej.division.split('/').pop()?.trim() : ''],
-      gramaNiladhariDivision: [ej?.gramaNiladhariDivision || ''],
+      division: [ej?.division ? ej.division.split('/').pop()?.trim() : (ic?.division || '')],
+      gramaNiladhariDivision: [ej?.gramaNiladhariDivision || ic?.gnDivision || ''],
       gpsCoordinates: [ej?.gpsCoordinates || ''],
       priority: [ej?.priority || 'Normal'],
       initialNotes: [ej?.initialNotes || '']
@@ -250,6 +332,8 @@ export class LandJobDialogComponent implements OnInit {
 
     if (ej?.customerName) {
       this.selectedCustomerName.set(ej.customerName);
+    } else if (ic?.name) {
+      this.selectedCustomerName.set(ic.name);
     }
 
     this.completionForm = this.fb.group({
@@ -280,14 +364,18 @@ export class LandJobDialogComponent implements OnInit {
           if (!currentPfx) {
             const defPrefix = s.defaultJobPrefix || (s.refPrefixes && s.refPrefixes[0]?.code) || 'LND';
             const matchedPfxObj = s.refPrefixes?.find(p => p.code === defPrefix);
+            const defaultFn = matchedPfxObj?.fileNumber || s.fileNumber || 'FN-01';
             this.initialForm.patchValue({
               prefixCode: defPrefix,
               subjectCode: matchedPfxObj?.subjectCode || s.subjectCode || '04',
-              fileNumber: matchedPfxObj?.fileNumber || s.fileNumber || 'FN-01',
+              fileNumber: defaultFn,
               fileVersion: matchedPfxObj?.fileVersion || s.fileVersion || 'V1'
             });
+            this.fileNumberFilterText.set(defaultFn);
             this.updateGeneratedJobRef();
           }
+        } else if (ej?.fileNumber) {
+          this.fileNumberFilterText.set(ej.fileNumber);
         }
 
         if (ej && ej.jobTypeId) {
@@ -306,6 +394,12 @@ export class LandJobDialogComponent implements OnInit {
           const first = s.jobTypes.find(j => j.isActive) || s.jobTypes[0];
           this.onJobTypeChange(first.id);
         }
+      }
+    });
+
+    this.landService.getLandJobs().subscribe({
+      next: (jobs) => {
+        this.existingJobsList.set(jobs || []);
       }
     });
 
@@ -330,16 +424,67 @@ export class LandJobDialogComponent implements OnInit {
     });
   }
 
+  onFileNumberInputChange(val: string) {
+    this.fileNumberFilterText.set(val);
+    this.initialForm.patchValue({ fileNumber: val });
+    this.updateGeneratedJobRef();
+  }
+
+  onSelectFileNumber(fileNum: string) {
+    this.fileNumberFilterText.set(fileNum);
+    this.initialForm.patchValue({ fileNumber: fileNum });
+    this.updateGeneratedJobRef();
+  }
+
+  onFileNumberBlur() {
+    const val = (this.fileNumberFilterText() || '').trim();
+    if (val) {
+      this.initialForm.patchValue({ fileNumber: val });
+      this.updateGeneratedJobRef();
+    }
+  }
+
+  autofillFromLinkedFile(job: LandJob) {
+    if (!job) return;
+    this.initialForm.patchValue({
+      customerId: job.customerId || '',
+      customerName: job.customerName || '',
+      customerNic: job.customerNic || '',
+      customerPhone: job.customerPhone || '',
+      customerAddress: job.customerAddress || '',
+      customerEmail: job.customerEmail || '',
+      deedNumber: job.deedNumber || '',
+      planNumber: job.planNumber || '',
+      lotNumber: job.lotNumber || '',
+      landName: job.landName || '',
+      sizeSqm: job.sizeSqm || null,
+      extentText: job.extentText || '',
+      locationAddress: job.locationAddress || '',
+      division: job.division || '',
+      gramaNiladhariDivision: job.gramaNiladhariDivision || '',
+      gpsCoordinates: job.gpsCoordinates || ''
+    });
+    if (job.customerName) {
+      this.selectedCustomerName.set(job.customerName);
+    }
+    this.notif.success(`Copied details from existing file dossier (${job.fileNumber || ''})`);
+  }
+
   onReferencePrefixChange(prefixCode: string) {
     const s = this.settings();
     const pfx = s.refPrefixes?.find(p => (p.id || p.code) === prefixCode);
     if (pfx) {
+      const currentFn = this.initialForm.get('fileNumber')?.value;
       this.initialForm.patchValue({
         prefixCode: pfx.id || pfx.code,
         subjectCode: pfx.subjectCode || s.subjectCode || '04',
-        fileNumber: pfx.fileNumber || s.fileNumber || 'FN-01',
         fileVersion: pfx.fileVersion || s.fileVersion || 'V1'
       });
+      if (!currentFn) {
+        const fn = pfx.fileNumber || s.fileNumber || 'FN-01';
+        this.initialForm.patchValue({ fileNumber: fn });
+        this.fileNumberFilterText.set(fn);
+      }
     } else {
       this.initialForm.patchValue({ prefixCode });
     }
@@ -609,6 +754,11 @@ export class LandJobDialogComponent implements OnInit {
    * Save and Exit at ANY stage
    */
   async saveAndExit(explicitStage?: LandJobStatus) {
+    if (this.isEditMode() && this.existingJob && !this.landService.canEditJob(this.existingJob)) {
+      this.notif.error(`Permission denied: Only an Administrator or the officer who registered this task (${this.existingJob.createdBy || 'the creator'}) can save changes.`);
+      return;
+    }
+
     // Validate Stage 1 basics (required before saving any task)
     if (this.initialForm.invalid) {
       this.initialForm.markAllAsTouched();

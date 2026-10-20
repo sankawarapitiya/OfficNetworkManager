@@ -1,4 +1,4 @@
-import { Component, Inject, OnInit, inject, signal } from '@angular/core';
+import { Component, Inject, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MAT_DIALOG_DATA, MatDialogRef, MatDialogModule, MatDialog } from '@angular/material/dialog';
@@ -16,6 +16,7 @@ import { LandJob, LandJobStatus } from '../../models/land.model';
 import { LandService } from '../../services/land.service';
 import { NotificationService } from '../../../../core/services/notification.service';
 import { LandJobDialogComponent } from '../land-job-dialog/land-job-dialog.component';
+import { SendSmsDialogComponent } from '../send-sms-dialog/send-sms-dialog.component';
 
 @Component({
   selector: 'app-land-job-detail-dialog',
@@ -45,6 +46,9 @@ import { LandJobDialogComponent } from '../land-job-dialog/land-job-dialog.compo
           <div>
             <div class="title-row">
               <span class="job-ref">{{ job.jobRef }}</span>
+              <span *ngIf="job.fileNumber" class="file-num-pill" [matTooltip]="'Cadastral File Dossier: ' + job.fileNumber">
+                <mat-icon style="font-size: 13px; width: 13px; height: 13px;">folder</mat-icon> File: {{ job.fileNumber }}
+              </span>
               <span class="job-type-pill">{{ job.jobTypeName }}</span>
               <span class="priority-pill" [ngClass]="job.priority.toLowerCase()">{{ job.priority }}</span>
             </div>
@@ -53,8 +57,14 @@ import { LandJobDialogComponent } from '../land-job-dialog/land-job-dialog.compo
         </div>
 
         <div class="header-actions">
-          <button mat-stroked-button color="primary" class="mr-2" (click)="openInWizard()" matTooltip="Open full 4-stage workflow wizard to update documents, checklist or completion">
+          <button mat-stroked-button class="mr-2 sms-header-btn" (click)="openSendSmsDialog()" [matTooltip]="job.customerPhone ? 'Send SMS notification to ' + job.customerPhone : 'Send SMS to Citizen'">
+            <mat-icon>sms</mat-icon> Send SMS
+          </button>
+          <button *ngIf="canEditJob()" mat-stroked-button color="primary" class="mr-2" (click)="openInWizard()" matTooltip="Open full 4-stage workflow wizard to update documents, checklist or completion">
             <mat-icon>edit_document</mat-icon> Edit in Wizard
+          </button>
+          <button *ngIf="!canEditJob()" mat-stroked-button disabled class="mr-2 locked-btn" [matTooltip]="'Edit locked: Only an Administrator or ' + (job.createdBy || 'the creator') + ' can edit this task in the wizard'">
+            <mat-icon>lock</mat-icon> Edit in Wizard
           </button>
           <button mat-icon-button (click)="close()" matTooltip="Close">
             <mat-icon>close</mat-icon>
@@ -114,7 +124,12 @@ import { LandJobDialogComponent } from '../land-job-dialog/land-job-dialog.compo
                   </div>
                   <div class="info-item">
                     <span class="label">Contact Phone</span>
-                    <span class="val">{{ job.customerPhone }}</span>
+                    <span class="val flex-row-val">
+                      {{ job.customerPhone }}
+                      <button *ngIf="job.customerPhone" mat-icon-button class="mini-sms-btn" (click)="openSendSmsDialog()" matTooltip="Send SMS to customer">
+                        <mat-icon>sms</mat-icon>
+                      </button>
+                    </span>
                   </div>
                   <div class="info-item">
                     <span class="label">Email Address</span>
@@ -169,15 +184,56 @@ import { LandJobDialogComponent } from '../land-job-dialog/land-job-dialog.compo
                 </div>
               </div>
 
+              <!-- File Dossier & Linked Tasks Card -->
+              <div class="info-card file-dossier-card" *ngIf="job.fileNumber">
+                <div class="card-title-between">
+                  <h4 class="card-heading"><mat-icon class="text-indigo">folder_shared</mat-icon> File Dossier: <strong>{{ job.fileNumber }}</strong></h4>
+                  <span class="dossier-task-count">{{ linkedJobsWithSameFile().length + 1 }} {{ (linkedJobsWithSameFile().length + 1) === 1 ? 'Task' : 'Tasks' }} in File</span>
+                </div>
+                <div *ngIf="linkedJobsWithSameFile().length > 0" class="linked-jobs-section">
+                  <p class="section-subtext">Other cadastral tasks linked to this same file dossier:</p>
+                  <div class="linked-tasks-grid">
+                    <div *ngFor="let lj of linkedJobsWithSameFile()" class="linked-task-item" (click)="openOtherJob(lj)" matTooltip="Click to inspect this linked task">
+                      <div class="lt-left">
+                        <mat-icon class="lt-icon text-indigo">article</mat-icon>
+                        <div>
+                          <span class="lt-ref font-mono font-bold">{{ lj.jobRef }}</span>
+                          <span class="lt-type">{{ lj.jobTypeName }}</span>
+                        </div>
+                      </div>
+                      <div class="lt-right">
+                        <span class="stage-tag" [ngClass]="lj.status.toLowerCase()">{{ lj.status }}</span>
+                        <mat-icon class="lt-arrow">arrow_forward</mat-icon>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <p class="section-subtext" *ngIf="linkedJobsWithSameFile().length === 0">
+                  This task is currently the only recorded job under File Dossier <strong>{{ job.fileNumber }}</strong>.
+                </p>
+              </div>
+
               <div class="info-card" *ngIf="job.initialNotes">
                 <h4 class="card-heading"><mat-icon>notes</mat-icon> Initial Notes</h4>
                 <p class="notes-text">{{ job.initialNotes }}</p>
+              </div>
+
+              <div class="creator-info-card">
+                <mat-icon class="ci-icon">fingerprint</mat-icon>
+                <div class="ci-details">
+                  <span class="ci-title">Registered by: <strong>{{ job.createdBy || 'Land Officer' }}</strong></span>
+                  <span class="ci-sub">Created on {{ job.createdAt | date:'medium' }} • {{ canEditJob() ? 'You have edit access' : 'Only Admin or the creator can edit' }}</span>
+                </div>
+                <span class="permission-pill" [class.allowed]="canEditJob()" [class.locked]="!canEditJob()">
+                  <mat-icon>{{ canEditJob() ? 'edit' : 'lock' }}</mat-icon>
+                  {{ canEditJob() ? 'Editable' : 'View Only' }}
+                </span>
               </div>
             </div>
           </mat-tab>
 
           <!-- TAB 2: Documentation Checklist -->
-          <mat-tab label="Required Documentation">
+          <mat-tab [label]="'Required Documentation (' + getReceivedDocCount() + '/' + (job.documents ? job.documents.length : 0) + ')'">
             <div class="tab-pane">
               <div class="docs-list">
                 <div *ngFor="let doc of job.documents; let i = index" class="doc-card">
@@ -330,6 +386,19 @@ import { LandJobDialogComponent } from '../land-job-dialog/land-job-dialog.compo
             color: #0f172a;
           }
 
+          .file-num-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            background: #eef2ff;
+            color: #4f46e5;
+            font-size: 0.75rem;
+            font-weight: 700;
+            padding: 2px 8px;
+            border-radius: 6px;
+            border: 1px solid #c7d2fe;
+          }
+
           .job-type-pill {
             background: #f1f5f9;
             color: #334155;
@@ -354,6 +423,26 @@ import { LandJobDialogComponent } from '../land-job-dialog/land-job-dialog.compo
           margin: 4px 0 0 0;
           font-size: 0.85rem;
           color: #64748b;
+        }
+      }
+
+      .header-actions {
+        display: flex;
+        align-items: center;
+
+        .locked-btn {
+          opacity: 0.65;
+          cursor: not-allowed;
+          color: #94a3b8 !important;
+          border-color: #cbd5e1 !important;
+          background: #f8fafc;
+          mat-icon {
+            font-size: 16px;
+            width: 16px;
+            height: 16px;
+            margin-right: 4px;
+            color: #94a3b8;
+          }
         }
       }
     }
@@ -492,21 +581,260 @@ import { LandJobDialogComponent } from '../land-job-dialog/land-job-dialog.compo
       }
     }
 
+    .file-dossier-card {
+      border-left: 4px solid #4f46e5 !important;
+      background: #f8fafc;
+
+      .card-title-between {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 12px;
+
+        .card-heading {
+          margin: 0;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          font-size: 0.95rem;
+          font-weight: 700;
+        }
+
+        .dossier-task-count {
+          font-size: 0.75rem;
+          font-weight: 700;
+          background: #e0e7ff;
+          color: #3730a3;
+          padding: 2px 8px;
+          border-radius: 12px;
+        }
+      }
+
+      .linked-jobs-section {
+        .linked-tasks-grid {
+          display: grid;
+          grid-template-columns: 1fr;
+          gap: 8px;
+          margin-top: 8px;
+        }
+
+        .linked-task-item {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 10px 14px;
+          background: #ffffff;
+          border: 1px solid #e2e8f0;
+          border-radius: 8px;
+          cursor: pointer;
+          transition: all 0.15s ease;
+
+          &:hover {
+            border-color: #6366f1;
+            background: #f5f3ff;
+            transform: translateX(2px);
+          }
+
+          .lt-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+
+            .lt-icon {
+              font-size: 20px;
+              width: 20px;
+              height: 20px;
+            }
+
+            .lt-ref {
+              font-size: 0.85rem;
+              color: #0f172a;
+              margin-right: 8px;
+            }
+
+            .lt-type {
+              font-size: 0.8rem;
+              color: #64748b;
+            }
+          }
+
+          .lt-right {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+
+            .lt-arrow {
+              font-size: 16px;
+              width: 16px;
+              height: 16px;
+              color: #94a3b8;
+            }
+          }
+        }
+      }
+    }
+
     .text-green { color: #16a34a; }
     .text-gray { color: #94a3b8; }
     .text-indigo { color: #4f46e5; }
     .btn-success { background: #16a34a !important; color: #ffffff !important; }
+
+    .creator-info-card {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 16px;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      font-size: 0.85rem;
+
+      .ci-icon {
+        color: #64748b;
+        font-size: 22px;
+        width: 22px;
+        height: 22px;
+      }
+
+      .ci-details {
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+
+        .ci-title {
+          color: #1e293b;
+        }
+
+        .ci-sub {
+          font-size: 0.75rem;
+          color: #64748b;
+          margin-top: 1px;
+        }
+      }
+
+      .permission-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 0.75rem;
+        font-weight: 700;
+        padding: 3px 10px;
+        border-radius: 12px;
+
+        mat-icon {
+          font-size: 13px;
+          width: 13px;
+          height: 13px;
+        }
+
+        &.allowed {
+          background: #dcfce7;
+          color: #15803d;
+        }
+
+        &.locked {
+          background: #f1f5f9;
+          color: #64748b;
+        }
+      }
+    }
+
+    .sms-header-btn {
+      color: #0284c7 !important;
+      border-color: #bae6fd !important;
+      background: #f0f9ff;
+      mat-icon { color: #0284c7; }
+      &:hover { background: #e0f2fe; }
+    }
+
+    .flex-row-val {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      .mini-sms-btn {
+        width: 26px;
+        height: 26px;
+        line-height: 26px;
+        mat-icon {
+          font-size: 16px;
+          width: 16px;
+          height: 16px;
+          color: #0284c7;
+        }
+      }
+    }
   `]
 })
-export class LandJobDetailDialogComponent {
+export class LandJobDetailDialogComponent implements OnInit {
   private landService = inject(LandService);
   private notif = inject(NotificationService);
   private dialogRef = inject(MatDialogRef<LandJobDetailDialogComponent>);
+  private dialog = inject(MatDialog);
 
   job: LandJob;
+  allJobs = signal<LandJob[]>([]);
+
+  linkedJobsWithSameFile = computed(() => {
+    const fn = this.job.fileNumber?.trim();
+    if (!fn) return [];
+    return this.allJobs().filter(j => j.id !== this.job.id && j.fileNumber?.trim() === fn);
+  });
 
   constructor(@Inject(MAT_DIALOG_DATA) public data: { job: LandJob }) {
     this.job = { ...data.job };
+  }
+
+  ngOnInit() {
+    this.landService.getLandJobs().subscribe({
+      next: (jobs) => this.allJobs.set(jobs || [])
+    });
+
+    this.landService.getSettings().subscribe({
+      next: (s) => {
+        if (!this.job.documents || this.job.documents.length === 0) {
+          const matched = s.jobTypes?.find(j => (this.job.jobTypeId && j.id === this.job.jobTypeId) || (this.job.jobTypeName && j.name === this.job.jobTypeName));
+          if (matched && matched.requiredDocumentTypes?.length > 0) {
+            this.job.documents = matched.requiredDocumentTypes.map(dt => ({
+              docTypeId: dt.id,
+              docTypeName: dt.name,
+              isMandatory: dt.isMandatory,
+              received: false,
+              status: 'Pending',
+              remarks: ''
+            }));
+          }
+        }
+      }
+    });
+  }
+
+  getReceivedDocCount(): number {
+    if (!this.job.documents || this.job.documents.length === 0) return 0;
+    if (this.job.status === 'Completed') return this.job.documents.length;
+    return this.job.documents.filter(d => 
+      d.received === true || 
+      d.status === 'Uploaded' || 
+      d.status === 'Verified' || 
+      d.status === 'Exempted' || 
+      !!d.fileName || 
+      !!d.fileUrl
+    ).length;
+  }
+
+  openOtherJob(otherJob: LandJob) {
+    this.dialogRef.close();
+    this.dialog.open(LandJobDetailDialogComponent, {
+      width: '850px',
+      data: { job: otherJob }
+    });
+  }
+
+  openSendSmsDialog() {
+    this.dialog.open(SendSmsDialogComponent, {
+      width: '700px',
+      maxWidth: '96vw',
+      data: { job: this.job }
+    });
   }
 
   getStageIcon(status: LandJobStatus): string {
@@ -555,9 +883,15 @@ export class LandJobDetailDialogComponent {
     }
   }
 
-  private dialog = inject(MatDialog);
+  canEditJob(): boolean {
+    return this.landService.canEditJob(this.job);
+  }
 
   openInWizard() {
+    if (!this.canEditJob()) {
+      this.notif.warning(`Permission denied: Only an Administrator or the officer who registered this task (${this.job.createdBy || 'the creator'}) can edit this job.`);
+      return;
+    }
     const currentJob = this.job;
     this.dialogRef.close();
     this.dialog.open(LandJobDialogComponent, {

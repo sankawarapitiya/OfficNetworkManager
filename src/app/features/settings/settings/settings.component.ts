@@ -19,11 +19,18 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatPaginatorModule, MatPaginator } from '@angular/material/paginator';
 import { MatTableModule, MatTableDataSource } from '@angular/material/table';
 import { MatSortModule, MatSort } from '@angular/material/sort';
+import { MatDatepickerModule } from '@angular/material/datepicker';
+import { MatNativeDateModule } from '@angular/material/core';
+import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import * as XLSX from 'xlsx';
 
 import { EventLogService } from '../../../core/services/event-log.service';
 import { FirestoreService } from '../../../core/services/firestore.service';
 import { WorkPlanService } from '../../work-plans/services/work-plan.service';
+import { RbacService } from '../../../auth/rbac.service';
+import { AuthService } from '../../../auth/auth.service';
+import { LicenseService, AppActivationKeyFile, AppLicensePayload } from '../../../core/services/license.service';
+import { SmsService, SmsSettings, DEFAULT_SMS_SETTINGS, SmsLogEntry } from '../../../core/services/sms.service';
 import { 
   SYSTEM_MODULE_PERMISSIONS, 
   DEFAULT_ROLE_PERMISSIONS, 
@@ -61,7 +68,10 @@ export interface SystemUserOption {
     MatSelectModule,
     MatPaginatorModule,
     MatTableModule,
-    MatSortModule
+    MatSortModule,
+    MatDatepickerModule,
+    MatNativeDateModule,
+    MatSlideToggleModule
   ],
   templateUrl: './settings.component.html',
   styleUrl: './settings.component.scss'
@@ -72,6 +82,22 @@ export class SettingsComponent implements OnInit, AfterViewInit {
   private eventLogService = inject(EventLogService);
   private snackBar = inject(MatSnackBar);
   private workPlanService = inject(WorkPlanService);
+  rbacService = inject(RbacService);
+  authService = inject(AuthService);
+  licenseService = inject(LicenseService);
+  smsService = inject(SmsService);
+
+  isSuperAdmin = computed(() => this.rbacService.isSuperAdmin());
+
+  // SMS Gateway Settings State
+  smsSettings = signal<SmsSettings>({ ...DEFAULT_SMS_SETTINGS });
+  isSavingSmsSettings = signal<boolean>(false);
+  showSmsToken = signal<boolean>(false);
+  testSmsRecipient = signal<string>('');
+  testSmsMessage = signal<string>('Test notification from Divisional Secretariat Office Management System.');
+  isSendingTestSms = signal<boolean>(false);
+  smsLogs = signal<SmsLogEntry[]>([]);
+  isLoadingSmsLogs = signal<boolean>(false);
 
   // Work Plan On-Behalf Task Delegation Roles
   rolesPermittedToCreateOnBehalf = signal<string[]>(['Super Admin', 'Divisional Admin', 'Department Head']);
@@ -211,6 +237,8 @@ export class SettingsComponent implements OnInit, AfterViewInit {
     this.loadRolePermissions();
     this.loadDynamicSchemas();
     this.loadWorkPlanDelegationRoles();
+    this.loadSmsSettings();
+    this.loadSmsLogs();
   }
 
   // --- Role & Permission Mapping Methods ---
@@ -812,5 +840,283 @@ export class SettingsComponent implements OnInit, AfterViewInit {
     } finally {
       this.isSavingDelegationRoles.set(false);
     }
+  }
+
+  // ============================================================
+  // APPLICATION ACTIVATION & EXPIRING LICENSE KEYS
+  // ============================================================
+
+  // Generator form fields (Super Admin only)
+  genIssuedTo = signal<string>('Divisional Secretariat');
+  genLicenseType = signal<string>('Government Platform Edition');
+  genDurationDays = signal<number>(365);
+  genCustomExpiryDate = signal<Date | null>(null);
+  genNotes = signal<string>('');
+  isGeneratingKey = signal<boolean>(false);
+  generatedKeyFile = signal<AppActivationKeyFile | null>(null);
+  generatedActivationCode = signal<string>('');
+
+  // Activation apply form fields
+  activationInput = signal<string>('');
+  selectedKeyFileName = signal<string>('');
+  isActivatingKey = signal<boolean>(false);
+  activationFeedback = signal<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  // Pre-calculated target expiration date
+  calculatedExpiryDate = computed(() => {
+    if (this.genCustomExpiryDate()) {
+      return this.genCustomExpiryDate()!;
+    }
+    const days = this.genDurationDays();
+    const d = new Date();
+    d.setDate(d.getDate() + days);
+    return d;
+  });
+
+  setDurationPreset(days: number) {
+    this.genCustomExpiryDate.set(null);
+    this.genDurationDays.set(days);
+  }
+
+  async generateLicenseKey() {
+    if (!this.isSuperAdmin()) {
+      this.snackBar.open('Unauthorized: Only Super Administrators can generate license keys', 'Dismiss', { duration: 3000 });
+      return;
+    }
+
+    const org = this.genIssuedTo().trim();
+    if (!org) {
+      this.snackBar.open('Please specify the licensee / organization name', 'Dismiss', { duration: 3000 });
+      return;
+    }
+
+    const expiryMs = this.calculatedExpiryDate().getTime();
+    if (expiryMs <= Date.now()) {
+      this.snackBar.open('License expiry date must be in the future', 'Dismiss', { duration: 3000 });
+      return;
+    }
+
+    this.isGeneratingKey.set(true);
+    try {
+      const user = this.authService.currentUser();
+      const result = await this.licenseService.generateActivationKey({
+        issuedTo: org,
+        licenseType: this.genLicenseType(),
+        expiresAt: expiryMs,
+        notes: this.genNotes().trim(),
+        issuerEmail: user?.email || 'superadmin@officnetwork.gov.lk',
+        issuerName: user?.displayName || 'Super Administrator'
+      });
+
+      this.generatedKeyFile.set(result.keyFile);
+      this.generatedActivationCode.set(result.activationCode);
+      this.snackBar.open('Expiring license key generated & signed successfully!', 'Dismiss', { duration: 4000 });
+    } catch (e: any) {
+      this.snackBar.open('Failed to generate key: ' + (e?.message || 'Error'), 'Dismiss', { duration: 4000 });
+    } finally {
+      this.isGeneratingKey.set(false);
+    }
+  }
+
+  downloadGeneratedKey() {
+    const k = this.generatedKeyFile();
+    if (k) {
+      this.licenseService.downloadKeyFile(k);
+      this.snackBar.open('Key file downloaded successfully (.key)', 'Dismiss', { duration: 2500 });
+    }
+  }
+
+  copyToClipboard(text: string, label: string = 'Activation Code') {
+    if (!text) return;
+    navigator.clipboard.writeText(text).then(() => {
+      this.snackBar.open(`${label} copied to clipboard!`, 'Dismiss', { duration: 2500 });
+    }).catch(() => {
+      this.snackBar.open('Could not copy to clipboard. Please copy manually.', 'Dismiss', { duration: 2500 });
+    });
+  }
+
+  onKeyFileSelected(event: any) {
+    const file = event.target?.files?.[0];
+    if (!file) return;
+
+    this.selectedKeyFileName.set(file.name);
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const content = e.target?.result as string;
+      if (content) {
+        this.activationInput.set(content);
+        this.activationFeedback.set(null);
+      }
+    };
+    reader.readAsText(file);
+  }
+
+  async applyActivationKey() {
+    const input = this.activationInput().trim();
+    if (!input) {
+      this.activationFeedback.set({ type: 'error', message: 'Please upload a .key file or paste a valid activation code.' });
+      return;
+    }
+
+    this.isActivatingKey.set(true);
+    this.activationFeedback.set(null);
+
+    try {
+      const verification = await this.licenseService.verifyKeyStringOrFile(input);
+      if (!verification.valid || !verification.keyFile) {
+        this.activationFeedback.set({ type: 'error', message: verification.error || 'Invalid activation key.' });
+        this.snackBar.open(verification.error || 'Activation failed', 'Dismiss', { duration: 4500 });
+        return;
+      }
+
+      const user = this.authService.currentUser();
+      await this.licenseService.applyLicense(
+        verification.keyFile, 
+        user?.email || user?.displayName || 'Administrator'
+      );
+
+      const expDate = new Date(verification.keyFile.payload.expiresAt).toLocaleDateString();
+      this.activationFeedback.set({ 
+        type: 'success', 
+        message: `Platform successfully activated for "${verification.keyFile.payload.issuedTo}"! Valid until ${expDate}.` 
+      });
+      this.snackBar.open(`Application successfully activated! Expires: ${expDate}`, 'Dismiss', { duration: 4500 });
+      this.activationInput.set('');
+      this.selectedKeyFileName.set('');
+    } catch (e: any) {
+      this.activationFeedback.set({ type: 'error', message: 'Activation failed: ' + (e?.message || 'Error') });
+    } finally {
+      this.isActivatingKey.set(false);
+    }
+  }
+
+  async applyGeneratedKeyDirectly() {
+    const k = this.generatedKeyFile();
+    if (!k) return;
+
+    this.isActivatingKey.set(true);
+    try {
+      const user = this.authService.currentUser();
+      await this.licenseService.applyLicense(k, user?.email || 'Super Administrator');
+      const expDate = new Date(k.payload.expiresAt).toLocaleDateString();
+      this.snackBar.open(`Activated successfully! Valid until ${expDate}`, 'Dismiss', { duration: 4500 });
+    } catch (e: any) {
+      this.snackBar.open('Activation failed: ' + (e?.message || 'Error'), 'Dismiss', { duration: 4500 });
+    } finally {
+      this.isActivatingKey.set(false);
+    }
+  }
+
+  async deactivatePlatform() {
+    if (!confirm('Are you sure you want to deactivate / clear the current license from this platform?')) {
+      return;
+    }
+    const user = this.authService.currentUser();
+    await this.licenseService.deactivateLicense(user?.email || 'Administrator');
+    this.snackBar.open('Platform license deactivated.', 'Dismiss', { duration: 3000 });
+  }
+
+  // --- SMS Gateway Management Methods ---
+
+  loadSmsSettings() {
+    this.smsService.settings$.subscribe({
+      next: (cfg) => {
+        if (cfg) {
+          this.smsSettings.set({
+            ...DEFAULT_SMS_SETTINGS,
+            ...cfg,
+            templates: {
+              ...DEFAULT_SMS_SETTINGS.templates,
+              ...(cfg.templates || {})
+            }
+          });
+        }
+      }
+    });
+  }
+
+  loadSmsLogs() {
+    this.isLoadingSmsLogs.set(true);
+    this.smsService.getAllSmsLogs(30).subscribe({
+      next: (logs) => {
+        this.smsLogs.set(logs || []);
+        this.isLoadingSmsLogs.set(false);
+      },
+      error: () => this.isLoadingSmsLogs.set(false)
+    });
+  }
+
+  toggleSmsTokenVisibility() {
+    this.showSmsToken.update(v => !v);
+  }
+
+  updateSmsField(field: 'apiEndpoint' | 'apiToken' | 'senderId', value: string) {
+    this.smsSettings.update(cfg => ({ ...cfg, [field]: value }));
+  }
+
+  updateSmsEnabled(enabled: boolean) {
+    this.smsSettings.update(cfg => ({ ...cfg, enabled }));
+  }
+
+  updateSmsTemplate(templateKey: 'initial' | 'documentation' | 'verification' | 'completed' | 'custom', value: string) {
+    this.smsSettings.update(cfg => ({
+      ...cfg,
+      templates: {
+        ...(cfg.templates || {}),
+        [templateKey]: value
+      }
+    }));
+  }
+
+  async saveSmsConfig() {
+    this.isSavingSmsSettings.set(true);
+    try {
+      await this.smsService.saveSettings(this.smsSettings());
+      this.snackBar.open('SMS Gateway configuration saved successfully', 'Dismiss', { duration: 3000 });
+    } catch (e: any) {
+      this.snackBar.open('Failed to save SMS settings: ' + (e?.message || 'Error'), 'Dismiss', { duration: 4500 });
+    } finally {
+      this.isSavingSmsSettings.set(false);
+    }
+  }
+
+  async sendTestSms() {
+    const recipient = this.testSmsRecipient().trim();
+    if (!recipient) {
+      this.snackBar.open('Please specify a recipient mobile number for the test (e.g. 0771234567)', 'Dismiss', { duration: 3500 });
+      return;
+    }
+    const message = this.testSmsMessage().trim();
+    if (!message) {
+      this.snackBar.open('Please provide test message text', 'Dismiss', { duration: 3000 });
+      return;
+    }
+
+    this.isSendingTestSms.set(true);
+    try {
+      const res = await this.smsService.sendSms({
+        recipient,
+        message,
+        senderId: this.smsSettings().senderId
+      });
+      if (res.success) {
+        this.snackBar.open(`Test SMS dispatched! ${res.message}`, 'Dismiss', { duration: 4500 });
+        this.loadSmsLogs();
+      } else {
+        this.snackBar.open(`Failed to dispatch test SMS: ${res.message}`, 'Dismiss', { duration: 5500 });
+      }
+    } catch (e: any) {
+      this.snackBar.open(`Error dispatching test SMS: ${e?.message || 'Network error'}`, 'Dismiss', { duration: 5500 });
+    } finally {
+      this.isSendingTestSms.set(false);
+    }
+  }
+
+  resetSmsSettingsToDefault() {
+    this.smsSettings.set({
+      ...DEFAULT_SMS_SETTINGS,
+      templates: { ...DEFAULT_SMS_SETTINGS.templates }
+    });
+    this.snackBar.open('Reset to default send.lk settings. Click "Save SMS Gateway Configuration" to persist.', 'Dismiss', { duration: 4000 });
   }
 }

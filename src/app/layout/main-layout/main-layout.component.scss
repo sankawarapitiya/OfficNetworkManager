@@ -51,6 +51,314 @@
   margin: 0 auto;
 }
 
+/* ============================================================ */
+/* APPLICATION LOCK SCREEN OVERLAY                             */
+/* ============================================================ */
+
+.app-lock-overlay {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100%;
+  padding: 24px 16px;
+  background: radial-gradient(circle at center top, rgba(15, 23, 42, 0.05), transparent 70%);
+
+  .lock-modal-card {
+    max-width: 620px;
+    width: 100%;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+    padding: 36px 32px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    animation: lockPopIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+
+    @media (max-width: 600px) {
+      padding: 24px 18px;
+    }
+  }
+
+  .lock-icon-wrap {
+    width: 72px;
+    height: 72px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 16px;
+
+    mat-icon {
+      font-size: 38px;
+      width: 38px;
+      height: 38px;
+    }
+
+    &.expired {
+      background-color: #fee2e2;
+      color: #dc2626;
+      box-shadow: 0 0 0 8px rgba(239, 68, 68, 0.12);
+    }
+
+    &.unactivated {
+      background-color: #f1f5f9;
+      color: #475569;
+      box-shadow: 0 0 0 8px rgba(100, 116, 139, 0.12);
+    }
+  }
+
+  .lock-status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    padding: 3px 12px;
+    border-radius: 20px;
+    margin-bottom: 12px;
+
+    mat-icon {
+      font-size: 13px;
+      width: 13px;
+      height: 13px;
+    }
+
+    &.expired {
+      background-color: #fef2f2;
+      color: #b91c1c;
+      border: 1px solid #fecaca;
+    }
+
+    &.unactivated {
+      background-color: #f8fafc;
+      color: #475569;
+      border: 1px solid #cbd5e1;
+    }
+  }
+
+  .lock-title {
+    font-size: 24px;
+    font-weight: 800;
+    color: #0f172a;
+    margin: 0 0 8px 0;
+  }
+
+  .lock-desc {
+    font-size: 14px;
+    color: #64748b;
+    line-height: 1.5;
+    margin: 0 0 20px 0;
+    max-width: 520px;
+
+    strong {
+      color: #0f172a;
+    }
+  }
+
+  .expired-meta-box {
+    display: flex;
+    justify-content: space-around;
+    flex-wrap: wrap;
+    gap: 12px;
+    width: 100%;
+    background-color: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 12px 16px;
+    margin-bottom: 22px;
+
+    .meta-item {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      text-align: left;
+
+      .label {
+        font-size: 11px;
+        font-weight: 700;
+        color: #94a3b8;
+        text-transform: uppercase;
+      }
+      .val {
+        font-size: 13px;
+        color: #1e293b;
+        font-weight: 500;
+      }
+    }
+  }
+
+  .lock-form-section {
+    width: 100%;
+    background-color: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 20px;
+    text-align: left;
+    margin-bottom: 18px;
+
+    .form-section-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: #0f172a;
+      margin: 0 0 12px 0;
+      text-align: center;
+    }
+
+    .lock-file-dropzone {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      background: #f8fafc;
+      border: 1px dashed #cbd5e1;
+      border-radius: 8px;
+      padding: 10px 14px;
+      margin-bottom: 10px;
+
+      .dropzone-text {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 12.5px;
+        color: #475569;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+
+        .file-icon {
+          font-size: 18px;
+          width: 18px;
+          height: 18px;
+          color: #0284c7;
+          flex-shrink: 0;
+        }
+      }
+    }
+
+    mat-form-field.w-full {
+      width: 100% !important;
+      display: block;
+      margin-top: 8px;
+      margin-bottom: 12px;
+
+      .font-mono {
+        font-family: monospace;
+        font-size: 13px;
+        letter-spacing: 0.03em;
+      }
+    }
+
+    .lock-error-alert {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background-color: #fef2f2;
+      border: 1px solid #fecaca;
+      border-radius: 6px;
+      padding: 8px 12px;
+      font-size: 12.5px;
+      color: #b91c1c;
+      margin-bottom: 12px;
+
+      mat-icon {
+        font-size: 16px;
+        width: 16px;
+        height: 16px;
+        color: #dc2626;
+        flex-shrink: 0;
+      }
+    }
+
+    .unlock-btn {
+      width: 100%;
+      height: 44px;
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      margin-top: 4px;
+    }
+  }
+
+  .super-admin-emergency-box {
+    width: 100%;
+    background: linear-gradient(135deg, #f5f3ff, #ede9fe);
+    border: 1.5px solid #c4b5fd;
+    border-radius: 12px;
+    padding: 16px 20px;
+    text-align: left;
+    margin-bottom: 18px;
+
+    .sa-box-header {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      margin-bottom: 12px;
+
+      .sa-icon {
+        font-size: 24px;
+        width: 24px;
+        height: 24px;
+        color: #7c3aed;
+        flex-shrink: 0;
+        margin-top: 2px;
+      }
+
+      strong {
+        font-size: 13.5px;
+        color: #4c1d95;
+        display: block;
+      }
+
+      p {
+        margin: 2px 0 0 0;
+        font-size: 12px;
+        color: #6d28d9;
+        line-height: 1.4;
+      }
+    }
+
+    .sa-actions-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+
+      button {
+        font-size: 12.5px;
+        font-weight: 600;
+      }
+    }
+  }
+
+  .lock-card-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding-top: 12px;
+    border-top: 1px solid #f1f5f9;
+
+    .user-info {
+      font-size: 12px;
+      color: #64748b;
+    }
+  }
+}
+
+@keyframes lockPopIn {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
 @media print {
   :host {
     height: auto !important;

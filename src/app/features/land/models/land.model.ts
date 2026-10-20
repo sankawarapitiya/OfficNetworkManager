@@ -120,8 +120,12 @@ export interface LandJob {
   assignedOfficer?: string;
   createdAt: number;
   createdBy: string;
+  createdById?: string;
+  createdByEmail?: string;
   updatedAt: number;
   updatedBy: string;
+  updatedById?: string;
+  updatedByEmail?: string;
 }
 
 export interface LandAuditRecord {

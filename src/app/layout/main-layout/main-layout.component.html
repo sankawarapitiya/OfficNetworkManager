@@ -11,7 +11,118 @@
 
     <!-- Main Content Area -->
     <main class="content-scrollable-area">
-      <div class="content-inner" [@fadeAnimation]="getRouteAnimationData()">
+
+      <!-- Full-Screen Application Lock Screen (When expired or not activated) -->
+      <div *ngIf="isAppLocked()" class="app-lock-overlay">
+        <div class="lock-modal-card">
+          <!-- Header with Glowing Shield -->
+          <div class="lock-icon-wrap" [ngClass]="licenseService.status() === 'EXPIRED' ? 'expired' : 'unactivated'">
+            <mat-icon>{{ licenseService.status() === 'EXPIRED' ? 'gpp_bad' : 'lock' }}</mat-icon>
+          </div>
+
+          <div class="lock-status-badge" [ngClass]="licenseService.status() === 'EXPIRED' ? 'expired' : 'unactivated'">
+            <mat-icon>shield</mat-icon>
+            {{ licenseService.status() === 'EXPIRED' ? 'LICENSE EXPIRED' : 'PLATFORM NOT ACTIVATED' }}
+          </div>
+
+          <h1 class="lock-title">Application Access Locked</h1>
+          <p class="lock-desc">
+            <span *ngIf="licenseService.status() === 'EXPIRED'">
+              The enterprise software license for this platform expired on 
+              <strong>{{ licenseService.licenseRecord()?.payload?.expiresAt | date:'fullDate' }}</strong>.
+              All administrative operations, cadastral files, and modules are locked until renewed.
+            </span>
+            <span *ngIf="licenseService.status() !== 'EXPIRED'">
+              This software deployment has not been activated. To enable platform operations, upload a signed <strong>.key</strong> file or enter a valid activation code issued by your Super Administrator.
+            </span>
+          </p>
+
+          <!-- Expired Meta Box if previous record exists -->
+          <div *ngIf="licenseService.licenseRecord() as rec" class="expired-meta-box">
+            <div class="meta-item">
+              <span class="label">Organization:</span>
+              <span class="val">{{ rec.payload.issuedTo }}</span>
+            </div>
+            <div class="meta-item">
+              <span class="label">License ID:</span>
+              <span class="val font-mono">{{ rec.payload.licenseId }}</span>
+            </div>
+            <div class="meta-item">
+              <span class="label">Expired On:</span>
+              <span class="val text-red font-semibold">{{ rec.payload.expiresAt | date:'yyyy-MM-dd HH:mm' }}</span>
+            </div>
+          </div>
+
+          <!-- Activation Form Inside Lock -->
+          <div class="lock-form-section">
+            <h3 class="form-section-title">Unlock With Activation Key</h3>
+
+            <!-- Method 1: Upload File -->
+            <div class="lock-file-dropzone">
+              <input type="file" #lockFileInput accept=".key,.json" (change)="onKeyFileSelected($event)" style="display: none;">
+              <div class="dropzone-text">
+                <mat-icon class="file-icon">key</mat-icon>
+                <span>{{ selectedKeyFileName() ? selectedKeyFileName() : 'Upload Application Key File (.key)' }}</span>
+              </div>
+              <button mat-stroked-button color="primary" type="button" (click)="lockFileInput.click()">
+                <mat-icon>folder_open</mat-icon> Browse File
+              </button>
+            </div>
+
+            <!-- Method 2: Paste Code -->
+            <mat-form-field appearance="outline" class="w-full mt-2" subscriptSizing="dynamic">
+              <mat-label>Or Paste Activation Code (ONM-ACT-...)</mat-label>
+              <input matInput type="text" [ngModel]="lockKeyInput()" (ngModelChange)="lockKeyInput.set($event)" placeholder="Paste activation code (ONM-ACT-...) or JSON string here..." class="font-mono">
+              <button mat-icon-button matSuffix *ngIf="lockKeyInput()" (click)="lockKeyInput.set('')" matTooltip="Clear input" type="button">
+                <mat-icon>clear</mat-icon>
+              </button>
+            </mat-form-field>
+
+            <!-- Error Feedback -->
+            <div *ngIf="unlockError()" class="lock-error-alert">
+              <mat-icon>error_outline</mat-icon>
+              <span>{{ unlockError() }}</span>
+            </div>
+
+            <!-- Unlock Button -->
+            <button mat-flat-button color="primary" class="unlock-btn mt-3" [disabled]="!lockKeyInput().trim() || isUnlocking()" (click)="applyUnlockKey()">
+              <mat-icon>{{ isUnlocking() ? 'sync' : 'lock_open' }}</mat-icon>
+              {{ isUnlocking() ? 'Verifying & Unlocking...' : 'Unlock Platform' }}
+            </button>
+          </div>
+
+          <!-- Super Admin Fast Unlock Actions -->
+          <div *ngIf="isSuperAdmin()" class="super-admin-emergency-box">
+            <div class="sa-box-header">
+              <mat-icon class="sa-icon">admin_panel_settings</mat-icon>
+              <div>
+                <strong>Super Administrator Emergency Controls</strong>
+                <p>You have statutory authority to immediately generate a renewed license or manage keys in Platform Settings.</p>
+              </div>
+            </div>
+            <div class="sa-actions-row">
+              <button mat-flat-button color="accent" (click)="superAdminQuickUnlock()" [disabled]="isUnlocking()">
+                <mat-icon>bolt</mat-icon> Quick-Generate 1-Year Key & Unlock Now
+              </button>
+              <button mat-stroked-button (click)="goToSettingsAsSuperAdmin()">
+                <mat-icon>settings</mat-icon> Open Platform Settings
+              </button>
+            </div>
+          </div>
+
+          <!-- Sign Out Footer -->
+          <div class="lock-card-footer">
+            <span class="user-info">Logged in as: <strong>{{ authService.currentUser()?.email || 'User' }}</strong></span>
+            <button mat-button color="warn" (click)="logout()">
+              <mat-icon>logout</mat-icon> Sign Out
+            </button>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Main Unlocked Content Area -->
+      <div class="content-inner" *ngIf="!isAppLocked()" [@fadeAnimation]="getRouteAnimationData()">
         <router-outlet></router-outlet>
       </div>
     </main>

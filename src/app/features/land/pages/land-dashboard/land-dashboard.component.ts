@@ -13,6 +13,72 @@ import { LandJob, LandJobStatus } from '../../models/land.model';
 import { LandJobDialogComponent } from '../../components/land-job-dialog/land-job-dialog.component';
 import { LandJobDetailDialogComponent } from '../../components/land-job-detail-dialog/land-job-detail-dialog.component';
 
+export interface StageCounts {
+  initial: number;
+  documentation: number;
+  verification: number;
+  completed: number;
+  rejected: number;
+  onHold: number;
+}
+
+export interface GNDivisionStat {
+  name: string;
+  count: number;
+  stages: StageCounts;
+}
+
+export interface DSDivisionStat {
+  name: string;
+  count: number;
+  percentage: number;
+  stages: StageCounts;
+  gnDivisions: GNDivisionStat[];
+}
+
+export interface GNDivisionWithParentStat {
+  name: string;
+  dsName: string;
+  count: number;
+  stages: StageCounts;
+}
+
+export interface JobTypeStat {
+  name: string;
+  count: number;
+  stages: StageCounts;
+}
+
+function initStageCounts(): StageCounts {
+  return { initial: 0, documentation: 0, verification: 0, completed: 0, rejected: 0, onHold: 0 };
+}
+
+function incrementStage(counts: StageCounts, status: LandJobStatus | string | undefined) {
+  switch (status) {
+    case 'Initial':
+      counts.initial++;
+      break;
+    case 'Documentation':
+      counts.documentation++;
+      break;
+    case 'Verification':
+      counts.verification++;
+      break;
+    case 'Completed':
+      counts.completed++;
+      break;
+    case 'Rejected':
+      counts.rejected++;
+      break;
+    case 'On Hold':
+      counts.onHold++;
+      break;
+    default:
+      counts.initial++;
+      break;
+  }
+}
+
 @Component({
   selector: 'app-land-dashboard',
   standalone: true,
@@ -101,46 +167,227 @@ import { LandJobDetailDialogComponent } from '../../components/land-job-detail-d
 
       <!-- Divisional & Job Type Breakdown Grids -->
       <div class="analytics-row">
-        <!-- Division Load -->
+        <!-- Division Load (DS & GN Divisions with Stages) -->
         <mat-card class="analytics-card">
-          <div class="card-header">
-            <mat-icon class="sec-icon text-indigo">holiday_village</mat-icon>
-            <div>
-              <h3 class="card-title">Tasks by Administrative Division</h3>
-              <p class="card-subtitle">Active distribution across jurisdictional boundaries</p>
+          <div class="card-header flex-between">
+            <div class="flex-align">
+              <mat-icon class="sec-icon text-indigo">holiday_village</mat-icon>
+              <div>
+                <h3 class="card-title">Tasks by Administrative Division</h3>
+                <p class="card-subtitle">DS & GN Division distribution with stage progress</p>
+              </div>
+            </div>
+            <div class="view-toggle-group">
+              <button type="button" 
+                class="view-toggle-btn" 
+                [class.active]="divisionViewMode() === 'DS'" 
+                (click)="setDivisionViewMode('DS')">
+                DS Division
+              </button>
+              <button type="button" 
+                class="view-toggle-btn" 
+                [class.active]="divisionViewMode() === 'GN'" 
+                (click)="setDivisionViewMode('GN')">
+                All GN Divisions
+              </button>
             </div>
           </div>
 
-          <div class="division-stats-list">
-            <div *ngFor="let div of divisionStats()" class="division-stat-item">
-              <div class="div-info-line">
-                <span class="div-name">{{ div.name }}</span>
-                <span class="div-badge">{{ div.count }} jobs</span>
+          <!-- By DS Division View with nested GN divisions -->
+          <div class="division-stats-list" *ngIf="divisionViewMode() === 'DS'">
+            <div *ngIf="dsDivisionStats().length === 0" class="empty-state-text">
+              No division records logged yet.
+            </div>
+
+            <div *ngFor="let ds of dsDivisionStats()" class="ds-stat-card">
+              <div class="ds-info-line" (click)="toggleDsExpand(ds.name)">
+                <div class="ds-left">
+                  <mat-icon class="ds-icon">apartment</mat-icon>
+                  <span class="ds-name">{{ ds.name }}</span>
+                  <span class="ds-badge">{{ ds.count }} {{ ds.count === 1 ? 'job' : 'jobs' }}</span>
+                  <span class="ds-pct">({{ ds.percentage }}%)</span>
+                </div>
+                <div class="ds-right">
+                  <span class="gn-count-tag" matTooltip="Click to expand/collapse GN Divisions">
+                    {{ ds.gnDivisions.length }} GN {{ ds.gnDivisions.length === 1 ? 'Area' : 'Areas' }}
+                    <mat-icon class="toggle-icon">{{ isDsExpanded(ds.name) ? 'expand_less' : 'expand_more' }}</mat-icon>
+                  </span>
+                </div>
               </div>
-              <div class="stat-progress-bar">
-                <div class="progress-fill" [style.width.%]="div.percentage"></div>
+
+              <!-- DS Division Current Stage Breakdown -->
+              <div class="stage-breakdown-row">
+                <span class="mini-stage-chip initial" matTooltip="Stage 1: Initial">
+                  <span class="chip-label">Init:</span>
+                  <strong>{{ ds.stages.initial }}</strong>
+                </span>
+                <span class="mini-stage-chip documentation" matTooltip="Stage 2: Documentation">
+                  <span class="chip-label">Doc:</span>
+                  <strong>{{ ds.stages.documentation }}</strong>
+                </span>
+                <span class="mini-stage-chip verification" matTooltip="Stage 3: Verification">
+                  <span class="chip-label">Verif:</span>
+                  <strong>{{ ds.stages.verification }}</strong>
+                </span>
+                <span class="mini-stage-chip completed" matTooltip="Stage 4: Completed">
+                  <span class="chip-label">Done:</span>
+                  <strong>{{ ds.stages.completed }}</strong>
+                </span>
+                <span *ngIf="ds.stages.rejected > 0" class="mini-stage-chip rejected" matTooltip="Rejected">
+                  <span class="chip-label">Rej:</span>
+                  <strong>{{ ds.stages.rejected }}</strong>
+                </span>
+                <span *ngIf="ds.stages.onHold > 0" class="mini-stage-chip on_hold" matTooltip="On Hold">
+                  <span class="chip-label">Hold:</span>
+                  <strong>{{ ds.stages.onHold }}</strong>
+                </span>
+              </div>
+
+              <!-- Multi-stage progress bar -->
+              <div class="multi-progress-bar" *ngIf="ds.count > 0">
+                <div class="bar-seg initial" [style.width.%]="(ds.stages.initial / ds.count) * 100" [matTooltip]="'Initial: ' + ds.stages.initial"></div>
+                <div class="bar-seg documentation" [style.width.%]="(ds.stages.documentation / ds.count) * 100" [matTooltip]="'Documentation: ' + ds.stages.documentation"></div>
+                <div class="bar-seg verification" [style.width.%]="(ds.stages.verification / ds.count) * 100" [matTooltip]="'Verification: ' + ds.stages.verification"></div>
+                <div class="bar-seg completed" [style.width.%]="(ds.stages.completed / ds.count) * 100" [matTooltip]="'Completed: ' + ds.stages.completed"></div>
+                <div class="bar-seg rejected" [style.width.%]="(ds.stages.rejected / ds.count) * 100" [matTooltip]="'Rejected: ' + ds.stages.rejected"></div>
+                <div class="bar-seg on_hold" [style.width.%]="(ds.stages.onHold / ds.count) * 100" [matTooltip]="'On Hold: ' + ds.stages.onHold"></div>
+              </div>
+
+              <!-- Nested GN Divisions -->
+              <div class="gn-sublist-container" *ngIf="isDsExpanded(ds.name)">
+                <div *ngIf="ds.gnDivisions.length === 0" class="gn-empty-text">
+                  No GN divisions recorded for {{ ds.name }}
+                </div>
+                <div *ngFor="let gn of ds.gnDivisions" class="gn-subitem-card">
+                  <div class="gn-head-row">
+                    <div class="gn-left">
+                      <mat-icon class="gn-branch-icon">subdirectory_arrow_right</mat-icon>
+                      <span class="gn-title">{{ gn.name }}</span>
+                    </div>
+                    <span class="gn-jobs-count">{{ gn.count }} {{ gn.count === 1 ? 'job' : 'jobs' }}</span>
+                  </div>
+
+                  <div class="stage-breakdown-row sub">
+                    <span class="mini-stage-chip sm initial">Init: <strong>{{ gn.stages.initial }}</strong></span>
+                    <span class="mini-stage-chip sm documentation">Doc: <strong>{{ gn.stages.documentation }}</strong></span>
+                    <span class="mini-stage-chip sm verification">Verif: <strong>{{ gn.stages.verification }}</strong></span>
+                    <span class="mini-stage-chip sm completed">Done: <strong>{{ gn.stages.completed }}</strong></span>
+                    <span *ngIf="gn.stages.rejected > 0" class="mini-stage-chip sm rejected">Rej: <strong>{{ gn.stages.rejected }}</strong></span>
+                    <span *ngIf="gn.stages.onHold > 0" class="mini-stage-chip sm on_hold">Hold: <strong>{{ gn.stages.onHold }}</strong></span>
+                  </div>
+
+                  <div class="multi-progress-bar sm" *ngIf="gn.count > 0">
+                    <div class="bar-seg initial" [style.width.%]="(gn.stages.initial / gn.count) * 100"></div>
+                    <div class="bar-seg documentation" [style.width.%]="(gn.stages.documentation / gn.count) * 100"></div>
+                    <div class="bar-seg verification" [style.width.%]="(gn.stages.verification / gn.count) * 100"></div>
+                    <div class="bar-seg completed" [style.width.%]="(gn.stages.completed / gn.count) * 100"></div>
+                    <div class="bar-seg rejected" [style.width.%]="(gn.stages.rejected / gn.count) * 100"></div>
+                    <div class="bar-seg on_hold" [style.width.%]="(gn.stages.onHold / gn.count) * 100"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- All GN Divisions Flat View -->
+          <div class="all-gn-list" *ngIf="divisionViewMode() === 'GN'">
+            <div *ngIf="allGNDivisionStats().length === 0" class="empty-state-text">
+              No GN division records found.
+            </div>
+            <div *ngFor="let gn of allGNDivisionStats()" class="gn-flat-card">
+              <div class="gn-head-row">
+                <div class="gn-left">
+                  <mat-icon class="gn-flat-icon">place</mat-icon>
+                  <div>
+                    <span class="gn-title">{{ gn.name }}</span>
+                    <span class="gn-parent-tag">{{ gn.dsName }}</span>
+                  </div>
+                </div>
+                <span class="gn-jobs-count">{{ gn.count }} {{ gn.count === 1 ? 'job' : 'jobs' }}</span>
+              </div>
+
+              <div class="stage-breakdown-row">
+                <span class="mini-stage-chip initial">Init: <strong>{{ gn.stages.initial }}</strong></span>
+                <span class="mini-stage-chip documentation">Doc: <strong>{{ gn.stages.documentation }}</strong></span>
+                <span class="mini-stage-chip verification">Verif: <strong>{{ gn.stages.verification }}</strong></span>
+                <span class="mini-stage-chip completed">Done: <strong>{{ gn.stages.completed }}</strong></span>
+                <span *ngIf="gn.stages.rejected > 0" class="mini-stage-chip rejected">Rej: <strong>{{ gn.stages.rejected }}</strong></span>
+                <span *ngIf="gn.stages.onHold > 0" class="mini-stage-chip on_hold">Hold: <strong>{{ gn.stages.onHold }}</strong></span>
+              </div>
+
+              <div class="multi-progress-bar" *ngIf="gn.count > 0">
+                <div class="bar-seg initial" [style.width.%]="(gn.stages.initial / gn.count) * 100"></div>
+                <div class="bar-seg documentation" [style.width.%]="(gn.stages.documentation / gn.count) * 100"></div>
+                <div class="bar-seg verification" [style.width.%]="(gn.stages.verification / gn.count) * 100"></div>
+                <div class="bar-seg completed" [style.width.%]="(gn.stages.completed / gn.count) * 100"></div>
+                <div class="bar-seg rejected" [style.width.%]="(gn.stages.rejected / gn.count) * 100"></div>
+                <div class="bar-seg on_hold" [style.width.%]="(gn.stages.onHold / gn.count) * 100"></div>
               </div>
             </div>
           </div>
         </mat-card>
 
-        <!-- Job Type Distribution -->
+        <!-- Tasks by Job Type with Current Stage Counts -->
         <mat-card class="analytics-card">
           <div class="card-header">
             <mat-icon class="sec-icon text-teal">category</mat-icon>
             <div>
               <h3 class="card-title">Tasks by Job Type</h3>
-              <p class="card-subtitle">Breakdown by cadastral service category</p>
+              <p class="card-subtitle">Cadastral service categories with current stage breakdown</p>
             </div>
           </div>
 
           <div class="job-type-stats-list">
-            <div *ngFor="let jt of jobTypeStats()" class="jt-stat-item">
-              <div class="jt-stat-left">
-                <span class="jt-bullet"></span>
-                <span class="jt-title">{{ jt.name }}</span>
+            <div *ngIf="jobTypeStats().length === 0" class="empty-state-text">
+              No job types logged yet.
+            </div>
+
+            <div *ngFor="let jt of jobTypeStats()" class="jt-stat-card">
+              <div class="jt-header-row">
+                <div class="jt-stat-left">
+                  <span class="jt-bullet"></span>
+                  <span class="jt-title">{{ jt.name }}</span>
+                </div>
+                <span class="jt-count-tag">{{ jt.count }} {{ jt.count === 1 ? 'task' : 'tasks' }}</span>
               </div>
-              <span class="jt-count-tag">{{ jt.count }}</span>
+
+              <!-- Current stage count breakdown under job type -->
+              <div class="stage-breakdown-row">
+                <span class="mini-stage-chip initial" matTooltip="Stage 1: Initial">
+                  <span class="chip-label">Init:</span>
+                  <strong>{{ jt.stages.initial }}</strong>
+                </span>
+                <span class="mini-stage-chip documentation" matTooltip="Stage 2: Documentation">
+                  <span class="chip-label">Doc:</span>
+                  <strong>{{ jt.stages.documentation }}</strong>
+                </span>
+                <span class="mini-stage-chip verification" matTooltip="Stage 3: Verification">
+                  <span class="chip-label">Verif:</span>
+                  <strong>{{ jt.stages.verification }}</strong>
+                </span>
+                <span class="mini-stage-chip completed" matTooltip="Stage 4: Completed">
+                  <span class="chip-label">Done:</span>
+                  <strong>{{ jt.stages.completed }}</strong>
+                </span>
+                <span *ngIf="jt.stages.rejected > 0" class="mini-stage-chip rejected" matTooltip="Rejected">
+                  <span class="chip-label">Rej:</span>
+                  <strong>{{ jt.stages.rejected }}</strong>
+                </span>
+                <span *ngIf="jt.stages.onHold > 0" class="mini-stage-chip on_hold" matTooltip="On Hold">
+                  <span class="chip-label">Hold:</span>
+                  <strong>{{ jt.stages.onHold }}</strong>
+                </span>
+              </div>
+
+              <!-- Multi-stage progress bar -->
+              <div class="multi-progress-bar" *ngIf="jt.count > 0">
+                <div class="bar-seg initial" [style.width.%]="(jt.stages.initial / jt.count) * 100" [matTooltip]="'Initial: ' + jt.stages.initial"></div>
+                <div class="bar-seg documentation" [style.width.%]="(jt.stages.documentation / jt.count) * 100" [matTooltip]="'Documentation: ' + jt.stages.documentation"></div>
+                <div class="bar-seg verification" [style.width.%]="(jt.stages.verification / jt.count) * 100" [matTooltip]="'Verification: ' + jt.stages.verification"></div>
+                <div class="bar-seg completed" [style.width.%]="(jt.stages.completed / jt.count) * 100" [matTooltip]="'Completed: ' + jt.stages.completed"></div>
+                <div class="bar-seg rejected" [style.width.%]="(jt.stages.rejected / jt.count) * 100" [matTooltip]="'Rejected: ' + jt.stages.rejected"></div>
+                <div class="bar-seg on_hold" [style.width.%]="(jt.stages.onHold / jt.count) * 100" [matTooltip]="'On Hold: ' + jt.stages.onHold"></div>
+              </div>
             </div>
           </div>
         </mat-card>
@@ -301,8 +548,9 @@ import { LandJobDetailDialogComponent } from '../../components/land-job-detail-d
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 20px;
+      align-items: start;
 
-      @media (max-width: 900px) {
+      @media (max-width: 1024px) {
         grid-template-columns: 1fr;
       }
     }
@@ -319,53 +567,260 @@ import { LandJobDetailDialogComponent } from '../../components/land-job-detail-d
         gap: 10px;
         margin-bottom: 16px;
 
+        &.flex-between {
+          justify-content: space-between;
+          flex-wrap: wrap;
+          gap: 12px;
+        }
+
         .card-title { margin: 0; font-size: 1.05rem; font-weight: 700; color: #0f172a; }
         .card-subtitle { margin: 2px 0 0 0; font-size: 0.8rem; color: #64748b; }
       }
     }
 
-    .division-stats-list {
+    .view-toggle-group {
+      display: inline-flex;
+      background: #f1f5f9;
+      border-radius: 8px;
+      padding: 3px;
+      border: 1px solid #e2e8f0;
+
+      .view-toggle-btn {
+        background: transparent;
+        border: none;
+        outline: none;
+        padding: 4px 10px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: #64748b;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: all 0.15s ease;
+
+        &:hover {
+          color: #0f172a;
+        }
+
+        &.active {
+          background: #ffffff;
+          color: #0e7490;
+          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+          font-weight: 700;
+        }
+      }
+    }
+
+    .empty-state-text {
+      text-align: center;
+      padding: 24px;
+      color: #94a3b8;
+      font-size: 0.85rem;
+    }
+
+    .division-stats-list, .all-gn-list, .job-type-stats-list {
       display: flex;
       flex-direction: column;
       gap: 12px;
+      max-height: 520px;
+      overflow-y: auto;
+      padding-right: 4px;
+    }
 
-      .division-stat-item {
-        .div-info-line {
+    .ds-stat-card {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 12px 14px;
+      transition: border-color 0.15s ease;
+
+      &:hover {
+        border-color: #cbd5e1;
+      }
+
+      .ds-info-line {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        cursor: pointer;
+        user-select: none;
+
+        .ds-left {
           display: flex;
-          justify-content: space-between;
-          font-size: 0.85rem;
-          margin-bottom: 4px;
-          .div-name { font-weight: 600; color: #1e293b; }
-          .div-badge { color: #64748b; font-size: 0.8rem; }
-        }
-        .stat-progress-bar {
-          height: 6px;
-          background: #f1f5f9;
-          border-radius: 3px;
-          overflow: hidden;
+          align-items: center;
+          gap: 8px;
 
-          .progress-fill {
-            height: 100%;
-            background: #4f46e5;
-            border-radius: 3px;
+          .ds-icon {
+            font-size: 18px;
+            width: 18px;
+            height: 18px;
+            color: #4f46e5;
+          }
+
+          .ds-name {
+            font-weight: 700;
+            font-size: 0.9rem;
+            color: #1e293b;
+          }
+
+          .ds-badge {
+            background: #e0e7ff;
+            color: #3730a3;
+            font-size: 0.72rem;
+            font-weight: 700;
+            padding: 2px 7px;
+            border-radius: 10px;
+          }
+
+          .ds-pct {
+            font-size: 0.75rem;
+            color: #94a3b8;
+          }
+        }
+
+        .ds-right {
+          .gn-count-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 2px;
+            font-size: 0.75rem;
+            color: #0e7490;
+            font-weight: 600;
+            background: #e0f2fe;
+            padding: 3px 8px;
+            border-radius: 6px;
+
+            .toggle-icon {
+              font-size: 18px;
+              width: 18px;
+              height: 18px;
+            }
           }
         }
       }
     }
 
-    .job-type-stats-list {
+    .gn-sublist-container {
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px dashed #cbd5e1;
       display: flex;
       flex-direction: column;
-      gap: 10px;
+      gap: 8px;
 
-      .jt-stat-item {
+      .gn-empty-text {
+        font-size: 0.75rem;
+        color: #94a3b8;
+        font-style: italic;
+        padding-left: 24px;
+      }
+
+      .gn-subitem-card {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 8px 10px;
+        margin-left: 12px;
+
+        .gn-head-row {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+
+          .gn-left {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+
+            .gn-branch-icon {
+              font-size: 16px;
+              width: 16px;
+              height: 16px;
+              color: #94a3b8;
+            }
+
+            .gn-title {
+              font-size: 0.8rem;
+              font-weight: 600;
+              color: #334155;
+            }
+          }
+
+          .gn-jobs-count {
+            font-size: 0.72rem;
+            font-weight: 700;
+            color: #475569;
+            background: #f1f5f9;
+            padding: 1px 6px;
+            border-radius: 8px;
+          }
+        }
+      }
+    }
+
+    .gn-flat-card {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 12px 14px;
+
+      .gn-head-row {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        padding: 8px 12px;
-        background: #f8fafc;
-        border: 1px solid #f1f5f9;
-        border-radius: 8px;
+
+        .gn-left {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+
+          .gn-flat-icon {
+            font-size: 20px;
+            width: 20px;
+            height: 20px;
+            color: #0e7490;
+          }
+
+          .gn-title {
+            font-weight: 700;
+            font-size: 0.875rem;
+            color: #1e293b;
+          }
+
+          .gn-parent-tag {
+            margin-left: 8px;
+            font-size: 0.72rem;
+            background: #e2e8f0;
+            color: #475569;
+            padding: 1px 6px;
+            border-radius: 4px;
+            font-weight: 500;
+          }
+        }
+
+        .gn-jobs-count {
+          font-size: 0.75rem;
+          font-weight: 700;
+          color: #0f172a;
+          background: #e2e8f0;
+          padding: 2px 8px;
+          border-radius: 10px;
+        }
+      }
+    }
+
+    .jt-stat-card {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 12px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+
+      .jt-header-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
 
         .jt-stat-left {
           display: flex;
@@ -378,7 +833,11 @@ import { LandJobDetailDialogComponent } from '../../components/land-job-detail-d
             border-radius: 50%;
             background: #0d9488;
           }
-          .jt-title { font-size: 0.875rem; font-weight: 600; color: #1e293b; }
+          .jt-title {
+            font-size: 0.875rem;
+            font-weight: 700;
+            color: #1e293b;
+          }
         }
 
         .jt-count-tag {
@@ -389,6 +848,101 @@ import { LandJobDetailDialogComponent } from '../../components/land-job-detail-d
           padding: 2px 8px;
           border-radius: 12px;
         }
+      }
+    }
+
+    .stage-breakdown-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 8px;
+
+      &.sub {
+        margin-top: 6px;
+        gap: 4px;
+      }
+    }
+
+    .mini-stage-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 0.72rem;
+      padding: 2px 7px;
+      border-radius: 6px;
+      border: 1px solid transparent;
+      line-height: 1.2;
+
+      .chip-label {
+        font-weight: 500;
+        opacity: 0.85;
+      }
+
+      strong {
+        font-weight: 800;
+      }
+
+      &.sm {
+        font-size: 0.68rem;
+        padding: 1px 5px;
+      }
+
+      &.initial {
+        background: #e0f2fe;
+        color: #0369a1;
+        border-color: #bae6fd;
+      }
+      &.documentation {
+        background: #fef3c7;
+        color: #b45309;
+        border-color: #fde68a;
+      }
+      &.verification {
+        background: #fae8ff;
+        color: #86198f;
+        border-color: #f5d0fe;
+      }
+      &.completed {
+        background: #dcfce7;
+        color: #15803d;
+        border-color: #bbf7d0;
+      }
+      &.rejected {
+        background: #fee2e2;
+        color: #b91c1c;
+        border-color: #fecaca;
+      }
+      &.on_hold {
+        background: #f1f5f9;
+        color: #475569;
+        border-color: #e2e8f0;
+      }
+    }
+
+    .multi-progress-bar {
+      display: flex;
+      height: 6px;
+      background: #e2e8f0;
+      border-radius: 4px;
+      overflow: hidden;
+      margin-top: 8px;
+      width: 100%;
+
+      &.sm {
+        height: 4px;
+        margin-top: 6px;
+      }
+
+      .bar-seg {
+        height: 100%;
+        transition: width 0.25s ease;
+
+        &.initial { background: #06b6d4; }
+        &.documentation { background: #f59e0b; }
+        &.verification { background: #c026d3; }
+        &.completed { background: #16a34a; }
+        &.rejected { background: #dc2626; }
+        &.on_hold { background: #94a3b8; }
       }
     }
 
@@ -492,6 +1046,8 @@ export class LandDashboardComponent implements OnInit {
   private dialog = inject(MatDialog);
 
   jobs = signal<LandJob[]>([]);
+  expandedDsMap = signal<Record<string, boolean>>({});
+  divisionViewMode = signal<'DS' | 'GN'>('DS');
 
   totalCount = computed(() => this.jobs().length);
   initialCount = computed(() => this.jobs().filter(j => j.status === 'Initial').length);
@@ -501,27 +1057,104 @@ export class LandDashboardComponent implements OnInit {
 
   recentJobs = computed(() => this.jobs().slice(0, 8));
 
-  divisionStats = computed(() => {
-    const map = new Map<string, number>();
-    for (const j of this.jobs()) {
-      const d = j.division || 'Unknown';
-      map.set(d, (map.get(d) || 0) + 1);
+  isDsExpanded(name: string): boolean {
+    const map = this.expandedDsMap();
+    return map[name] !== undefined ? map[name] : true;
+  }
+
+  toggleDsExpand(name: string, event?: Event) {
+    if (event) {
+      event.stopPropagation();
     }
+    const current = this.isDsExpanded(name);
+    this.expandedDsMap.update(m => ({ ...m, [name]: !current }));
+  }
+
+  setDivisionViewMode(mode: 'DS' | 'GN') {
+    this.divisionViewMode.set(mode);
+  }
+
+  dsDivisionStats = computed<DSDivisionStat[]>(() => {
     const total = this.totalCount() || 1;
-    return Array.from(map.entries()).map(([name, count]) => ({
-      name,
-      count,
-      percentage: Math.min(100, Math.round((count / total) * 100))
-    }));
+    const dsMap = new Map<string, {
+      name: string;
+      count: number;
+      stages: StageCounts;
+      gnMap: Map<string, { name: string; count: number; stages: StageCounts }>;
+    }>();
+
+    for (const j of this.jobs()) {
+      const dsName = j.division?.trim() || 'Unassigned DS';
+      const gnName = j.gramaNiladhariDivision?.trim() || 'Unassigned GN';
+
+      if (!dsMap.has(dsName)) {
+        dsMap.set(dsName, {
+          name: dsName,
+          count: 0,
+          stages: initStageCounts(),
+          gnMap: new Map()
+        });
+      }
+
+      const dsItem = dsMap.get(dsName)!;
+      dsItem.count++;
+      incrementStage(dsItem.stages, j.status);
+
+      if (!dsItem.gnMap.has(gnName)) {
+        dsItem.gnMap.set(gnName, {
+          name: gnName,
+          count: 0,
+          stages: initStageCounts()
+        });
+      }
+      const gnItem = dsItem.gnMap.get(gnName)!;
+      gnItem.count++;
+      incrementStage(gnItem.stages, j.status);
+    }
+
+    return Array.from(dsMap.values())
+      .map(ds => ({
+        name: ds.name,
+        count: ds.count,
+        percentage: Math.min(100, Math.round((ds.count / total) * 100)),
+        stages: ds.stages,
+        gnDivisions: Array.from(ds.gnMap.values()).sort((a, b) => b.count - a.count)
+      }))
+      .sort((a, b) => b.count - a.count);
   });
 
-  jobTypeStats = computed(() => {
-    const map = new Map<string, number>();
+  // Alias for backward compatibility
+  divisionStats = computed(() => this.dsDivisionStats());
+
+  allGNDivisionStats = computed<GNDivisionWithParentStat[]>(() => {
+    const map = new Map<string, { name: string; dsName: string; count: number; stages: StageCounts }>();
     for (const j of this.jobs()) {
-      const t = j.jobTypeName || 'General';
-      map.set(t, (map.get(t) || 0) + 1);
+      const dsName = j.division?.trim() || 'Unassigned DS';
+      const gnName = j.gramaNiladhariDivision?.trim() || 'Unassigned GN';
+      const key = `${dsName}:::${gnName}`;
+
+      if (!map.has(key)) {
+        map.set(key, { name: gnName, dsName, count: 0, stages: initStageCounts() });
+      }
+      const item = map.get(key)!;
+      item.count++;
+      incrementStage(item.stages, j.status);
     }
-    return Array.from(map.entries()).map(([name, count]) => ({ name, count }));
+    return Array.from(map.values()).sort((a, b) => b.count - a.count);
+  });
+
+  jobTypeStats = computed<JobTypeStat[]>(() => {
+    const map = new Map<string, { name: string; count: number; stages: StageCounts }>();
+    for (const j of this.jobs()) {
+      const t = j.jobTypeName?.trim() || 'General';
+      if (!map.has(t)) {
+        map.set(t, { name: t, count: 0, stages: initStageCounts() });
+      }
+      const item = map.get(t)!;
+      item.count++;
+      incrementStage(item.stages, j.status);
+    }
+    return Array.from(map.values()).sort((a, b) => b.count - a.count);
   });
 
   ngOnInit() {

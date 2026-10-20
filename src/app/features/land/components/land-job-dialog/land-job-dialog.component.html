@@ -9,6 +9,9 @@
         <div class="title-row">
           <h2 class="dialog-title">{{ isEditMode() ? 'Edit Land Task Dossier' : 'Register New Land Task / Job' }}</h2>
           <span *ngIf="isEditMode() && existingJob" class="ref-badge">{{ existingJob.jobRef }}</span>
+          <span *ngIf="isEditMode() && !canEdit()" class="readonly-pill">
+            <mat-icon>lock</mat-icon> View-Only
+          </span>
           <span class="stage-indicator-pill">{{ currentStageName() }}</span>
         </div>
         <p class="dialog-subtitle">Cadastral parcel filing, verification workflow & deed tracking</p>
@@ -23,6 +26,13 @@
 
   <!-- 4-Stage Stepper Wizard Content -->
   <mat-dialog-content class="wizard-dialog-content">
+    <div *ngIf="isEditMode() && !canEdit()" class="readonly-warning-banner">
+      <mat-icon class="ro-icon">lock</mat-icon>
+      <div class="ro-text">
+        <strong>Read-Only Mode:</strong> This task was registered by <strong>{{ existingJob?.createdBy || 'another officer' }}</strong>.
+        Only an Administrator or the user who created it can edit or save changes.
+      </div>
+    </div>
     <mat-stepper #stepper (selectionChange)="onStepChange($event)" class="land-stepper">
 
       <!-- ============================================== -->
@@ -38,15 +48,16 @@
             </div>
           </div>
 
-          <!-- Section 1A: Select Land Job Type (FIRST - DROPDOWN) -->
+          <!-- Section 1A: Select Land Job Type & File Number -->
           <div class="form-card highlight-card">
             <div class="card-title-row">
               <mat-icon class="sec-icon text-indigo">category</mat-icon>
-              <h4 class="card-heading">1. Select Land Job Type</h4>
+              <h4 class="card-heading">1. Select Land Job Type & File Number</h4>
             </div>
-            <p class="section-subtext">Select the official land cadastral job type. Documentation requirements and verification checklists will automatically configure based on your selected job type.</p>
+            <p class="section-subtext">Select the cadastral service category and assign or link a File Number (Dossier). Multiple tasks can be linked together under the same File Number.</p>
 
-            <div class="job-type-selection-grid">
+            <div class="grid-2-col">
+              <!-- Select Land Job Type -->
               <mat-form-field appearance="outline" class="w-full">
                 <mat-label>Select Land Job Type *</mat-label>
                 <mat-select formControlName="jobTypeId" (selectionChange)="onJobTypeChange($event.value)" panelClass="land-job-type-dropdown">
@@ -61,6 +72,107 @@
                 </mat-hint>
                 <mat-error *ngIf="initialForm.get('jobTypeId')?.invalid">Job Type is required</mat-error>
               </mat-form-field>
+
+              <!-- File Number Typeahead -->
+              <mat-form-field appearance="outline" class="w-full file-number-field">
+                <mat-label>File Number (Dossier) *</mat-label>
+                <input matInput 
+                       [ngModel]="fileNumberFilterText()" 
+                       [ngModelOptions]="{standalone: true}"
+                       (ngModelChange)="onFileNumberInputChange($event)"
+                       (blur)="onFileNumberBlur()"
+                       [matAutocomplete]="autoFileNumber" 
+                       placeholder="e.g. FN-01 or LND/2026/042">
+                <mat-icon matSuffix class="text-slate-400">folder_open</mat-icon>
+                <mat-hint>Search existing dossier or enter a new File Number</mat-hint>
+
+                <mat-autocomplete #autoFileNumber="matAutocomplete" (optionSelected)="onSelectFileNumber($event.option.value)">
+                  <!-- New File Number Option -->
+                  <mat-option *ngIf="isNewFileNumber()" [value]="fileNumberFilterText().trim()" class="new-file-option">
+                    <div class="file-opt-row new-file">
+                      <div class="file-opt-left">
+                        <mat-icon class="new-opt-icon">add_circle</mat-icon>
+                        <div class="file-opt-text">
+                          <span class="file-number-text">Add New File: <strong>"{{ fileNumberFilterText().trim() }}"</strong></span>
+                        </div>
+                      </div>
+                      <span class="new-badge">New File</span>
+                    </div>
+                  </mat-option>
+
+                  <!-- Existing File Number Options -->
+                  <mat-option *ngFor="let fn of filteredFileNumbers()" [value]="fn.fileNumber">
+                    <div class="file-opt-row">
+                      <div class="file-opt-left">
+                        <mat-icon class="file-opt-icon">folder</mat-icon>
+                        <div class="file-opt-text">
+                          <span class="file-number-text font-bold">{{ fn.fileNumber }}</span>
+                          <span *ngIf="fn.customerNames.length > 0" class="file-cust-name">
+                            ({{ fn.customerNames[0] }}{{ fn.customerNames.length > 1 ? ' +' + (fn.customerNames.length - 1) : '' }})
+                          </span>
+                        </div>
+                      </div>
+                      <span class="jobs-linked-badge" [class.has-jobs]="fn.jobCount > 0">
+                        {{ fn.jobCount }} {{ fn.jobCount === 1 ? 'task' : 'tasks' }} linked
+                      </span>
+                    </div>
+                  </mat-option>
+                </mat-autocomplete>
+              </mat-form-field>
+            </div>
+
+            <!-- Active Dossier Banner: Existing File with Linked Tasks -->
+            <div *ngIf="selectedFileNumberInfo()" class="file-dossier-banner existing">
+              <div class="dossier-banner-left">
+                <div class="dossier-icon-wrap">
+                  <mat-icon>folder_shared</mat-icon>
+                </div>
+                <div class="dossier-text">
+                  <div class="dossier-title-row">
+                    <span class="dossier-title">Linked File Dossier: <strong>{{ selectedFileNumberInfo()?.fileNumber }}</strong></span>
+                    <span class="dossier-badge">{{ selectedFileNumberInfo()?.jobCount }} {{ selectedFileNumberInfo()?.jobCount === 1 ? 'Task' : 'Tasks' }} Linked</span>
+                  </div>
+                  <p class="dossier-sub" *ngIf="selectedFileNumberInfo()?.customerNames?.length">
+                    Citizen: <strong>{{ selectedFileNumberInfo()?.customerNames?.join(', ') }}</strong>
+                    <span *ngIf="selectedFileNumberInfo()?.lastJob?.lotNumber"> • Lot: {{ selectedFileNumberInfo()?.lastJob?.lotNumber }}</span>
+                    <span *ngIf="selectedFileNumberInfo()?.lastJob?.division"> • {{ selectedFileNumberInfo()?.lastJob?.division }}</span>
+                  </p>
+                  <div class="linked-jobs-chips" *ngIf="selectedFileNumberInfo()!.jobs.length > 0">
+                    <span class="chips-label">File Tasks:</span>
+                    <span *ngFor="let j of selectedFileNumberInfo()!.jobs.slice(0, 3)" class="job-chip">
+                      {{ j.jobRef }} ({{ j.status }})
+                    </span>
+                    <span *ngIf="selectedFileNumberInfo()!.jobs.length > 3" class="job-chip more">
+                      +{{ selectedFileNumberInfo()!.jobs.length - 3 }} more
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <button *ngIf="selectedFileNumberInfo()?.lastJob && !selectedCustomerName()" 
+                      type="button" 
+                      mat-stroked-button 
+                      color="primary"
+                      class="autofill-btn"
+                      (click)="autofillFromLinkedFile(selectedFileNumberInfo()!.lastJob!)"
+                      matTooltip="Copy citizen and land parcel details from this existing file dossier">
+                <mat-icon>content_copy</mat-icon> Auto-fill from File
+              </button>
+            </div>
+
+            <!-- Active Dossier Banner: New File -->
+            <div *ngIf="!selectedFileNumberInfo() && (initialForm.get('fileNumber')?.value || fileNumberFilterText())" class="file-dossier-banner new-file">
+              <div class="dossier-banner-left">
+                <div class="dossier-icon-wrap new">
+                  <mat-icon>create_new_folder</mat-icon>
+                </div>
+                <div class="dossier-text">
+                  <div class="dossier-title-row">
+                    <span class="dossier-title">New File Dossier: <strong>{{ initialForm.get('fileNumber')?.value || fileNumberFilterText() }}</strong></span>
+                    <span class="dossier-badge new">New File</span>
+                  </div>
+                  <p class="dossier-sub">A new cadastral file record will be created. Future tasks for this land or citizen can be linked under this same File Number.</p>
+                </div>
+              </div>
             </div>
 
             <!-- Selected Job Type Summary Bar -->
@@ -572,8 +684,8 @@
       </button>
 
       <!-- SAVE & EXIT AT CURRENT STAGE BUTTON -->
-      <button mat-flat-button color="accent" class="save-exit-btn" [disabled]="isSaving()" (click)="saveAndExit()" matTooltip="Save your current progress and exit. You can resume this task anytime.">
-        <mat-icon>save</mat-icon> Save & Exit
+      <button mat-flat-button color="accent" class="save-exit-btn" [disabled]="isSaving() || (isEditMode() && !canEdit())" (click)="saveAndExit()" [matTooltip]="(isEditMode() && !canEdit()) ? 'Edit locked: Only an Administrator or the task creator can save changes' : 'Save your current progress and exit. You can resume this task anytime.'">
+        <mat-icon>{{ (isEditMode() && !canEdit()) ? 'lock' : 'save' }}</mat-icon> Save & Exit
       </button>
 
       <!-- Next / Complete Button -->
@@ -581,8 +693,8 @@
         Next Stage <mat-icon>arrow_forward</mat-icon>
       </button>
 
-      <button *ngIf="currentStepIndex() === 3" mat-flat-button color="primary" class="finalize-btn" [disabled]="isSaving()" (click)="finalizeJob()">
-        <mat-icon>check_circle</mat-icon> Finalize & Complete Task
+      <button *ngIf="currentStepIndex() === 3" mat-flat-button color="primary" class="finalize-btn" [disabled]="isSaving() || (isEditMode() && !canEdit())" (click)="finalizeJob()" [matTooltip]="(isEditMode() && !canEdit()) ? 'Edit locked: Only an Administrator or the task creator can finalize' : 'Finalize and complete task'">
+        <mat-icon>{{ (isEditMode() && !canEdit()) ? 'lock' : 'check_circle' }}</mat-icon> Finalize & Complete Task
       </button>
     </div>
   </div>
