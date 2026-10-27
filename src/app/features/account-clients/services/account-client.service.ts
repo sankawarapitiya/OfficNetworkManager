@@ -101,6 +101,8 @@ export class AccountClientService {
       if (clientId) {
         const byClientId = await this.firestoreService.queryDocuments('vouchers', 'clientId', '==', clientId);
         if (byClientId && byClientId.length > 0) return true;
+        const byCustomerId = await this.firestoreService.queryDocuments('vouchers', 'customerId', '==', clientId);
+        if (byCustomerId && byCustomerId.length > 0) return true;
       }
       if (clientNicOrBrn && clientNicOrBrn.trim()) {
         const byNic = await this.firestoreService.queryDocuments('vouchers', 'payeeNic', '==', clientNicOrBrn.trim());

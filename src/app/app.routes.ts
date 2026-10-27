@@ -43,6 +43,12 @@ export const routes: Routes = [
             loadComponent: () => import('./features/vouchers/vouchers.component').then(m => m.VouchersComponent),
             canActivate: [rbacGuard],
             data: { module: 'account' }
+          },
+          {
+            path: 'settings',
+            loadComponent: () => import('./features/account-settings/account-settings.component').then(m => m.AccountSettingsComponent),
+            canActivate: [rbacGuard],
+            data: { module: 'account', requireRoles: ['Super Admin', 'Divisional Admin', 'Department Head'] }
           }
         ]
       },

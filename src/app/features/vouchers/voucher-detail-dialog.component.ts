@@ -103,6 +103,125 @@ import { Voucher } from './models/voucher.model';
             </tr>
           </table>
 
+          <!-- Payment Methods with Nested Payees Allocation -->
+          <div *ngIf="hasNestedPayees()" class="sub-table-section">
+            <h4 class="sub-table-title">
+              <mat-icon class="sub-icon">account_balance_wallet</mat-icon>
+              Payment Methods & Allocated Beneficiaries ({{ voucher.payments?.length }} {{ voucher.payments?.length === 1 ? 'Method' : 'Methods' }})
+            </h4>
+            
+            <div *ngFor="let pm of voucher.payments; let j = index" class="print-pm-block">
+              <div class="print-pm-banner">
+                <div class="pm-banner-left">
+                  <span class="pm-pill">Method #{{ j + 1 }}: {{ pm.paymentMethod }}</span>
+                  <span class="pm-ref-text" *ngIf="pm.referenceNo">Cheque/Ref: {{ pm.referenceNo }}</span>
+                  <span class="pm-bank-text" *ngIf="pm.bankName">• {{ pm.bankName }}</span>
+                </div>
+                <div class="pm-banner-right">
+                  Payment Amount: <strong>LKR {{ pm.amount | number:'1.2-2' }}</strong>
+                </div>
+              </div>
+
+              <!-- Nested Payees Table under this payment method -->
+              <table class="schedule-table nested-table" *ngIf="pm.payees && pm.payees.length > 0">
+                <thead>
+                  <tr>
+                    <th style="width: 32px;">#</th>
+                    <th style="width: 140px;">Sub Voucher No</th>
+                    <th>Payee / Beneficiary Name</th>
+                    <th>Classification / NIC</th>
+                    <th>Bank & Account</th>
+                    <th>Note / Purpose</th>
+                    <th class="text-right" style="width: 130px;">Allocated Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let p of pm.payees; let idx = index">
+                    <td class="text-center">{{ idx + 1 }}</td>
+                    <td class="font-mono font-bold" style="color: #0284c7;">{{ p.subVoucherNo || (voucher.voucherNo + '-' + (idx + 1)) }}</td>
+                    <td class="primary-bold">{{ p.payeeName }}</td>
+                    <td>{{ p.clientType }} {{ p.payeeNic ? '• ' + p.payeeNic : '' }}</td>
+                    <td>{{ p.bankName || p.accountNumber || 'N/A' }}</td>
+                    <td>{{ p.notes || '-' }}</td>
+                    <td class="text-right font-mono font-bold">LKR {{ p.amount | number:'1.2-2' }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Fallback: Multi-Payees Allocation Schedule Table (when not nested) -->
+          <div *ngIf="!hasNestedPayees() && voucher.payees && voucher.payees.length > 0" class="sub-table-section">
+            <h4 class="sub-table-title">
+              <mat-icon class="sub-icon">groups</mat-icon>
+              Payee & Beneficiary Allocations Schedule ({{ voucher.payees.length }} {{ voucher.payees.length === 1 ? 'Record' : 'Records' }})
+            </h4>
+            <table class="schedule-table">
+              <thead>
+                <tr>
+                  <th style="width: 35px;">#</th>
+                  <th style="width: 140px;">Sub Voucher No</th>
+                  <th>Payee / Beneficiary Name</th>
+                  <th>Classification / NIC</th>
+                  <th>Bank & Account</th>
+                  <th>Note / Memo</th>
+                  <th class="text-right" style="width: 130px;">Amount (LKR)</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let p of voucher.payees; let idx = index">
+                  <td class="text-center">{{ idx + 1 }}</td>
+                  <td class="font-mono font-bold" style="color: #0284c7;">{{ p.subVoucherNo || (voucher.voucherNo + '-' + (idx + 1)) }}</td>
+                  <td class="primary-bold">{{ p.payeeName }}</td>
+                  <td>{{ p.clientType }} {{ p.payeeNic ? '• ' + p.payeeNic : '' }}</td>
+                  <td>{{ p.bankName || p.accountNumber || 'N/A' }}</td>
+                  <td>{{ p.notes || '-' }}</td>
+                  <td class="text-right font-mono font-bold">LKR {{ p.amount | number:'1.2-2' }}</td>
+                </tr>
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td colspan="6" class="text-right font-bold">Subtotal Payees Allocated:</td>
+                  <td class="text-right font-mono font-bold highlight">LKR {{ voucher.amount | number:'1.2-2' }}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+
+          <!-- Fallback: Multi-Payment Methods Breakdown Table (when not nested) -->
+          <div *ngIf="!hasNestedPayees() && voucher.payments && voucher.payments.length > 0" class="sub-table-section">
+            <h4 class="sub-table-title">
+              <mat-icon class="sub-icon">account_balance_wallet</mat-icon>
+              Payment Methods Settlement Breakdown ({{ voucher.payments.length }} {{ voucher.payments.length === 1 ? 'Method' : 'Methods' }})
+            </h4>
+            <table class="schedule-table">
+              <thead>
+                <tr>
+                  <th style="width: 35px;">#</th>
+                  <th>Payment Method</th>
+                  <th>Cheque / Reference Number</th>
+                  <th>Settlement Bank & Branch</th>
+                  <th class="text-right" style="width: 130px;">Amount (LKR)</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let pm of voucher.payments; let j = index">
+                  <td class="text-center">{{ j + 1 }}</td>
+                  <td class="primary-bold">{{ pm.paymentMethod }}</td>
+                  <td class="font-mono">{{ pm.referenceNo || 'N/A' }}</td>
+                  <td>{{ pm.bankName || 'General Account' }}</td>
+                  <td class="text-right font-mono font-bold">LKR {{ pm.amount | number:'1.2-2' }}</td>
+                </tr>
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td colspan="4" class="text-right font-bold">Subtotal Payments Disbursed:</td>
+                  <td class="text-right font-mono font-bold highlight">LKR {{ voucher.amount | number:'1.2-2' }}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+
           <div class="particulars-section">
             <h3 class="part-header">PARTICULARS OF DISBURSEMENT / RECEIPT</h3>
             <div class="part-text">
@@ -352,6 +471,103 @@ import { Voucher } from './models/voucher.model';
       }
     }
 
+    .sub-table-section {
+      margin-bottom: 20px;
+
+      .sub-table-title {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 11.5px;
+        font-weight: 700;
+        color: #312e81;
+        margin: 0 0 6px 0;
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+
+        .sub-icon { font-size: 16px; width: 16px; height: 16px; color: #4338ca; }
+      }
+
+      .schedule-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 11.5px;
+
+        th {
+          background: #f1f5f9;
+          color: #334155;
+          font-weight: 700;
+          text-align: left;
+          padding: 6px 8px;
+          border: 1px solid #cbd5e1;
+        }
+
+        td {
+          padding: 6px 8px;
+          border: 1px solid #e2e8f0;
+          color: #1e293b;
+        }
+
+        tfoot td {
+          background: #f8fafc;
+          border-top: 2px solid #cbd5e1;
+          padding: 6px 8px;
+        }
+
+        .highlight { color: #047857; }
+        .text-right { text-align: right; }
+        .text-center { text-align: center; }
+        .font-mono { font-family: monospace; }
+        .font-bold { font-weight: 700; }
+        .primary-bold { font-weight: 700; color: #1e1b4b; }
+      }
+
+      .print-pm-block {
+        margin-bottom: 12px;
+        border: 1px solid #cbd5e1;
+        border-radius: 6px;
+        overflow: hidden;
+
+        .print-pm-banner {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          background: #f1f5f9;
+          padding: 6px 10px;
+          border-bottom: 1px solid #cbd5e1;
+
+          .pm-banner-left {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 11.5px;
+
+            .pm-pill {
+              font-weight: 700;
+              background: #dcfce7;
+              color: #065f46;
+              padding: 2px 8px;
+              border-radius: 4px;
+            }
+
+            .pm-ref-text { font-family: monospace; font-weight: 600; color: #1e293b; }
+            .pm-bank-text { color: #64748b; }
+          }
+
+          .pm-banner-right {
+            font-size: 12px;
+            color: #065f46;
+          }
+        }
+
+        .nested-table {
+          border: none;
+          th { background: #f8fafc; font-size: 11px; }
+          td { font-size: 11px; }
+        }
+      }
+    }
+
     .particulars-section {
       border: 1px solid #cbd5e1;
       border-radius: 6px;
@@ -471,6 +687,10 @@ export class VoucherDetailDialogComponent {
 
   constructor(@Inject(MAT_DIALOG_DATA) public data: { voucher: Voucher }) {
     this.voucher = data.voucher;
+  }
+
+  hasNestedPayees(): boolean {
+    return !!(this.voucher.payments && this.voucher.payments.some(pm => pm.payees && pm.payees.length > 0));
   }
 
   printVoucher() {

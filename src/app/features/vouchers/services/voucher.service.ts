@@ -4,6 +4,7 @@ import { map } from 'rxjs/operators';
 import { FirestoreService } from '../../../core/services/firestore.service';
 import { AuthService } from '../../../auth/auth.service';
 import { EventLogService } from '../../../core/services/event-log.service';
+import { AccountSettingsService } from '../../account-settings/services/account-settings.service';
 import { Voucher, VoucherStatus } from '../models/voucher.model';
 
 @Injectable({
@@ -13,6 +14,7 @@ export class VoucherService {
   private firestoreService = inject(FirestoreService);
   private authService = inject(AuthService);
   private eventLogService = inject(EventLogService);
+  private accountSettingsService = inject(AccountSettingsService);
 
   private readonly collectionName = 'vouchers';
 
@@ -28,7 +30,11 @@ export class VoucherService {
 
   async generateVoucherNo(type: string = 'Payment Voucher'): Promise<string> {
     const year = new Date().getFullYear();
-    const prefix = type === 'Receipt Voucher' ? 'RV' : (type === 'Petty Cash' ? 'PCV' : (type === 'Journal Voucher' ? 'JV' : 'PV'));
+    const vt = this.accountSettingsService.getVoucherTypeByName(type);
+    let prefix = vt?.prefix || vt?.code;
+    if (!prefix) {
+      prefix = type === 'Receipt Voucher' ? 'RV' : (type === 'Petty Cash' ? 'PCV' : (type === 'Journal Voucher' ? 'JV' : 'PV'));
+    }
     const randSeq = Math.floor(1000 + Math.random() * 9000);
     return `${prefix}/${year}/${randSeq}`;
   }

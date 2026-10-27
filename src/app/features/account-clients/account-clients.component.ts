@@ -14,12 +14,13 @@ import { MatDialogModule, MatDialog } from '@angular/material/dialog';
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import * as XLSX from 'xlsx';
 
-import { AccountClient, AccountClientType } from './models/account-client.model';
+import { AccountClient, AccountClientType, isVoucherLinkedToClient, getClientAllocationsFromVoucher } from './models/account-client.model';
 import { AccountClientService } from './services/account-client.service';
 import { AccountClientDialogComponent } from './account-client-dialog.component';
 import { AccountClientDetailDialogComponent } from './account-client-detail-dialog.component';
 import { VoucherService } from '../vouchers/services/voucher.service';
 import { Voucher } from '../vouchers/models/voucher.model';
+import { VoucherDialogComponent } from '../vouchers/voucher-dialog.component';
 import { NotificationService } from '../../core/services/notification.service';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog.component';
 import { RbacService } from '../../auth/rbac.service';
@@ -79,15 +80,9 @@ export class AccountClientsComponent implements OnInit {
   vendorClientsCount = computed(() => this.clients().filter(c => c.clientType === 'Business / Vendor').length);
 
   totalLinkedVouchersCount = computed(() => {
-    const clientIds = new Set(this.clients().map(c => c.id).filter(Boolean));
-    const clientNics = new Set(this.clients().map(c => c.nicOrBrn?.trim().toLowerCase()).filter(Boolean));
-    const clientNames = new Set(this.clients().map(c => c.name?.trim().toLowerCase()).filter(Boolean));
-
-    return this.vouchers().filter(v =>
-      (v.clientId && clientIds.has(v.clientId)) ||
-      (v.payeeNic && clientNics.has(v.payeeNic.trim().toLowerCase())) ||
-      (v.payeeName && clientNames.has(v.payeeName.trim().toLowerCase()))
-    ).length;
+    const clients = this.clients();
+    if (!clients.length) return 0;
+    return this.vouchers().filter(v => clients.some(c => isVoucherLinkedToClient(v, c))).length;
   });
 
   filteredClients = computed(() => {
@@ -162,15 +157,13 @@ export class AccountClientsComponent implements OnInit {
 
   getClientVouchersCount(client: AccountClient): number {
     if (!client) return 0;
-    const cId = client.id;
-    const cNic = client.nicOrBrn?.trim().toLowerCase();
-    const cName = client.name?.trim().toLowerCase();
+    return this.vouchers().filter(v => isVoucherLinkedToClient(v, client)).length;
+  }
 
-    return this.vouchers().filter(v =>
-      (cId && v.clientId && v.clientId === cId) ||
-      (cNic && v.payeeNic && v.payeeNic.trim().toLowerCase() === cNic) ||
-      (cName && v.payeeName && v.payeeName.trim().toLowerCase() === cName)
-    ).length;
+  getClientAllocationsCount(client: AccountClient): number {
+    if (!client) return 0;
+    const linked = this.vouchers().filter(v => isVoucherLinkedToClient(v, client));
+    return linked.reduce((sum, v) => sum + getClientAllocationsFromVoucher(v, client).length, 0);
   }
 
   getClientTypeIcon(type: string): string {
@@ -244,6 +237,21 @@ export class AccountClientsComponent implements OnInit {
     ref.afterClosed().subscribe(() => {
       this.loadClients();
       this.loadVouchers();
+    });
+  }
+
+  openIssueVoucherDialog(client: AccountClient) {
+    const dialogRef = this.dialog.open(VoucherDialogComponent, {
+      width: '960px',
+      maxWidth: '96vw',
+      data: { preselectedClient: client }
+    });
+
+    dialogRef.afterClosed().subscribe(result => {
+      if (result) {
+        this.loadVouchers();
+        this.loadClients();
+      }
     });
   }
 

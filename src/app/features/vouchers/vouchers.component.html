@@ -84,10 +84,9 @@
         <mat-label>Voucher Type</mat-label>
         <mat-select [ngModel]="selectedType()" (ngModelChange)="selectedType.set($event)">
           <mat-option value="All">All Types</mat-option>
-          <mat-option value="Payment Voucher">Payment Voucher (PV)</mat-option>
-          <mat-option value="Receipt Voucher">Receipt Voucher (RV)</mat-option>
-          <mat-option value="Petty Cash">Petty Cash (PCV)</mat-option>
-          <mat-option value="Journal Voucher">Journal Voucher (JV)</mat-option>
+          <mat-option *ngFor="let vt of activeVoucherTypes()" [value]="vt.name">
+            {{ vt.name }} ({{ vt.prefix || vt.code }})
+          </mat-option>
         </mat-select>
         <mat-icon matPrefix>category</mat-icon>
       </mat-form-field>
@@ -146,14 +145,18 @@
           <th mat-header-cell *matHeaderCellDef>Payee / Beneficiary</th>
           <td mat-cell *matCellDef="let v">
             <div class="payee-cell">
-              <span class="payee-name">{{ v.payeeName }}</span>
+              <div class="payee-name-row">
+                <span class="payee-name">{{ v.payeeName }}</span>
+                <span class="multi-payee-badge" *ngIf="v.payees && v.payees.length > 1" [matTooltip]="getPayeesTooltip(v)">
+                  <mat-icon class="badge-icon">groups</mat-icon> {{ v.payees.length }}
+                </span>
+              </div>
               <span class="payee-sub" *ngIf="v.payeeNic || v.payeePhone">
                 {{ v.payeeNic ? 'NIC: ' + v.payeeNic : '' }} {{ v.payeePhone ? '• ' + v.payeePhone : '' }}
               </span>
             </div>
           </td>
         </ng-container>
-
 
         <!-- Amount Column -->
         <ng-container matColumnDef="amount">
@@ -168,7 +171,12 @@
           <th mat-header-cell *matHeaderCellDef>Payment Method</th>
           <td mat-cell *matCellDef="let v">
             <div class="method-cell">
-              <span>{{ v.paymentMethod }}</span>
+              <div class="method-name-row">
+                <span class="method-name">{{ v.paymentMethod }}</span>
+                <span class="multi-method-badge" *ngIf="v.payments && v.payments.length > 1" [matTooltip]="getPaymentsTooltip(v)">
+                  <mat-icon class="badge-icon">paid</mat-icon> {{ v.payments.length }}
+                </span>
+              </div>
               <span class="ref-sub" *ngIf="v.referenceNo">Ref: {{ v.referenceNo }}</span>
             </div>
           </td>

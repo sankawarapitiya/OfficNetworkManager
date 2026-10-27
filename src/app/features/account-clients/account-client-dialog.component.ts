@@ -8,6 +8,8 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { AccountClient, AccountClientType, AccountClientStatus } from './models/account-client.model';
+import { SettingsService, Division } from '../settings/settings.service';
+import { signal, computed } from '@angular/core';
 
 @Component({
   selector: 'app-account-client-dialog',
@@ -137,8 +139,10 @@ import { AccountClient, AccountClientType, AccountClientStatus } from './models/
 
           <!-- Division -->
           <mat-form-field appearance="outline" class="col-span-1">
-            <mat-label>Administrative Division</mat-label>
-            <input matInput formControlName="division" placeholder="e.g. Central Division">
+            <mat-label>Administrative Division (DS Division)</mat-label>
+            <mat-select formControlName="division" placeholder="Select DS Division">
+              <mat-option *ngFor="let ds of availableDSDivisions()" [value]="ds">{{ ds }}</mat-option>
+            </mat-select>
             <mat-icon matPrefix>location_city</mat-icon>
           </mat-form-field>
 
@@ -238,13 +242,56 @@ import { AccountClient, AccountClientType, AccountClientStatus } from './models/
 })
 export class AccountClientDialogComponent implements OnInit {
   private fb = inject(FormBuilder);
+  private settingsService = inject(SettingsService);
   public dialogRef = inject(MatDialogRef<AccountClientDialogComponent>);
   public data: { client?: AccountClient } = inject(MAT_DIALOG_DATA);
 
   clientForm!: FormGroup;
   isEdit = false;
 
+  divisions = signal<Division[]>([]);
+
+  private cleanEn(s?: string): string {
+    if (!s) return '';
+    return s.replace(/[^\x20-\x7E]/g, '')
+            .replace(/\//g, '')
+            .replace(/(^[\s-]+|[\s-]+$)/g, '')
+            .replace(/\s{2,}/g, ' ')
+            .trim();
+  }
+
+  availableDSDivisions = computed(() => {
+    const all = this.divisions() || [];
+    const set = new Set<string>();
+
+    for (const d of all) {
+      const ds = this.cleanEn(d.divisionalSecretariat);
+      if (ds) set.add(ds);
+    }
+
+    if (set.size === 0) {
+      for (const d of all) {
+        const name = this.cleanEn(d.name);
+        if (name) set.add(name);
+      }
+    }
+
+    set.add('General');
+
+    const current = this.data?.client?.division;
+    if (current && typeof current === 'string' && current.trim()) {
+      set.add(current.trim());
+    }
+
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  });
+
   ngOnInit() {
+    this.settingsService.getDivisions().subscribe({
+      next: (divs) => this.divisions.set(divs || []),
+      error: () => this.divisions.set([])
+    });
+
     this.isEdit = !!this.data?.client?.id;
     const c = this.data?.client;
 

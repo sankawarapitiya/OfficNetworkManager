@@ -81,6 +81,13 @@ export class SidebarComponent implements OnInit, OnDestroy {
     return this.rbacService.canAccessModule('customers') || this.rbacService.canAccessModule('account');
   });
 
+  canManageAccountSettings = computed(() => {
+    return this.rbacService.isAdmin() ||
+           this.rbacService.isSuperAdmin() ||
+           this.rbacService.isDivisionalAdmin() ||
+           this.rbacService.hasRole('Department Head');
+  });
+
   canAccessVerification = computed(() => {
     if (this.rbacService.isAdmin() || this.rbacService.isSuperAdmin() || this.rbacService.isDivisionalAdmin()) {
       return true;

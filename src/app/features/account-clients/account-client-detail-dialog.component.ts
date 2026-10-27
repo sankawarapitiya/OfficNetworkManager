@@ -6,13 +6,16 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatTableModule } from '@angular/material/table';
-import { AccountClient } from './models/account-client.model';
+import { AccountClient, isVoucherLinkedToClient, getClientAllocatedAmount, getClientAllocationsFromVoucher, ClientPayeeAllocation } from './models/account-client.model';
 import { Voucher } from '../vouchers/models/voucher.model';
 import { VoucherService } from '../vouchers/services/voucher.service';
 import { VoucherDetailDialogComponent } from '../vouchers/voucher-detail-dialog.component';
+import { VoucherDialogComponent } from '../vouchers/voucher-dialog.component';
 import { AccountClientDialogComponent } from './account-client-dialog.component';
+import { LinkClientVoucherDialogComponent } from './link-client-voucher-dialog.component';
 import { AccountClientService } from './services/account-client.service';
 import { NotificationService } from '../../core/services/notification.service';
+import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog.component';
 
 @Component({
   selector: 'app-account-client-detail-dialog',
@@ -122,7 +125,12 @@ import { NotificationService } from '../../core/services/notification.service';
         <div class="metrics-strip">
           <div class="metric-block">
             <span class="metric-num">{{ clientVouchers().length }}</span>
-            <span class="metric-desc">Total Vouchers Issued</span>
+            <span class="metric-desc">Master Vouchers</span>
+          </div>
+          <div class="metric-separator"></div>
+          <div class="metric-block sub-v-block">
+            <span class="metric-num">{{ totalSubVouchersCount() }}</span>
+            <span class="metric-desc">Sub Vouchers / Splits</span>
           </div>
           <div class="metric-separator"></div>
           <div class="metric-block paid-block">
@@ -143,10 +151,18 @@ import { NotificationService } from '../../core/services/notification.service';
               <mat-icon class="section-icon">receipt_long</mat-icon>
               <div>
                 <h3 class="section-title">Client Financial Vouchers History</h3>
-                <p class="section-desc">Disbursements, receipts, and invoices issued to this account client</p>
+                <p class="section-desc">All linked vouchers and individual sub-voucher allocations for this account client</p>
               </div>
             </div>
-            <span class="voucher-count-pill">{{ clientVouchers().length }} Records</span>
+            <div class="section-actions-wrap">
+              <span class="voucher-count-pill">{{ clientVouchers().length }} {{ clientVouchers().length === 1 ? 'Voucher' : 'Vouchers' }} ({{ totalSubVouchersCount() }} Sub Vouchers)</span>
+              <button mat-stroked-button color="primary" class="voucher-action-btn" (click)="openCreateVoucherModal()" matTooltip="Issue New Voucher for this Client">
+                <mat-icon>add</mat-icon> Issue Voucher
+              </button>
+              <button mat-stroked-button class="voucher-action-btn link-voucher-btn" (click)="openLinkExistingVoucherModal()" matTooltip="Link Existing Voucher from Ledger">
+                <mat-icon>link</mat-icon> Link Voucher
+              </button>
+            </div>
           </div>
 
           <!-- Empty State -->
@@ -154,51 +170,105 @@ import { NotificationService } from '../../core/services/notification.service';
             <mat-icon class="empty-icon">payments</mat-icon>
             <h4>No Vouchers Issued to this Client Yet</h4>
             <p>When financial vouchers are recorded under this client, they will appear here automatically.</p>
+            <div class="empty-actions">
+              <button mat-flat-button color="primary" (click)="openCreateVoucherModal()">
+                <mat-icon>add</mat-icon> Issue New Voucher
+              </button>
+              <button mat-stroked-button (click)="openLinkExistingVoucherModal()">
+                <mat-icon>link</mat-icon> Link Existing Voucher
+              </button>
+            </div>
           </div>
 
           <!-- Vouchers List -->
           <div *ngIf="clientVouchers().length > 0" class="vouchers-list">
             <div *ngFor="let v of clientVouchers()" class="voucher-item-card">
+              <!-- Header Row -->
               <div class="v-header-row">
                 <div class="v-ref-group">
-                  <span class="v-no-tag" (click)="openVoucherDetail(v)" matTooltip="View & Print Voucher">
+                  <span class="v-no-tag" (click)="openVoucherDetail(v)" matTooltip="Click to inspect & print voucher certificate">
                     <mat-icon class="v-icon">receipt</mat-icon>
-                    {{ v.voucherNo }}
+                    Master: {{ v.voucherNo }}
                   </span>
                   <span class="v-type">{{ v.type }}</span>
+                  <span class="v-date font-mono">
+                    <mat-icon class="inline-v-icon">calendar_today</mat-icon>
+                    {{ v.date }}
+                  </span>
                 </div>
                 <div class="v-status-group">
-                  <span class="v-method">{{ v.paymentMethod }}</span>
                   <span class="v-status-pill" [ngClass]="v.status.toLowerCase().replace(' ', '-')">
+                    <span class="status-dot"></span>
                     {{ v.status }}
                   </span>
                 </div>
               </div>
 
-              <div class="v-grid">
-                <div class="v-item">
-                  <span class="v-label">Amount</span>
-                  <span class="v-val amount-val">LKR {{ v.amount | number:'1.2-2' }}</span>
-                </div>
-                <div class="v-item">
-                  <span class="v-label">Voucher Date</span>
-                  <span class="v-val font-mono">{{ v.date }}</span>
-                </div>
-                <div class="v-item">
-                  <span class="v-label">Payment Method</span>
-                  <span class="v-val">{{ v.paymentMethod }}</span>
-                </div>
-                <div class="v-item">
-                  <span class="v-label">Cheque / Ref No</span>
-                  <span class="v-val font-mono">{{ v.referenceNo || 'N/A' }}</span>
-                </div>
+              <!-- Linked Sub-Voucher Allocations Table for this Client -->
+              <div class="v-allocations-block">
+                <table class="allocations-table">
+                  <thead>
+                    <tr>
+                      <th style="width: 170px;">Sub Voucher #</th>
+                      <th style="width: 140px;">Payment Method</th>
+                      <th style="width: 150px;">Cheque / Ref No</th>
+                      <th>Allocation Note / Purpose</th>
+                      <th class="text-right" style="width: 140px;">Allocated Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr *ngFor="let alloc of getClientAllocations(v)">
+                      <td class="sub-v-col">
+                        <span class="sub-v-badge" (click)="openVoucherDetail(v)" matTooltip="Inspect this Sub Voucher">
+                          <mat-icon class="badge-icon">tag</mat-icon>
+                          {{ alloc.subVoucherNo || v.voucherNo }}
+                        </span>
+                      </td>
+                      <td class="method-col">
+                        <span class="method-tag">{{ alloc.paymentMethod || v.paymentMethod || 'Cash' }}</span>
+                      </td>
+                      <td class="ref-col font-mono">
+                        {{ alloc.referenceNo || v.referenceNo || '-' }}
+                      </td>
+                      <td class="notes-col">
+                        <span class="notes-text" [title]="alloc.notes || v.description">
+                          {{ alloc.notes || v.description || 'General Disbursement' }}
+                        </span>
+                      </td>
+                      <td class="amount-col text-right font-mono font-bold">
+                        LKR {{ alloc.amount | number:'1.2-2' }}
+                      </td>
+                    </tr>
+                  </tbody>
+                  <tfoot *ngIf="getClientAllocations(v).length > 1 || isMultiPayee(v)">
+                    <tr>
+                      <td colspan="4" class="text-right summary-label">
+                        Total Client Share in this Voucher:
+                        <span *ngIf="isMultiPayee(v)" class="master-total-hint">
+                          (Master Voucher Total: LKR {{ v.amount | number:'1.2-2' }})
+                        </span>
+                      </td>
+                      <td class="text-right font-mono font-bold total-client-val">
+                        LKR {{ getClientShare(v) | number:'1.2-2' }}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
               </div>
 
+              <!-- Footer Row -->
               <div class="v-footer-row">
-                <span class="v-desc" [title]="v.description">{{ v.description }}</span>
-                <button mat-stroked-button class="view-v-btn" (click)="openVoucherDetail(v)">
-                  <mat-icon>visibility</mat-icon> Inspect Voucher
-                </button>
+                <span class="v-desc" [title]="v.description">
+                  <strong class="desc-lbl">Particulars:</strong> {{ v.description }}
+                </span>
+                <div class="v-actions">
+                  <button mat-stroked-button class="view-v-btn" (click)="openVoucherDetail(v)" matTooltip="Inspect full voucher certificate & breakdown">
+                    <mat-icon>visibility</mat-icon> Inspect Voucher
+                  </button>
+                  <button mat-button color="warn" class="unlink-v-btn" (click)="unlinkVoucher(v)" matTooltip="Unlink Voucher from this Client">
+                    <mat-icon>link_off</mat-icon> Unlink
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -416,6 +486,7 @@ import { NotificationService } from '../../core/services/notification.service';
           font-weight: 600;
         }
 
+        &.sub-v-block .metric-num { color: #0284c7; }
         &.paid-block .metric-num { color: #059669; }
         &.pending-block .metric-num { color: #d97706; }
       }
@@ -451,6 +522,31 @@ import { NotificationService } from '../../core/services/notification.service';
           .section-desc { font-size: 11px; color: #64748b; margin: 0; }
         }
 
+        .section-actions-wrap {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          flex-wrap: wrap;
+
+          .voucher-action-btn {
+            height: 28px;
+            line-height: 28px;
+            font-size: 11px;
+            padding: 0 10px;
+            border-radius: 6px;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            mat-icon { font-size: 15px; width: 15px; height: 15px; }
+
+            &.link-voucher-btn {
+              color: #0284c7;
+              border-color: #bae6fd;
+              &:hover { background: #f0f9ff; }
+            }
+          }
+        }
+
         .voucher-count-pill {
           font-size: 11px;
           font-weight: 600;
@@ -468,6 +564,20 @@ import { NotificationService } from '../../core/services/notification.service';
         .empty-icon { font-size: 36px; width: 36px; height: 36px; color: #cbd5e1; }
         h4 { margin: 8px 0 4px 0; color: #334155; }
         p { margin: 0; font-size: 12px; }
+
+        .empty-actions {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 10px;
+          margin-top: 14px;
+          button {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            mat-icon { font-size: 16px; width: 16px; height: 16px; }
+          }
+        }
       }
 
       .vouchers-list {
@@ -515,6 +625,18 @@ import { NotificationService } from '../../core/services/notification.service';
                 color: #64748b;
                 font-weight: 500;
               }
+
+              .v-date {
+                display: inline-flex;
+                align-items: center;
+                gap: 4px;
+                font-size: 11px;
+                color: #64748b;
+                background: #f1f5f9;
+                padding: 1px 6px;
+                border-radius: 4px;
+                .inline-v-icon { font-size: 13px; width: 13px; height: 13px; }
+              }
             }
 
             .v-status-group {
@@ -522,15 +644,10 @@ import { NotificationService } from '../../core/services/notification.service';
               align-items: center;
               gap: 8px;
 
-              .v-method {
-                font-size: 11px;
-                color: #64748b;
-                background: #f1f5f9;
-                padding: 2px 6px;
-                border-radius: 4px;
-              }
-
               .v-status-pill {
+                display: inline-flex;
+                align-items: center;
+                gap: 4px;
                 font-size: 11px;
                 font-weight: 600;
                 padding: 2px 8px;
@@ -538,29 +655,139 @@ import { NotificationService } from '../../core/services/notification.service';
                 background: #f1f5f9;
                 color: #475569;
 
-                &.paid { background: #dcfce7; color: #166534; }
-                &.approved { background: #e0f2fe; color: #075985; }
-                &.pending-approval { background: #fef3c7; color: #92400e; }
-                &.draft { background: #f1f5f9; color: #64748b; }
+                .status-dot {
+                  width: 6px;
+                  height: 6px;
+                  border-radius: 50%;
+                  background: #94a3b8;
+                }
+
+                &.paid {
+                  background: #dcfce7;
+                  color: #166534;
+                  .status-dot { background: #16a34a; }
+                }
+                &.approved {
+                  background: #e0f2fe;
+                  color: #075985;
+                  .status-dot { background: #0284c7; }
+                }
+                &.pending-approval {
+                  background: #fef3c7;
+                  color: #92400e;
+                  .status-dot { background: #d97706; }
+                }
+                &.draft {
+                  background: #f1f5f9;
+                  color: #64748b;
+                  .status-dot { background: #94a3b8; }
+                }
               }
             }
           }
 
-          .v-grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 8px;
+          .v-allocations-block {
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
             background: #ffffff;
-            border: 1px solid #f1f5f9;
-            border-radius: 4px;
-            padding: 8px;
+            overflow: hidden;
 
-            .v-item {
-              display: flex;
-              flex-direction: column;
-              .v-label { font-size: 10px; color: #94a3b8; text-transform: uppercase; font-weight: 600; }
-              .v-val { font-size: 12px; color: #1e293b; font-weight: 500; }
-              .amount-val { color: #047857; font-weight: 700; font-family: monospace; }
+            .allocations-table {
+              width: 100%;
+              border-collapse: collapse;
+              font-size: 12px;
+
+              th {
+                background: #f8fafc;
+                color: #64748b;
+                font-size: 11px;
+                font-weight: 600;
+                text-transform: uppercase;
+                padding: 7px 12px;
+                border-bottom: 1px solid #e2e8f0;
+                text-align: left;
+                &.text-right { text-align: right; }
+              }
+
+              td {
+                padding: 7px 12px;
+                border-bottom: 1px solid #f1f5f9;
+                color: #1e293b;
+                vertical-align: middle;
+                &.text-right { text-align: right; }
+              }
+
+              tr:last-child td {
+                border-bottom: none;
+              }
+
+              .sub-v-badge {
+                display: inline-flex;
+                align-items: center;
+                gap: 4px;
+                font-family: monospace;
+                font-weight: 700;
+                font-size: 12px;
+                color: #0284c7;
+                background: #e0f2fe;
+                padding: 2px 8px;
+                border-radius: 4px;
+                cursor: pointer;
+                &:hover {
+                  background: #bae6fd;
+                }
+                .badge-icon {
+                  font-size: 12px;
+                  width: 12px;
+                  height: 12px;
+                }
+              }
+
+              .method-tag {
+                display: inline-block;
+                font-size: 11px;
+                font-weight: 600;
+                color: #475569;
+                background: #f1f5f9;
+                padding: 1px 8px;
+                border-radius: 12px;
+                border: 1px solid #e2e8f0;
+              }
+
+              .notes-text {
+                color: #475569;
+                display: inline-block;
+                max-width: 320px;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+              }
+
+              .amount-col {
+                color: #059669;
+                font-weight: 700;
+              }
+
+              tfoot {
+                background: #fafafa;
+                border-top: 1px solid #e2e8f0;
+                td {
+                  padding: 7px 12px;
+                }
+                .summary-label {
+                  font-size: 11.5px;
+                  color: #64748b;
+                }
+                .master-total-hint {
+                  color: #94a3b8;
+                  font-size: 11px;
+                  margin-left: 4px;
+                }
+                .total-client-val {
+                  color: #0f172a;
+                  font-size: 12.5px;
+                }
+              }
             }
           }
 
@@ -575,15 +802,34 @@ import { NotificationService } from '../../core/services/notification.service';
               white-space: nowrap;
               overflow: hidden;
               text-overflow: ellipsis;
-              max-width: 65%;
+              max-width: 60%;
+              .desc-lbl {
+                color: #64748b;
+                font-weight: 600;
+              }
             }
 
-            .view-v-btn {
-              font-size: 11px;
-              height: 28px;
-              line-height: 28px;
-              padding: 0 8px;
-              mat-icon { font-size: 14px; width: 14px; height: 14px; }
+            .v-actions {
+              display: flex;
+              align-items: center;
+              gap: 6px;
+
+              .view-v-btn {
+                font-size: 11px;
+                height: 28px;
+                line-height: 28px;
+                padding: 0 8px;
+                mat-icon { font-size: 14px; width: 14px; height: 14px; }
+              }
+
+              .unlink-v-btn {
+                font-size: 11px;
+                height: 28px;
+                line-height: 28px;
+                padding: 0 6px;
+                min-width: 68px;
+                mat-icon { font-size: 14px; width: 14px; height: 14px; }
+              }
             }
           }
         }
@@ -627,15 +873,17 @@ export class AccountClientDetailDialogComponent implements OnInit {
   clientVouchers = signal<Voucher[]>([]);
 
   totalPaidAmount = computed(() => {
+    const c = this.client();
     return this.clientVouchers()
       .filter(v => v.status === 'Paid')
-      .reduce((sum, v) => sum + (v.amount || 0), 0);
+      .reduce((sum, v) => sum + getClientAllocatedAmount(v, c), 0);
   });
 
   pendingAmount = computed(() => {
+    const c = this.client();
     return this.clientVouchers()
       .filter(v => v.status !== 'Paid' && v.status !== 'Cancelled')
-      .reduce((sum, v) => sum + (v.amount || 0), 0);
+      .reduce((sum, v) => sum + getClientAllocatedAmount(v, c), 0);
   });
 
   pendingCount = computed(() => {
@@ -643,26 +891,117 @@ export class AccountClientDetailDialogComponent implements OnInit {
       .filter(v => v.status !== 'Paid' && v.status !== 'Cancelled').length;
   });
 
+  totalSubVouchersCount = computed(() => {
+    return this.clientVouchers()
+      .reduce((sum, v) => sum + this.getClientAllocations(v).length, 0);
+  });
+
+  getClientAllocations(v: Voucher): ClientPayeeAllocation[] {
+    return getClientAllocationsFromVoucher(v, this.client());
+  }
+
+  getClientShare(v: Voucher): number {
+    return getClientAllocatedAmount(v, this.client());
+  }
+
+  isMultiPayee(v: Voucher): boolean {
+    return !!(v.payees && v.payees.length > 1);
+  }
+
   ngOnInit() {
     this.loadClientVouchers();
   }
 
   loadClientVouchers() {
-    const cId = this.client().id;
-    const cNic = this.client().nicOrBrn?.trim().toLowerCase();
-    const cName = this.client().name?.trim().toLowerCase();
-
+    const client = this.client();
     this.voucherService.getVouchers().subscribe({
       next: (vouchers) => {
-        const filtered = (vouchers || []).filter(v => {
-          if (cId && v.clientId && v.clientId === cId) return true;
-          if (cNic && v.payeeNic && v.payeeNic.trim().toLowerCase() === cNic) return true;
-          if (cName && v.payeeName && v.payeeName.trim().toLowerCase() === cName) return true;
-          return false;
-        });
+        const filtered = (vouchers || []).filter(v => isVoucherLinkedToClient(v, client));
         this.clientVouchers.set(filtered);
       },
       error: () => this.clientVouchers.set([])
+    });
+  }
+
+  openCreateVoucherModal() {
+    const ref = this.dialog.open(VoucherDialogComponent, {
+      width: '960px',
+      maxWidth: '96vw',
+      data: { preselectedClient: this.client() }
+    });
+
+    ref.afterClosed().subscribe((res) => {
+      if (res) {
+        this.loadClientVouchers();
+      }
+    });
+  }
+
+  openLinkExistingVoucherModal() {
+    const ref = this.dialog.open(LinkClientVoucherDialogComponent, {
+      width: '740px',
+      maxWidth: '96vw',
+      data: { client: this.client() }
+    });
+
+    ref.afterClosed().subscribe((res) => {
+      if (res?.linked) {
+        this.loadClientVouchers();
+      }
+    });
+  }
+
+  unlinkVoucher(v: Voucher) {
+    if (!v.id) return;
+    const ref = this.dialog.open(ConfirmDialogComponent, {
+      width: '420px',
+      data: {
+        title: 'Unlink Voucher',
+        message: `Are you sure you want to unlink Voucher "${v.voucherNo}" from ${this.client().name}? The voucher will remain in the financial ledger as an unassigned voucher.`,
+        confirmText: 'Unlink Voucher'
+      }
+    });
+
+    ref.afterClosed().subscribe(async (confirmed) => {
+      if (confirmed) {
+        try {
+          const clientId = this.client().id;
+          const updatedPayees = v.payees?.map(p => {
+            if (p.clientId && p.clientId === clientId) {
+              return { ...p, clientId: '' };
+            }
+            return p;
+          });
+
+          const updatedPayments = v.payments?.map(pm => ({
+            ...pm,
+            payees: pm.payees?.map(p => {
+              if (p.clientId && p.clientId === clientId) {
+                return { ...p, clientId: '' };
+              }
+              return p;
+            })
+          }));
+
+          const updatePayload: any = {
+            clientId: v.clientId === clientId ? '' : (v.clientId || ''),
+            customerId: (v as any).customerId === clientId ? '' : ((v as any).customerId || '')
+          };
+          if (updatedPayees) {
+            updatePayload.payees = updatedPayees;
+          }
+          if (updatedPayments) {
+            updatePayload.payments = updatedPayments;
+          }
+
+          await this.voucherService.updateVoucher(v.id!, updatePayload);
+          this.notif.success(`Voucher ${v.voucherNo} unlinked successfully`);
+          this.loadClientVouchers();
+        } catch (e: any) {
+          console.error('Failed to unlink voucher', e);
+          this.notif.error(e?.message || 'Failed to unlink voucher');
+        }
+      }
     });
   }
 

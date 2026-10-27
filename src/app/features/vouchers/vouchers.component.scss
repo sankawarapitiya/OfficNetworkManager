@@ -246,9 +246,31 @@
       display: flex;
       flex-direction: column;
 
+      .payee-name-row {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+
       .payee-name {
         font-weight: 600;
         color: #0f172a;
+      }
+
+      .multi-payee-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 2px;
+        background: #e0f2fe;
+        color: #0369a1;
+        border: 1px solid #bae6fd;
+        border-radius: 10px;
+        padding: 1px 6px;
+        font-size: 10.5px;
+        font-weight: 700;
+        cursor: help;
+
+        .badge-icon { font-size: 13px; width: 13px; height: 13px; }
       }
 
       .payee-sub {
@@ -333,6 +355,28 @@
     .method-cell {
       display: flex;
       flex-direction: column;
+
+      .method-name-row {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .multi-method-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 2px;
+        background: #ecfdf5;
+        color: #047857;
+        border: 1px solid #a7f3d0;
+        border-radius: 10px;
+        padding: 1px 6px;
+        font-size: 10.5px;
+        font-weight: 700;
+        cursor: help;
+
+        .badge-icon { font-size: 13px; width: 13px; height: 13px; }
+      }
 
       .ref-sub {
         font-size: 10.5px;

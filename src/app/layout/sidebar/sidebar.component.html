@@ -56,6 +56,10 @@
           <mat-icon class="sub-icon">receipt_long</mat-icon>
           <span class="sub-title">Vouchers</span>
         </a>
+        <a *ngIf="canManageAccountSettings()" routerLink="/account/settings" routerLinkActive="active-sub-link" class="sub-nav-item">
+          <mat-icon class="sub-icon">settings</mat-icon>
+          <span class="sub-title">Settings</span>
+        </a>
       </div>
     </div>
 

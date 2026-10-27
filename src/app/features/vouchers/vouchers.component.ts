@@ -21,6 +21,7 @@ import { VoucherDetailDialogComponent } from './voucher-detail-dialog.component'
 import { AuthService } from '../../auth/auth.service';
 import { NotificationService } from '../../core/services/notification.service';
 import { RbacService } from '../../auth/rbac.service';
+import { AccountSettingsService } from '../account-settings/services/account-settings.service';
 
 @Component({
   selector: 'app-vouchers',
@@ -48,7 +49,11 @@ export class VouchersComponent implements OnInit {
   private authService = inject(AuthService);
   private dialog = inject(MatDialog);
   private notif = inject(NotificationService);
+  private accountSettingsService = inject(AccountSettingsService);
   rbacService = inject(RbacService);
+
+  activeVoucherTypes = this.accountSettingsService.activeVoucherTypes;
+  activePaymentMethods = this.accountSettingsService.activePaymentMethods;
 
   vouchers = signal<Voucher[]>([]);
   isLoading = signal<boolean>(true);
@@ -106,11 +111,23 @@ export class VouchersComponent implements OnInit {
         v.description.toLowerCase().includes(q) ||
         (v.referenceNo && v.referenceNo.toLowerCase().includes(q)) ||
         (v.taskRef && v.taskRef.toLowerCase().includes(q)) ||
-        (v.taskTitle && v.taskTitle.toLowerCase().includes(q))
+        (v.taskTitle && v.taskTitle.toLowerCase().includes(q)) ||
+        (v.payees && v.payees.some(p => p.payeeName.toLowerCase().includes(q) || (p.payeeNic && p.payeeNic.toLowerCase().includes(q)))) ||
+        (v.payments && v.payments.some(pm => (pm.referenceNo && pm.referenceNo.toLowerCase().includes(q)) || pm.paymentMethod.toLowerCase().includes(q)))
       );
     }
     return list;
   });
+
+  getPayeesTooltip(v: Voucher): string {
+    if (!v.payees || v.payees.length === 0) return '';
+    return v.payees.map(p => `${p.subVoucherNo ? '[' + p.subVoucherNo + '] ' : ''}${p.payeeName}: LKR ${p.amount.toLocaleString()}`).join('\n');
+  }
+
+  getPaymentsTooltip(v: Voucher): string {
+    if (!v.payments || v.payments.length === 0) return '';
+    return v.payments.map(p => `${p.paymentMethod}: LKR ${p.amount.toLocaleString()}${p.referenceNo ? ' (' + p.referenceNo + ')' : ''}`).join('\n');
+  }
 
   ngOnInit() {
     this.loadVouchers();
@@ -134,7 +151,7 @@ export class VouchersComponent implements OnInit {
   async openCreateDialog() {
     const defaultNo = await this.voucherService.generateVoucherNo('Payment Voucher');
     const dialogRef = this.dialog.open(VoucherDialogComponent, {
-      width: '720px',
+      width: '960px',
       maxWidth: '96vw',
       data: { defaultVoucherNo: defaultNo }
     });
@@ -154,7 +171,7 @@ export class VouchersComponent implements OnInit {
 
   openEditDialog(voucher: Voucher) {
     const dialogRef = this.dialog.open(VoucherDialogComponent, {
-      width: '720px',
+      width: '960px',
       maxWidth: '96vw',
       data: { voucher }
     });
