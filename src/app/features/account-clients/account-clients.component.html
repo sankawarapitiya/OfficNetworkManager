@@ -1,0 +1,238 @@
+<div class="account-clients-page">
+  <!-- Page Header -->
+  <div class="page-header">
+    <div class="header-left">
+      <div class="header-icon-box">
+        <mat-icon>people_alt</mat-icon>
+      </div>
+      <div>
+        <h1 class="page-title">Account Clients & Payees</h1>
+        <p class="page-subtitle">Dedicated dataset for vendors, suppliers, individual payees, and beneficiaries of Account vouchers</p>
+      </div>
+    </div>
+    <div class="header-actions">
+      <button mat-stroked-button color="primary" class="export-btn" (click)="exportExcel()" matTooltip="Export client ledger to Excel">
+        <mat-icon>download</mat-icon> Export Excel
+      </button>
+      <button mat-flat-button color="primary" class="create-btn" (click)="openCreateDialog()" matTooltip="Register New Client for Account">
+        <mat-icon>person_add</mat-icon> + Register New Client
+      </button>
+    </div>
+  </div>
+
+  <!-- Metric Overview Cards -->
+  <div class="metrics-grid">
+    <mat-card class="stat-card">
+      <div class="stat-icon-wrapper total-icon">
+        <mat-icon>groups</mat-icon>
+      </div>
+      <div class="stat-content">
+        <span class="stat-label">Total Account Clients</span>
+        <span class="stat-value">{{ totalClients() }}</span>
+      </div>
+    </mat-card>
+
+    <mat-card class="stat-card">
+      <div class="stat-icon-wrapper active-icon">
+        <mat-icon>verified</mat-icon>
+      </div>
+      <div class="stat-content">
+        <span class="stat-label">Active Clients</span>
+        <span class="stat-value">{{ activeClientsCount() }}</span>
+      </div>
+    </mat-card>
+
+    <mat-card class="stat-card">
+      <div class="stat-icon-wrapper vendor-icon">
+        <mat-icon>storefront</mat-icon>
+      </div>
+      <div class="stat-content">
+        <span class="stat-label">Vendors & Suppliers</span>
+        <span class="stat-value">{{ vendorClientsCount() }}</span>
+      </div>
+    </mat-card>
+
+    <mat-card class="stat-card">
+      <div class="stat-icon-wrapper vouchers-icon">
+        <mat-icon>receipt_long</mat-icon>
+      </div>
+      <div class="stat-content">
+        <span class="stat-label">Linked Vouchers Count</span>
+        <span class="stat-value">{{ totalLinkedVouchersCount() }}</span>
+      </div>
+    </mat-card>
+  </div>
+
+  <!-- Filters & Search Toolbar -->
+  <mat-card class="filter-card">
+    <div class="filter-toolbar">
+      <mat-form-field appearance="outline" class="search-field" subscriptSizing="dynamic">
+        <mat-label>Search Clients / Payees</mat-label>
+        <input matInput [ngModel]="searchQuery()" (ngModelChange)="searchQuery.set($event); onFilterChange()" placeholder="Search by name, NIC / BRN, phone, bank...">
+        <mat-icon matPrefix>search</mat-icon>
+        <button mat-icon-button matSuffix *ngIf="searchQuery()" (click)="searchQuery.set(''); onFilterChange()">
+          <mat-icon>close</mat-icon>
+        </button>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="select-field" subscriptSizing="dynamic">
+        <mat-label>Client Classification</mat-label>
+        <mat-select [ngModel]="selectedType()" (ngModelChange)="selectedType.set($event); onFilterChange()">
+          <mat-option value="All">All Classifications</mat-option>
+          <mat-option value="Individual">Individual Payees</mat-option>
+          <mat-option value="Business / Vendor">Business / Vendor</mat-option>
+          <mat-option value="Government Agency">Government Agency</mat-option>
+          <mat-option value="Employee">Employee / Staff</mat-option>
+          <mat-option value="Financial Institution">Financial Institution</mat-option>
+          <mat-option value="Other">Other</mat-option>
+        </mat-select>
+        <mat-icon matPrefix>category</mat-icon>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="select-field status-field" subscriptSizing="dynamic">
+        <mat-label>Status</mat-label>
+        <mat-select [ngModel]="selectedStatus()" (ngModelChange)="selectedStatus.set($event); onFilterChange()">
+          <mat-option value="All">All Statuses</mat-option>
+          <mat-option value="active">Active Only</mat-option>
+          <mat-option value="inactive">Inactive Only</mat-option>
+        </mat-select>
+        <mat-icon matPrefix>tune</mat-icon>
+      </mat-form-field>
+    </div>
+  </mat-card>
+
+  <!-- Clients Table Card -->
+  <mat-card class="table-card">
+    <div class="table-container">
+      <table mat-table [dataSource]="paginatedClients()" class="clients-table">
+        
+        <!-- Client Legal Name & Identity Column -->
+        <ng-container matColumnDef="client">
+          <th mat-header-cell *matHeaderCellDef> Client / Payee </th>
+          <td mat-cell *matCellDef="let client">
+            <div class="client-cell" (click)="openDetailDialog(client)" matTooltip="Inspect client dossier & vouchers">
+              <div class="client-avatar" [ngClass]="getAvatarColorClass(client.clientType)">
+                <mat-icon>{{ getClientTypeIcon(client.clientType) }}</mat-icon>
+              </div>
+              <div class="client-meta">
+                <span class="client-name">{{ client.name }}</span>
+                <span class="client-sub" *ngIf="client.nicOrBrn">
+                  <mat-icon class="sub-icon">badge</mat-icon>
+                  {{ client.nicOrBrn }}
+                  <span class="cat-pill" *ngIf="client.category">• {{ client.category }}</span>
+                </span>
+              </div>
+            </div>
+          </td>
+        </ng-container>
+
+        <!-- Classification Type Column -->
+        <ng-container matColumnDef="clientType">
+          <th mat-header-cell *matHeaderCellDef> Classification </th>
+          <td mat-cell *matCellDef="let client">
+            <span class="type-tag" [ngClass]="getAvatarColorClass(client.clientType)">
+              {{ client.clientType }}
+            </span>
+          </td>
+        </ng-container>
+
+        <!-- Contact & Address Column -->
+        <ng-container matColumnDef="contact">
+          <th mat-header-cell *matHeaderCellDef> Contact Info </th>
+          <td mat-cell *matCellDef="let client">
+            <div class="contact-meta">
+              <span class="phone-row" *ngIf="client.phone">
+                <mat-icon class="sub-icon">phone</mat-icon>
+                {{ client.phone }}
+              </span>
+              <span class="email-row" *ngIf="client.email">{{ client.email }}</span>
+              <span class="addr-row" *ngIf="client.address" [title]="client.address">{{ client.address }}</span>
+            </div>
+          </td>
+        </ng-container>
+
+        <!-- Bank Particulars Column -->
+        <ng-container matColumnDef="banking">
+          <th mat-header-cell *matHeaderCellDef> Bank & Settlement </th>
+          <td mat-cell *matCellDef="let client">
+            <div class="bank-meta" *ngIf="client.bankName || client.accountNumber; else noBankTpl">
+              <span class="bank-name">{{ client.bankName || 'Bank Account' }}</span>
+              <span class="acc-num font-mono" *ngIf="client.accountNumber">Acc: {{ client.accountNumber }}</span>
+              <span class="branch-text" *ngIf="client.branch">{{ client.branch }}</span>
+            </div>
+            <ng-template #noBankTpl>
+              <span class="empty-bank-text">Cash / Unspecified</span>
+            </ng-template>
+          </td>
+        </ng-container>
+
+        <!-- Linked Vouchers Count Column -->
+        <ng-container matColumnDef="vouchersCount">
+          <th mat-header-cell *matHeaderCellDef> Linked Vouchers </th>
+          <td mat-cell *matCellDef="let client">
+            <button mat-button class="vouchers-count-btn" (click)="openDetailDialog(client)" matTooltip="View issued vouchers">
+              <mat-icon class="v-icon">receipt</mat-icon>
+              <span class="v-num">{{ getClientVouchersCount(client) }} Vouchers</span>
+            </button>
+          </td>
+        </ng-container>
+
+        <!-- Status Column -->
+        <ng-container matColumnDef="status">
+          <th mat-header-cell *matHeaderCellDef> Status </th>
+          <td mat-cell *matCellDef="let client">
+            <span class="status-pill" [ngClass]="client.status">
+              <span class="status-dot"></span>
+              {{ client.status | titlecase }}
+            </span>
+          </td>
+        </ng-container>
+
+        <!-- Actions Column -->
+        <ng-container matColumnDef="actions">
+          <th mat-header-cell *matHeaderCellDef class="actions-header"> Actions </th>
+          <td mat-cell *matCellDef="let client" class="actions-cell">
+            <div class="actions-row">
+              <button mat-icon-button class="action-btn dossier-btn" (click)="openDetailDialog(client)" matTooltip="View Client Dossier">
+                <mat-icon>visibility</mat-icon>
+              </button>
+              <button mat-icon-button class="action-btn edit-btn" (click)="openEditDialog(client)" matTooltip="Edit Client">
+                <mat-icon>edit</mat-icon>
+              </button>
+              <button mat-icon-button class="action-btn delete-btn" (click)="deleteClient(client)" matTooltip="Delete Client">
+                <mat-icon>delete_outline</mat-icon>
+              </button>
+            </div>
+          </td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+        <tr mat-row *matRowDef="let row; columns: displayedColumns;" class="client-table-row"></tr>
+
+        <!-- No data row -->
+        <tr class="mat-row" *matNoDataRow>
+          <td class="mat-cell empty-table-cell" [attr.colspan]="displayedColumns.length">
+            <div class="empty-state-wrap">
+              <mat-icon class="empty-state-icon">person_search</mat-icon>
+              <h3>No Account Clients Found</h3>
+              <p>No client records match the current filter criteria, or the dataset is empty.</p>
+              <button mat-flat-button color="primary" (click)="openCreateDialog()">
+                <mat-icon>person_add</mat-icon> Register First Client
+              </button>
+            </div>
+          </td>
+        </tr>
+      </table>
+    </div>
+
+    <!-- Pagination -->
+    <mat-paginator
+      [length]="filteredClients().length"
+      [pageSize]="pageSize()"
+      [pageSizeOptions]="[10, 25, 50]"
+      [pageIndex]="currentPage() - 1"
+      (page)="onPageChange($event)"
+      showFirstLastButtons>
+    </mat-paginator>
+  </mat-card>
+</div>

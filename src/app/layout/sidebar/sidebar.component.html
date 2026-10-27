@@ -27,10 +27,38 @@
 
   <div class="nav-section-label">OPERATIONS</div>
   <mat-nav-list class="nav-list">
+    
+    <!-- Standalone Customers Link (Outside Account) -->
     <a mat-list-item *ngIf="rbacService.canAccessModule('customers')" routerLink="/customers" routerLinkActive="active-link">
       <mat-icon matListItemIcon>groups</mat-icon>
       <span matListItemTitle>Customers</span>
     </a>
+
+    <!-- Account Section with Sub-categories -->
+    <div class="nav-expandable-group" *ngIf="canAccessAccount()">
+      <div class="nav-parent-item" [class.expanded]="accountExpanded()" [class.parent-active]="isAccountActive()">
+        <a routerLink="/account/clients" class="parent-link">
+          <mat-icon class="parent-icon">account_balance_wallet</mat-icon>
+          <span class="parent-label">Account</span>
+        </a>
+        <button type="button" class="expand-btn" (click)="toggleAccount($event)" matTooltip="Toggle Sub-menu">
+          <mat-icon class="expand-icon">{{ accountExpanded() ? 'expand_less' : 'expand_more' }}</mat-icon>
+        </button>
+      </div>
+
+      <!-- Nested Sub-Categories -->
+      <div class="sub-nav-list" *ngIf="accountExpanded()">
+        <a routerLink="/account/clients" routerLinkActive="active-sub-link" class="sub-nav-item">
+          <mat-icon class="sub-icon">people_alt</mat-icon>
+          <span class="sub-title">Clients</span>
+        </a>
+        <a routerLink="/vouchers" routerLinkActive="active-sub-link" class="sub-nav-item">
+          <mat-icon class="sub-icon">receipt_long</mat-icon>
+          <span class="sub-title">Vouchers</span>
+        </a>
+      </div>
+    </div>
+
     <!-- Land Management with Sub-categories -->
     <div class="nav-expandable-group" *ngIf="rbacService.canAccessModule('land')">
       <div class="nav-parent-item" [class.expanded]="landExpanded()" [class.parent-active]="isLandActive()">
@@ -67,6 +95,7 @@
         </a>
       </div>
     </div>
+
     <!-- Work Plans with Sub-categories -->
     <div class="nav-expandable-group" *ngIf="rbacService.canAccessModule('work-plans')">
       <div class="nav-parent-item" [class.expanded]="workPlansExpanded()" [class.parent-active]="isWorkPlansActive()">
@@ -107,6 +136,7 @@
         </a>
       </div>
     </div>
+
     <!-- Official Letters with Sub-categories -->
     <div class="nav-expandable-group" *ngIf="rbacService.canAccessModule('letters')">
       <div class="nav-parent-item" [class.expanded]="lettersExpanded()" [class.parent-active]="isLettersActive()">
@@ -147,6 +177,7 @@
         </a>
       </div>
     </div>
+
     <a mat-list-item *ngIf="rbacService.canAccessModule('hr')" routerLink="/hr" routerLinkActive="active-link">
       <mat-icon matListItemIcon>badge</mat-icon>
       <span matListItemTitle>HR Directory</span>
