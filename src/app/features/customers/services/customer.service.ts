@@ -48,11 +48,13 @@ export class CustomerService {
   }
 
   async isCustomerLinked(customerId: string, customerNic?: string): Promise<boolean> {
-    // Check if customer is referenced in 'land_jobs' (the primary land tasks collection)
     try {
       if (customerId) {
         const landJobs = await this.firestoreService.queryDocuments('land_jobs', 'customerId', '==', customerId);
         if (landJobs && landJobs.length > 0) return true;
+
+        const workPlans = await this.firestoreService.queryDocuments('work_plans', 'customerId', '==', customerId);
+        if (workPlans && workPlans.length > 0) return true;
 
         const legacyRecords = await this.firestoreService.queryDocuments('land_records', 'ownerCustomerId', '==', customerId);
         if (legacyRecords && legacyRecords.length > 0) return true;

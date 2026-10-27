@@ -17,11 +17,13 @@ import { Customer, CustomerService } from './services/customer.service';
 import { SettingsService, Division } from '../settings/settings.service';
 import { LandService } from '../land/services/land.service';
 import { LandJob, LandJobStatus } from '../land/models/land.model';
+import { WorkPlan, WorkPlanService } from '../work-plans/services/work-plan.service';
 import { NotificationService } from '../../core/services/notification.service';
 import { EventLogService } from '../../core/services/event-log.service';
 import { CustomerDialogComponent } from './customer-dialog.component';
 import { CustomerDetailDialogComponent } from './customer-detail-dialog.component';
 import { LandJobDetailDialogComponent } from '../land/components/land-job-detail-dialog/land-job-detail-dialog.component';
+import { LinkTaskDialogComponent } from './link-task-dialog.component';
 import { RbacService } from '../../auth/rbac.service';
 
 @Component({
@@ -48,6 +50,7 @@ import { RbacService } from '../../auth/rbac.service';
 export class CustomersComponent implements OnInit {
   private customerService = inject(CustomerService);
   private landService = inject(LandService);
+  private workPlanService = inject(WorkPlanService);
   private settingsService = inject(SettingsService);
   private notif = inject(NotificationService);
   private eventLog = inject(EventLogService);
@@ -71,6 +74,7 @@ export class CustomersComponent implements OnInit {
   customers = signal<Customer[]>([]);
   divisions = signal<Division[]>([]);
   landJobs = signal<LandJob[]>([]);
+  workPlans = signal<WorkPlan[]>([]);
   isLoading = signal<boolean>(true);
   expandedCustomerId = signal<string | null>(null);
 
@@ -200,7 +204,23 @@ export class CustomersComponent implements OnInit {
     const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
     return this.customers().filter(c => c.createdAt > sevenDaysAgo).length;
   });
-  totalLinkedLandJobs = computed(() => this.landJobs().length);
+
+  // Total tasks linked across all citizens (Land Jobs and Work Plans)
+  totalLinkedTasks = computed(() => {
+    const custIds = new Set(this.customers().map(c => c.id).filter(Boolean));
+    const custNics = new Set(this.customers().map(c => c.nic?.trim().toLowerCase()).filter(Boolean));
+
+    const linkedLand = this.landJobs().filter(j => 
+      (j.customerId && custIds.has(j.customerId.trim())) || 
+      (j.customerNic && custNics.has(j.customerNic.trim().toLowerCase()))
+    ).length;
+
+    const linkedWork = this.workPlans().filter(p => 
+      p.customerId && custIds.has(p.customerId.trim())
+    ).length;
+
+    return linkedLand + linkedWork;
+  });
 
   ngOnInit() {
     // Load Customers
@@ -223,8 +243,14 @@ export class CustomersComponent implements OnInit {
 
     // Load Land Management Jobs to link with customers
     this.landService.getLandJobs().subscribe({
-      next: (jobs) => this.landJobs.set(jobs),
+      next: (jobs) => this.landJobs.set(jobs || []),
       error: (err) => console.error('Error fetching land jobs in customers component', err)
+    });
+
+    // Load Operational Work Plans to link with customers
+    this.workPlanService.getWorkPlans().subscribe({
+      next: (plans) => this.workPlans.set(plans || []),
+      error: (err) => console.error('Error fetching work plans in customers component', err)
     });
   }
 
@@ -257,6 +283,21 @@ export class CustomersComponent implements OnInit {
     });
   }
 
+  // --- Customer & Work Plan Directives Link Helper ---
+  getLinkedWorkPlans(customer: Customer): WorkPlan[] {
+    if (!customer) return [];
+    const allPlans = this.workPlans();
+    const cId = customer.id?.trim();
+    if (!cId) return [];
+
+    return allPlans.filter(p => p.customerId && p.customerId.trim() === cId);
+  }
+
+  // Total count of all linked tasks (land jobs + work plans)
+  getAllLinkedTasksCount(customer: Customer): number {
+    return this.getLinkedJobs(customer).length + this.getLinkedWorkPlans(customer).length;
+  }
+
   toggleRowExpand(customerId: string) {
     if (this.expandedCustomerId() === customerId) {
       this.expandedCustomerId.set(null);
@@ -267,19 +308,38 @@ export class CustomersComponent implements OnInit {
 
   // --- Modal Openers ---
   viewCustomerDossier(customer: Customer) {
-    const linked = this.getLinkedJobs(customer);
+    const linkedJobs = this.getLinkedJobs(customer);
+    const linkedWorkPlans = this.getLinkedWorkPlans(customer);
     const ref = this.dialog.open(CustomerDetailDialogComponent, {
-      width: '940px',
+      width: '960px',
       maxWidth: '96vw',
       data: {
         customer,
-        linkedJobs: linked,
+        linkedJobs,
+        linkedWorkPlans,
         divisions: this.divisions()
       }
     });
 
     ref.afterClosed().subscribe(() => {
-      // Re-trigger if anything changed
+      // Re-trigger sync if tasks were linked or updated
+      this.landService.getLandJobs().subscribe(jobs => this.landJobs.set(jobs || []));
+      this.workPlanService.getWorkPlans().subscribe(plans => this.workPlans.set(plans || []));
+    });
+  }
+
+  openLinkTaskDialog(customer: Customer) {
+    const dialogRef = this.dialog.open(LinkTaskDialogComponent, {
+      width: '680px',
+      maxWidth: '96vw',
+      data: { customer }
+    });
+
+    dialogRef.afterClosed().subscribe(res => {
+      if (res?.linked || res?.created) {
+        this.landService.getLandJobs().subscribe(jobs => this.landJobs.set(jobs || []));
+        this.workPlanService.getWorkPlans().subscribe(plans => this.workPlans.set(plans || []));
+      }
     });
   }
 
@@ -349,7 +409,7 @@ export class CustomersComponent implements OnInit {
     if (isLinked) {
       this.notif.showErrorBox(
         'Cannot Delete Customer',
-        'This customer is linked to records in Land Management tasks. To preserve statutory audit trails and cadastral integrity, please reassign or resolve linked tasks first.'
+        'This customer is linked to records in tasks or land management. To preserve statutory audit trails and administrative integrity, please reassign or resolve linked tasks first.'
       );
       return;
     }
@@ -380,7 +440,7 @@ export class CustomersComponent implements OnInit {
     }
 
     const csvRows = [
-      ['Name', 'NIC', 'Phone', 'Email', 'Address', 'Division', 'GN Division', 'Linked Land Tasks', 'Status'].join(','),
+      ['Name', 'NIC', 'Phone', 'Email', 'Address', 'Division', 'GN Division', 'Linked Tasks', 'Status'].join(','),
       ...data.map(c => [
         `"${c.name}"`,
         `"${c.nic}"`,
@@ -389,7 +449,7 @@ export class CustomersComponent implements OnInit {
         `"${(c.address || '').replace(/"/g, '""')}"`,
         `"${c.division}"`,
         `"${c.gnDivision || ''}"`,
-        `"${this.getLinkedJobs(c).length}"`,
+        `"${this.getAllLinkedTasksCount(c)}"`,
         `"${c.status}"`
       ].join(','))
     ];

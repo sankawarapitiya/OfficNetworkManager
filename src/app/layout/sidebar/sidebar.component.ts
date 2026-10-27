@@ -27,6 +27,7 @@ export class SidebarComponent implements OnInit, OnDestroy {
   workPlanService = inject(WorkPlanService);
   licenseService = inject(LicenseService);
 
+  accountExpanded = signal<boolean>(false);
   workPlansExpanded = signal<boolean>(false);
   lettersExpanded = signal<boolean>(false);
   landExpanded = signal<boolean>(false);
@@ -47,25 +48,38 @@ export class SidebarComponent implements OnInit, OnDestroy {
   }
 
   private syncExpansionWithRoute(url: string) {
-    if (url.startsWith('/land')) {
+    if (url.startsWith('/account') || url.startsWith('/vouchers')) {
+      this.accountExpanded.set(true);
+      this.landExpanded.set(false);
+      this.workPlansExpanded.set(false);
+      this.lettersExpanded.set(false);
+    } else if (url.startsWith('/land')) {
       this.landExpanded.set(true);
+      this.accountExpanded.set(false);
       this.workPlansExpanded.set(false);
       this.lettersExpanded.set(false);
     } else if (url.startsWith('/work-plans')) {
       this.workPlansExpanded.set(true);
+      this.accountExpanded.set(false);
       this.lettersExpanded.set(false);
       this.landExpanded.set(false);
     } else if (url.startsWith('/letters')) {
       this.lettersExpanded.set(true);
+      this.accountExpanded.set(false);
       this.workPlansExpanded.set(false);
       this.landExpanded.set(false);
     } else {
-      // In the root (/dashboard) or other root sections, keep toggle submenus closed
+      // In root (/dashboard) or other root sections (including /customers), keep toggle submenus closed
+      this.accountExpanded.set(false);
       this.workPlansExpanded.set(false);
       this.lettersExpanded.set(false);
       this.landExpanded.set(false);
     }
   }
+
+  canAccessAccount = computed(() => {
+    return this.rbacService.canAccessModule('customers') || this.rbacService.canAccessModule('account');
+  });
 
   canAccessVerification = computed(() => {
     if (this.rbacService.isAdmin() || this.rbacService.isSuperAdmin() || this.rbacService.isDivisionalAdmin()) {
@@ -95,6 +109,17 @@ export class SidebarComponent implements OnInit, OnDestroy {
   canManageSettings = computed(() => {
     return this.rbacService.hasPermission('work-plans:manage_policies') || this.rbacService.isSuperAdmin() || this.rbacService.isAdmin();
   });
+
+  toggleAccount(event?: MouseEvent) {
+    if (event) {
+      event.stopPropagation();
+    }
+    this.accountExpanded.update(v => !v);
+  }
+
+  isAccountActive(): boolean {
+    return this.router.url.startsWith('/account') || this.router.url.startsWith('/vouchers');
+  }
 
   toggleWorkPlans(event?: MouseEvent) {
     if (event) {

@@ -25,10 +25,38 @@ export const routes: Routes = [
         data: { module: 'dashboard', permission: 'dashboard:view_overview' }
       },
       {
+        path: 'account',
+        children: [
+          {
+            path: '',
+            redirectTo: 'clients',
+            pathMatch: 'full'
+          },
+          {
+            path: 'clients',
+            loadComponent: () => import('./features/account-clients/account-clients.component').then(m => m.AccountClientsComponent),
+            canActivate: [rbacGuard],
+            data: { module: 'account' }
+          },
+          {
+            path: 'vouchers',
+            loadComponent: () => import('./features/vouchers/vouchers.component').then(m => m.VouchersComponent),
+            canActivate: [rbacGuard],
+            data: { module: 'account' }
+          }
+        ]
+      },
+      {
         path: 'customers',
         loadComponent: () => import('./features/customers/customers.component').then(m => m.CustomersComponent),
         canActivate: [rbacGuard],
         data: { module: 'customers', permission: 'customers:view' }
+      },
+      {
+        path: 'vouchers',
+        loadComponent: () => import('./features/vouchers/vouchers.component').then(m => m.VouchersComponent),
+        canActivate: [rbacGuard],
+        data: { module: 'customers' }
       },
       {
         path: 'hr',

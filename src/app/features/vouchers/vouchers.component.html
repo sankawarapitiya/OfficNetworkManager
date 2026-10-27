@@ -1,0 +1,221 @@
+<div class="vouchers-page">
+  <!-- Page Header -->
+  <div class="page-header">
+    <div class="header-left">
+      <div class="header-badge">
+        <mat-icon>account_balance_wallet</mat-icon>
+        <span>Accounts & Finance Division</span>
+      </div>
+      <h1 class="page-title">Vouchers & Payment Orders</h1>
+      <p class="page-subtitle">Manage payment vouchers, receipts, disbursements, and financial tracking</p>
+    </div>
+    <div class="header-right">
+      <button mat-stroked-button (click)="exportExcel()" [disabled]="filteredVouchers().length === 0">
+        <mat-icon>download</mat-icon>
+        Export Excel
+      </button>
+      <button mat-flat-button color="primary" (click)="openCreateDialog()">
+        <mat-icon>add</mat-icon>
+        New Voucher
+      </button>
+    </div>
+  </div>
+
+  <!-- KPI Metrics Grid -->
+  <div class="metrics-grid">
+    <mat-card class="metric-card">
+      <div class="metric-icon-wrap emerald">
+        <mat-icon>paid</mat-icon>
+      </div>
+      <div class="metric-info">
+        <span class="metric-label">Total Disbursed (Paid)</span>
+        <span class="metric-value">LKR {{ totalAmountPaid() | number:'1.2-2' }}</span>
+        <span class="metric-sub">Certified disbursements</span>
+      </div>
+    </mat-card>
+
+    <mat-card class="metric-card">
+      <div class="metric-icon-wrap amber">
+        <mat-icon>pending_actions</mat-icon>
+      </div>
+      <div class="metric-info">
+        <span class="metric-label">Pending Approval</span>
+        <span class="metric-value">{{ pendingApprovalCount() }}</span>
+        <span class="metric-sub">Awaiting verification signoff</span>
+      </div>
+    </mat-card>
+
+    <mat-card class="metric-card">
+      <div class="metric-icon-wrap sky">
+        <mat-icon>check_circle</mat-icon>
+      </div>
+      <div class="metric-info">
+        <span class="metric-label">Approved (Ready for Payment)</span>
+        <span class="metric-value">{{ approvedCount() }}</span>
+        <span class="metric-sub">Ready for cashier disbursement</span>
+      </div>
+    </mat-card>
+
+    <mat-card class="metric-card">
+      <div class="metric-icon-wrap indigo">
+        <mat-icon>receipt_long</mat-icon>
+      </div>
+      <div class="metric-info">
+        <span class="metric-label">Total Vouchers Registered</span>
+        <span class="metric-value">{{ totalVouchersCount() }}</span>
+        <span class="metric-sub">Across all ledger categories</span>
+      </div>
+    </mat-card>
+  </div>
+
+  <!-- Filters & Search Toolbar -->
+  <mat-card class="filter-card">
+    <div class="filter-toolbar">
+      <mat-form-field appearance="outline" class="search-field">
+        <mat-label>Search vouchers, payees, cheque ref, tasks...</mat-label>
+        <input matInput [ngModel]="searchQuery()" (ngModelChange)="searchQuery.set($event)" placeholder="Search by name, voucher no, task ref, particulars">
+        <mat-icon matPrefix>search</mat-icon>
+        <button mat-icon-button matSuffix *ngIf="searchQuery()" (click)="searchQuery.set('')">
+          <mat-icon>clear</mat-icon>
+        </button>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="filter-select">
+        <mat-label>Voucher Type</mat-label>
+        <mat-select [ngModel]="selectedType()" (ngModelChange)="selectedType.set($event)">
+          <mat-option value="All">All Types</mat-option>
+          <mat-option value="Payment Voucher">Payment Voucher (PV)</mat-option>
+          <mat-option value="Receipt Voucher">Receipt Voucher (RV)</mat-option>
+          <mat-option value="Petty Cash">Petty Cash (PCV)</mat-option>
+          <mat-option value="Journal Voucher">Journal Voucher (JV)</mat-option>
+        </mat-select>
+        <mat-icon matPrefix>category</mat-icon>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="filter-select">
+        <mat-label>Status</mat-label>
+        <mat-select [ngModel]="selectedStatus()" (ngModelChange)="selectedStatus.set($event)">
+          <mat-option value="All">All Statuses</mat-option>
+          <mat-option value="Draft">Draft</mat-option>
+          <mat-option value="Pending Approval">Pending Approval</mat-option>
+          <mat-option value="Approved">Approved</mat-option>
+          <mat-option value="Paid">Paid / Disbursed</mat-option>
+          <mat-option value="Cancelled">Cancelled</mat-option>
+        </mat-select>
+        <mat-icon matPrefix>filter_list</mat-icon>
+      </mat-form-field>
+    </div>
+  </mat-card>
+
+  <!-- Vouchers Table Card -->
+  <mat-card class="table-card">
+    <div class="table-container">
+      <table mat-table [dataSource]="filteredVouchers()" class="vouchers-table">
+        
+        <!-- Voucher No Column -->
+        <ng-container matColumnDef="voucherNo">
+          <th mat-header-cell *matHeaderCellDef>Voucher No</th>
+          <td mat-cell *matCellDef="let v">
+            <div class="voucher-no-cell">
+              <mat-icon class="v-icon">tag</mat-icon>
+              <span class="v-text">{{ v.voucherNo }}</span>
+            </div>
+          </td>
+        </ng-container>
+
+        <!-- Type Column -->
+        <ng-container matColumnDef="type">
+          <th mat-header-cell *matHeaderCellDef>Type</th>
+          <td mat-cell *matCellDef="let v">
+            <span class="type-pill" [ngClass]="getTypeBadgeClass(v.type)">
+              {{ v.type }}
+            </span>
+          </td>
+        </ng-container>
+
+        <!-- Date Column -->
+        <ng-container matColumnDef="date">
+          <th mat-header-cell *matHeaderCellDef>Date</th>
+          <td mat-cell *matCellDef="let v">
+            <span class="date-text">{{ v.date }}</span>
+          </td>
+        </ng-container>
+
+        <!-- Payee Column -->
+        <ng-container matColumnDef="payee">
+          <th mat-header-cell *matHeaderCellDef>Payee / Beneficiary</th>
+          <td mat-cell *matCellDef="let v">
+            <div class="payee-cell">
+              <span class="payee-name">{{ v.payeeName }}</span>
+              <span class="payee-sub" *ngIf="v.payeeNic || v.payeePhone">
+                {{ v.payeeNic ? 'NIC: ' + v.payeeNic : '' }} {{ v.payeePhone ? '• ' + v.payeePhone : '' }}
+              </span>
+            </div>
+          </td>
+        </ng-container>
+
+
+        <!-- Amount Column -->
+        <ng-container matColumnDef="amount">
+          <th mat-header-cell *matHeaderCellDef>Amount (LKR)</th>
+          <td mat-cell *matCellDef="let v">
+            <span class="amount-val">LKR {{ v.amount | number:'1.2-2' }}</span>
+          </td>
+        </ng-container>
+
+        <!-- Payment Method Column -->
+        <ng-container matColumnDef="paymentMethod">
+          <th mat-header-cell *matHeaderCellDef>Payment Method</th>
+          <td mat-cell *matCellDef="let v">
+            <div class="method-cell">
+              <span>{{ v.paymentMethod }}</span>
+              <span class="ref-sub" *ngIf="v.referenceNo">Ref: {{ v.referenceNo }}</span>
+            </div>
+          </td>
+        </ng-container>
+
+        <!-- Status Column -->
+        <ng-container matColumnDef="status">
+          <th mat-header-cell *matHeaderCellDef>Status</th>
+          <td mat-cell *matCellDef="let v">
+            <span class="status-pill" [ngClass]="getStatusBadgeClass(v.status)">
+              {{ v.status }}
+            </span>
+          </td>
+        </ng-container>
+
+        <!-- Actions Column -->
+        <ng-container matColumnDef="actions">
+          <th mat-header-cell *matHeaderCellDef class="actions-header">Actions</th>
+          <td mat-cell *matCellDef="let v" class="actions-cell">
+            <button mat-icon-button (click)="viewVoucher(v)" matTooltip="View & Print Voucher" class="action-btn">
+              <mat-icon color="primary">visibility</mat-icon>
+            </button>
+            <button mat-icon-button (click)="openEditDialog(v)" matTooltip="Edit Voucher" class="action-btn">
+              <mat-icon>edit</mat-icon>
+            </button>
+            <button mat-icon-button (click)="deleteVoucher(v)" matTooltip="Delete Voucher" class="action-btn delete">
+              <mat-icon color="warn">delete</mat-icon>
+            </button>
+          </td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+        <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+
+        <!-- Empty Row -->
+        <tr class="mat-row" *matNoDataRow>
+          <td class="mat-cell empty-table" [attr.colspan]="displayedColumns.length">
+            <mat-icon class="empty-icon">search_off</mat-icon>
+            <p class="empty-title">No Vouchers Found</p>
+            <p class="empty-sub">No voucher entries match your current search or filter criteria.</p>
+            <button mat-flat-button color="primary" (click)="openCreateDialog()" style="margin-top: 10px;">
+              <mat-icon>add</mat-icon>
+              Create New Voucher
+            </button>
+          </td>
+        </tr>
+      </table>
+    </div>
+  </mat-card>
+</div>
