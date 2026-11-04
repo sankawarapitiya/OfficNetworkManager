@@ -254,6 +254,45 @@ export const SYSTEM_MODULE_PERMISSIONS: ModulePermissionDefinition[] = [
         description: 'Classify documents, manage confidential archives and seal case files'
       }
     ]
+  },
+  {
+    moduleId: 'inventory',
+    moduleName: 'Store & Inventory Management',
+    icon: 'inventory_2',
+    badgeColor: 'amber',
+    description: 'Catalog management, fixed assets register, store requisitions, and issuance tracking',
+    parts: [
+      {
+        id: 'inventory:view',
+        partKey: 'view',
+        name: 'Browse Inventory & Assets',
+        description: 'View catalog items, on-hand balances, and immovable asset registry'
+      },
+      {
+        id: 'inventory:request',
+        partKey: 'request',
+        name: 'Request Store Items',
+        description: 'Submit and track personal item requisitions'
+      },
+      {
+        id: 'inventory:manage_requests',
+        partKey: 'manage_requests',
+        name: 'Approve & Release Items',
+        description: 'Store manager dispatch, stock deductions, and supervisor approvals'
+      },
+      {
+        id: 'inventory:manage_items',
+        partKey: 'manage_items',
+        name: 'Manage Items & Assets',
+        description: 'Add and edit items, adjust stock levels, and decommission assets'
+      },
+      {
+        id: 'inventory:settings',
+        partKey: 'settings',
+        name: 'Inventory Policies & Settings',
+        description: 'Configure approval workflows, categories, and storage locations'
+      }
+    ]
   }
 ];
 
@@ -265,6 +304,11 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<string, string[]> = {
   'Super Admin': [...ALL_SYSTEM_PERMISSION_IDS],
 
   'Divisional Admin': [
+    'inventory:view',
+    'inventory:request',
+    'inventory:manage_requests',
+    'inventory:manage_items',
+    'inventory:settings',
     'dashboard:view_overview',
     'dashboard:view_analytics',
     'dashboard:export_reports',
@@ -291,6 +335,10 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<string, string[]> = {
   ],
 
   'Department Head': [
+    'inventory:view',
+    'inventory:request',
+    'inventory:manage_requests',
+    'inventory:manage_items',
     'dashboard:view_overview',
     'dashboard:view_analytics',
     'customers:view',
@@ -313,6 +361,8 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<string, string[]> = {
   ],
 
   'Staff': [
+    'inventory:view',
+    'inventory:request',
     'dashboard:view_overview',
     'customers:view',
     'customers:create',
@@ -346,6 +396,23 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<string, string[]> = {
     'land:view_parcels',
     'work-plans:view_tasks',
     'work-plans:individual_reports',
-    'letters:view_inward'
+        'letters:view_inward'
+  ],
+
+  'Store Manager': [
+    'inventory:view',
+    'inventory:request',
+    'inventory:manage_requests',
+    'inventory:manage_items',
+    'inventory:settings',
+    'dashboard:view_overview'
+  ],
+
+  'Inventory Officer': [
+    'inventory:view',
+    'inventory:request',
+    'inventory:manage_requests',
+    'inventory:manage_items',
+    'dashboard:view_overview'
   ]
 };

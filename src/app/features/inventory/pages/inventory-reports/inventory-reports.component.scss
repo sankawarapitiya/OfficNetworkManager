@@ -1,0 +1,779 @@
+@use '@angular/material' as mat;
+
+.inventory-reports-page {
+  padding: 1.5rem 2rem 3rem;
+  background: var(--bg-surface, #f8fafc);
+  min-height: 100vh;
+  color: #1e293b;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+// -------------------------------------------------------------
+// 1. HERO BANNER
+// -------------------------------------------------------------
+.hero-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+  padding: 1.75rem 2.25rem;
+  border-radius: 16px;
+  color: #ffffff;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.2);
+
+  .hero-tag-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.5rem;
+
+    .status-pill.amber {
+      background: rgba(245, 158, 11, 0.2);
+      color: #fbbf24;
+      border: 1px solid rgba(245, 158, 11, 0.35);
+      padding: 0.2rem 0.65rem;
+      border-radius: 20px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+
+      .pill-icon {
+        font-size: 14px;
+        width: 14px;
+        height: 14px;
+      }
+    }
+
+    .sync-indicator {
+      font-size: 0.8rem;
+      color: #94a3b8;
+    }
+  }
+
+  .hero-title {
+    font-size: 1.75rem;
+    font-weight: 700;
+    margin: 0 0 0.4rem;
+    letter-spacing: -0.02em;
+    color: #ffffff;
+  }
+
+  .hero-subtitle {
+    font-size: 0.95rem;
+    color: #94a3b8;
+    margin: 0;
+    max-width: 700px;
+    line-height: 1.45;
+  }
+
+  .hero-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+
+    .action-btn {
+      background: rgba(255, 255, 255, 0.1);
+      color: #ffffff;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 8px;
+      font-weight: 600;
+
+      mat-icon {
+        margin-right: 4px;
+      }
+
+      &:hover {
+        background: rgba(255, 255, 255, 0.18);
+      }
+    }
+
+    .primary-action-btn {
+      background: #0284c7;
+      color: #ffffff;
+      border-radius: 8px;
+      font-weight: 600;
+      box-shadow: 0 4px 12px rgba(2, 132, 199, 0.3);
+
+      mat-icon {
+        margin-right: 4px;
+      }
+
+      &:hover {
+        background: #0369a1;
+      }
+    }
+  }
+}
+
+// -------------------------------------------------------------
+// 2. REPORT TABS GRID (7 Types)
+// -------------------------------------------------------------
+.report-tabs-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  margin-bottom: 1.5rem;
+
+  .report-tab-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 14px 16px;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+
+    .tab-icon-box {
+      width: 38px;
+      height: 38px;
+      border-radius: 8px;
+      background: #f1f5f9;
+      color: #475569;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+
+      mat-icon {
+        font-size: 20px;
+        width: 20px;
+        height: 20px;
+      }
+    }
+
+    .tab-info {
+      flex: 1;
+      min-width: 0;
+
+      .tab-title {
+        font-size: 0.88rem;
+        font-weight: 700;
+        color: #1e293b;
+        margin: 0 0 3px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .tab-desc {
+        font-size: 0.73rem;
+        color: #64748b;
+        margin: 0;
+        line-height: 1.3;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+      }
+    }
+
+    &:hover {
+      border-color: #cbd5e1;
+      background: #f8fafc;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.08);
+    }
+
+    &.active {
+      background: #f0fdf4;
+      border-color: #059669;
+      box-shadow: 0 0 0 2px rgba(5, 150, 105, 0.15);
+
+      .tab-icon-box {
+        background: #059669;
+        color: #ffffff;
+      }
+
+      .tab-title {
+        color: #065f46;
+      }
+    }
+  }
+}
+
+// -------------------------------------------------------------
+// 3. PARAMETERS & FILTER CARD
+// -------------------------------------------------------------
+.filter-card {
+  border-radius: 12px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  margin-bottom: 1.5rem;
+  padding: 16px 20px;
+
+  .filter-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #f1f5f9;
+    margin-bottom: 14px;
+
+    .section-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: #475569;
+      letter-spacing: 0.04em;
+
+      mat-icon {
+        font-size: 16px;
+        width: 16px;
+        height: 16px;
+        color: #059669;
+      }
+    }
+
+    .timeframe-presets {
+      display: flex;
+      gap: 4px;
+      flex-wrap: wrap;
+
+      .preset-btn {
+        font-size: 0.75rem;
+        height: 28px;
+        line-height: 28px;
+        padding: 0 10px;
+        border-radius: 6px;
+        color: #64748b;
+        font-weight: 600;
+
+        &.active {
+          background: #e0f2fe;
+          color: #0369a1;
+          font-weight: 700;
+        }
+
+        &:hover:not(.active) {
+          background: #f1f5f9;
+        }
+      }
+    }
+  }
+
+  .filter-inputs-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+    align-items: center;
+
+    .filter-field {
+      width: 100%;
+    }
+
+    .search-field {
+      grid-column: span 1;
+
+      @media (min-width: 992px) {
+        grid-column: span 2;
+      }
+
+      .search-icon {
+        color: #94a3b8;
+        margin-right: 4px;
+      }
+    }
+  }
+}
+
+// -------------------------------------------------------------
+// 4. EXECUTIVE KPI GRID
+// -------------------------------------------------------------
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 1.5rem;
+
+  .kpi-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 16px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+
+    .kpi-label {
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-bottom: 4px;
+    }
+
+    .kpi-value {
+      font-size: 1.6rem;
+      font-weight: 800;
+      color: #0f172a;
+      line-height: 1.2;
+    }
+
+    .kpi-sub {
+      font-size: 0.72rem;
+      color: #94a3b8;
+      margin-top: 4px;
+    }
+
+    &.highlight-blue {
+      border-left: 4px solid #0284c7;
+    }
+
+    &.highlight-green {
+      border-left: 4px solid #059669;
+    }
+
+    &.highlight-amber {
+      border-left: 4px solid #f59e0b;
+    }
+
+    &.highlight-red {
+      border-left: 4px solid #ef4444;
+    }
+  }
+}
+
+// Text color utilities
+.text-green { color: #059669 !important; }
+.text-blue { color: #0284c7 !important; }
+.text-amber { color: #d97706 !important; }
+.text-danger { color: #dc2626 !important; }
+.text-muted { color: #94a3b8 !important; }
+.text-bold { font-weight: 700 !important; }
+.font-semibold { font-weight: 600 !important; }
+.font-mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+.text-right { text-align: right !important; }
+.text-center { text-align: center !important; }
+
+// -------------------------------------------------------------
+// 5. DATA TABLES & BOXES
+// -------------------------------------------------------------
+.printable-table-box {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  margin-bottom: 1.5rem;
+
+  .table-title-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 20px;
+    background: #f8fafc;
+    border-bottom: 1px solid #e2e8f0;
+
+    h4 {
+      margin: 0;
+      font-size: 1rem;
+      font-weight: 700;
+      color: #1e293b;
+    }
+
+    .count-badge {
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 3px 10px;
+      border-radius: 12px;
+      background: #e2e8f0;
+      color: #334155;
+
+      &.warning-badge {
+        background: #fef3c7;
+        color: #92400e;
+      }
+    }
+  }
+}
+
+.table-container {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.report-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+
+  th {
+    background: #f8fafc;
+    color: #475569;
+    font-weight: 700;
+    text-transform: uppercase;
+    font-size: 0.72rem;
+    letter-spacing: 0.03em;
+    padding: 10px 14px;
+    border-bottom: 2px solid #e2e8f0;
+    white-space: nowrap;
+  }
+
+  td {
+    padding: 10px 14px;
+    border-bottom: 1px solid #f1f5f9;
+    color: #334155;
+    vertical-align: middle;
+  }
+
+  tbody tr:nth-child(even) {
+    background-color: #fafbfc;
+  }
+
+  tbody tr:hover {
+    background-color: #f1f5f9;
+  }
+
+  tfoot tr.total-row td {
+    background: #f8fafc;
+    font-weight: 800;
+    border-top: 2px solid #cbd5e1;
+    border-bottom: 2px solid #cbd5e1;
+    padding: 12px 14px;
+  }
+
+  .empty-state-cell {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: #94a3b8;
+    font-style: italic;
+
+    .inline-icon {
+      vertical-align: middle;
+      margin-right: 6px;
+      font-size: 20px;
+      width: 20px;
+      height: 20px;
+    }
+  }
+}
+
+.secondary-table-box {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 16px 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+
+  .secondary-title {
+    margin: 0 0 12px;
+    font-size: 0.92rem;
+    font-weight: 700;
+    color: #1e293b;
+  }
+
+  .summary-table {
+    border: 1px solid #e2e8f0;
+  }
+}
+
+.matrix-table {
+  th.highlight-col,
+  td.highlight-col {
+    background-color: #f0fdf4;
+    border-left: 1px solid #dcfce7;
+  }
+}
+
+// -------------------------------------------------------------
+// 6. STATUS & PRIORITY PILLS
+// -------------------------------------------------------------
+.status-pill-table {
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 10px;
+  display: inline-block;
+  text-transform: uppercase;
+
+  &.ok {
+    background: #dcfce7;
+    color: #15803d;
+  }
+
+  &.low {
+    background: #fef3c7;
+    color: #b45309;
+  }
+
+  &.depleted {
+    background: #fee2e2;
+    color: #b91c1c;
+  }
+}
+
+.priority-badge {
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 8px;
+  text-transform: uppercase;
+
+  &.normal {
+    background: #e0f2fe;
+    color: #0369a1;
+  }
+
+  &.high {
+    background: #fef3c7;
+    color: #b45309;
+  }
+
+  &.urgent {
+    background: #fee2e2;
+    color: #b91c1c;
+  }
+}
+
+.movement-badge {
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 6px;
+  font-family: monospace;
+
+  &.in_purchase,
+  &.return_in {
+    background: #dcfce7;
+    color: #15803d;
+  }
+
+  &.out_release,
+  &.damage_writeoff {
+    background: #fee2e2;
+    color: #b91c1c;
+  }
+
+  &.adjustment_add,
+  &.adjustment_subtract {
+    background: #e0f2fe;
+    color: #0369a1;
+  }
+}
+
+// -------------------------------------------------------------
+// 7. OFFICIAL PRINT HEADER (Hidden on Screen, Shown on Print)
+// -------------------------------------------------------------
+.print-official-header {
+  display: none;
+}
+
+.print-signatures-block {
+  display: none;
+}
+
+// -------------------------------------------------------------
+// 8. PRINT STYLES (@media print)
+// -------------------------------------------------------------
+@media print {
+  @page {
+    size: A4 landscape;
+    margin: 10mm 12mm 15mm 12mm;
+  }
+
+  body, html {
+    background: #ffffff !important;
+    color: #000000 !important;
+    font-size: 9pt !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .no-print,
+  .app-sidebar,
+  .app-header,
+  .sidebar,
+  .header,
+  .navbar,
+  mat-toolbar {
+    display: none !important;
+    visibility: hidden !important;
+    height: 0 !important;
+    width: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .inventory-reports-page {
+    padding: 0 !important;
+    margin: 0 !important;
+    background: #ffffff !important;
+    width: 100% !important;
+    min-height: auto !important;
+  }
+
+  // Show print header
+  .print-official-header {
+    display: flex !important;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 2px solid #000000;
+    padding-bottom: 10px;
+    margin-bottom: 14px;
+
+    .gov-crest-box {
+      width: 50px;
+      text-align: center;
+
+      .gov-emblem {
+        font-size: 38px;
+        width: 38px;
+        height: 38px;
+        color: #000000;
+      }
+    }
+
+    .gov-titles {
+      flex: 1;
+      text-align: center;
+
+      .gov-republic {
+        font-size: 8pt;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        color: #333333;
+        display: block;
+      }
+
+      .gov-office {
+        font-size: 13pt;
+        font-weight: 800;
+        margin: 2px 0 0;
+        letter-spacing: -0.01em;
+      }
+
+      .gov-sub-dept {
+        font-size: 9pt;
+        font-weight: 700;
+        margin: 1px 0 4px;
+        color: #444444;
+      }
+
+      .report-main-title {
+        font-size: 11pt;
+        font-weight: 800;
+        text-transform: uppercase;
+        color: #000000;
+        border-top: 1px dashed #666666;
+        display: inline-block;
+        padding-top: 2px;
+        margin-top: 2px;
+      }
+    }
+
+    .report-meta-box {
+      font-size: 7.5pt;
+      color: #333333;
+      text-align: right;
+      line-height: 1.35;
+      min-width: 160px;
+    }
+  }
+
+  // KPI Grid on print
+  .kpi-grid {
+    gap: 8px !important;
+    margin-bottom: 12px !important;
+
+    .kpi-card {
+      padding: 8px 12px !important;
+      border: 1px solid #666666 !important;
+      box-shadow: none !important;
+
+      .kpi-label { font-size: 6.5pt !important; }
+      .kpi-value { font-size: 11pt !important; }
+      .kpi-sub { font-size: 6.5pt !important; }
+    }
+  }
+
+  // Data table styling on print
+  .printable-table-box {
+    border: 1px solid #000000 !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    margin-bottom: 12px !important;
+
+    .table-title-bar {
+      display: none !important;
+    }
+  }
+
+  .report-table {
+    font-size: 8pt !important;
+
+    th {
+      background: #eeeeee !important;
+      color: #000000 !important;
+      border-bottom: 1.5px solid #000000 !important;
+      padding: 5px 8px !important;
+      font-size: 7pt !important;
+    }
+
+    td {
+      padding: 4px 8px !important;
+      border-bottom: 0.5px solid #cccccc !important;
+      color: #000000 !important;
+    }
+
+    tbody tr {
+      page-break-inside: avoid !important;
+    }
+
+    tfoot tr.total-row td {
+      border-top: 1.5px solid #000000 !important;
+      border-bottom: 1.5px solid #000000 !important;
+      background: #eeeeee !important;
+      padding: 6px 8px !important;
+    }
+  }
+
+  // Official Signature Block
+  .print-signatures-block {
+    display: flex !important;
+    justify-content: space-between;
+    margin-top: 35px;
+    page-break-inside: avoid;
+
+    .sig-column {
+      width: 28%;
+      text-align: center;
+
+      .sig-line {
+        border-bottom: 1px dotted #000000;
+        height: 35px;
+        margin-bottom: 6px;
+      }
+
+      .sig-label {
+        font-size: 7.5pt;
+        font-weight: 700;
+        text-transform: uppercase;
+        color: #444444;
+      }
+
+      .sig-title {
+        font-size: 8.5pt;
+        font-weight: 800;
+        color: #000000;
+        margin-bottom: 6px;
+      }
+
+      .sig-meta {
+        font-size: 7.5pt;
+        color: #333333;
+        text-align: left;
+        margin-top: 3px;
+      }
+    }
+  }
+}

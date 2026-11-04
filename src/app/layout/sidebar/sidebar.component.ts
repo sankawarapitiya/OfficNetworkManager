@@ -31,6 +31,7 @@ export class SidebarComponent implements OnInit, OnDestroy {
   workPlansExpanded = signal<boolean>(false);
   lettersExpanded = signal<boolean>(false);
   landExpanded = signal<boolean>(false);
+  inventoryExpanded = signal<boolean>(false);
 
   private routerSub?: Subscription;
 
@@ -67,6 +68,13 @@ export class SidebarComponent implements OnInit, OnDestroy {
       this.lettersExpanded.set(true);
       this.accountExpanded.set(false);
       this.workPlansExpanded.set(false);
+      this.landExpanded.set(false);
+      this.inventoryExpanded.set(false);
+    } else if (url.startsWith('/inventory')) {
+      this.inventoryExpanded.set(true);
+      this.accountExpanded.set(false);
+      this.workPlansExpanded.set(false);
+      this.lettersExpanded.set(false);
       this.landExpanded.set(false);
     } else {
       // In root (/dashboard) or other root sections (including /customers), keep toggle submenus closed
@@ -159,5 +167,31 @@ export class SidebarComponent implements OnInit, OnDestroy {
 
   isLandActive(): boolean {
     return this.router.url.startsWith('/land');
+  }
+
+  canAccessInventory = computed(() => {
+    return this.rbacService.canAccessModule('inventory') ||
+           this.rbacService.hasPermission('inventory:view') ||
+           this.rbacService.hasPermission('inventory:request');
+  });
+
+  canManageInventorySettings = computed(() => {
+    return this.rbacService.isAdmin() ||
+           this.rbacService.isSuperAdmin() ||
+           this.rbacService.isDivisionalAdmin() ||
+           this.rbacService.isDepartmentHead() ||
+           this.rbacService.hasRole('Store Manager') ||
+           this.rbacService.hasPermission('inventory:settings');
+  });
+
+  toggleInventory(event?: MouseEvent) {
+    if (event) {
+      event.stopPropagation();
+    }
+    this.inventoryExpanded.update(v => !v);
+  }
+
+  isInventoryActive(): boolean {
+    return this.router.url.startsWith('/inventory');
   }
 }

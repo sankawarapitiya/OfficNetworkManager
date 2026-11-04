@@ -1,0 +1,253 @@
+<div class="settings-page">
+  <!-- Top Header -->
+  <div class="page-header">
+    <div class="header-left">
+      <div class="header-badge">
+        <mat-icon>tune</mat-icon>
+        <span>Inventory Configuration</span>
+      </div>
+      <h1 class="page-title">Stores & Asset Settings</h1>
+      <p class="page-subtitle">Configure approval workflows, stock warning thresholds, categories, and storage locations</p>
+    </div>
+
+    <div class="header-right">
+      <button mat-stroked-button (click)="resetToDefaults()" class="action-btn">
+        <mat-icon>restart_alt</mat-icon> Reset Defaults
+      </button>
+
+      <button mat-flat-button color="primary" (click)="onSaveSettings()" class="action-btn save-btn">
+        <mat-icon>save</mat-icon> Save Configuration
+      </button>
+    </div>
+  </div>
+
+  <form [formGroup]="settingsForm" (ngSubmit)="onSaveSettings()" class="settings-form-layout">
+    
+    <!-- CARD 1: REQUISITION & APPROVAL WORKFLOW POLICY -->
+    <mat-card class="settings-card highlight-card">
+      <div class="card-header">
+        <div class="ch-icon-wrap policy">
+          <mat-icon>fact_check</mat-icon>
+        </div>
+        <div>
+          <h2 class="ch-title">Requisition & Release Workflow Policy</h2>
+          <p class="ch-sub">Choose how store item requests are reviewed, authorized, and dispatched to staff</p>
+        </div>
+      </div>
+
+      <div class="workflow-options-grid">
+        <mat-radio-group formControlName="approvalWorkflow" class="workflow-radio-group">
+          <!-- Option A: Direct Store Manager Release -->
+          <div class="workflow-choice-card" 
+               [class.selected]="settingsForm.get('approvalWorkflow')?.value === 'direct_store_manager'"
+               (click)="settingsForm.patchValue({approvalWorkflow: 'direct_store_manager'})">
+            <mat-radio-button value="direct_store_manager" class="choice-radio">
+              <div class="choice-content">
+                <div class="choice-title-row">
+                  <span class="choice-title">Direct Store Manager Release</span>
+                  <span class="choice-badge recommended">Recommended</span>
+                </div>
+                <p class="choice-desc">
+                  Staff submit requisitions directly to the Store. The Store Manager verifies stock balances, adjusts quantities, and issues items in one unified step.
+                </p>
+                <div class="choice-flow">
+                  <span class="flow-step">1. User Submits</span>
+                  <mat-icon class="flow-arr">arrow_forward</mat-icon>
+                  <span class="flow-step highlight">2. Store Manager Issues</span>
+                  <mat-icon class="flow-arr">arrow_forward</mat-icon>
+                  <span class="flow-step">3. Stock Decremented</span>
+                </div>
+              </div>
+            </mat-radio-button>
+          </div>
+
+          <!-- Option B: Two-Step Approval Workflow -->
+          <div class="workflow-choice-card" 
+               [class.selected]="settingsForm.get('approvalWorkflow')?.value === 'supervisor_then_store_manager'"
+               (click)="settingsForm.patchValue({approvalWorkflow: 'supervisor_then_store_manager'})">
+            <mat-radio-button value="supervisor_then_store_manager" class="choice-radio">
+              <div class="choice-content">
+                <div class="choice-title-row">
+                  <span class="choice-title">Two-Step Approval (Supervisor First)</span>
+                  <span class="choice-badge strict">Strict Control</span>
+                </div>
+                <p class="choice-desc">
+                  Staff submit requisitions which must first be authorized by their Department Head / Supervisor. Only approved requests appear in the Store Manager dispatch queue.
+                </p>
+                <div class="choice-flow">
+                  <span class="flow-step">1. User Submits</span>
+                  <mat-icon class="flow-arr">arrow_forward</mat-icon>
+                  <span class="flow-step">2. Supervisor Approves</span>
+                  <mat-icon class="flow-arr">arrow_forward</mat-icon>
+                  <span class="flow-step highlight">3. Store Manager Issues</span>
+                </div>
+              </div>
+            </mat-radio-button>
+          </div>
+        </mat-radio-group>
+      </div>
+    </mat-card>
+
+    <!-- CARD 2: STOCK BALANCES & ALERT THRESHOLDS -->
+    <mat-card class="settings-card">
+      <div class="card-header">
+        <div class="ch-icon-wrap alert">
+          <mat-icon>notification_important</mat-icon>
+        </div>
+        <div>
+          <h2 class="ch-title">Stock Levels & Request Constraints</h2>
+          <p class="ch-sub">Control backorder requests and automated low stock warnings</p>
+        </div>
+      </div>
+
+      <div class="toggles-grid">
+        <div class="toggle-item-box">
+          <div class="toggle-text">
+            <span class="toggle-title">Allow Zero-Stock Requests</span>
+            <span class="toggle-desc">Allow staff to submit requisitions for items with 0 available on-hand balance (for store backordering).</span>
+          </div>
+          <mat-slide-toggle formControlName="allowZeroStockRequests" color="primary"></mat-slide-toggle>
+        </div>
+
+        <div class="toggle-item-box">
+          <div class="toggle-text">
+            <span class="toggle-title">Enable Low Stock Warning Badges</span>
+            <span class="toggle-desc">Display amber alert badges and include items in the Low Stock filter tab when quantity drops.</span>
+          </div>
+          <mat-slide-toggle formControlName="enableLowStockAlerts" color="primary"></mat-slide-toggle>
+        </div>
+
+        <div class="input-setting-box">
+          <mat-form-field appearance="outline" class="w-full">
+            <mat-label>Default Low-Stock Threshold</mat-label>
+            <input matInput type="number" formControlName="defaultLowStockThreshold" min="1" placeholder="10">
+            <mat-icon matPrefix>production_quantity_limits</mat-icon>
+            <mat-hint>Applied as default warning level for newly registered store items</mat-hint>
+          </mat-form-field>
+        </div>
+
+        <div class="input-setting-box">
+          <mat-form-field appearance="outline" class="w-full">
+            <mat-label>Requisition Number Prefix</mat-label>
+            <input matInput formControlName="requestPrefix" placeholder="REQ">
+            <mat-icon matPrefix>tag</mat-icon>
+            <mat-hint>Prefix for generated requisition numbers (e.g. REQ/2026/0101)</mat-hint>
+          </mat-form-field>
+        </div>
+      </div>
+    </mat-card>
+
+    <!-- CARD 3: INVENTORY CATEGORIES -->
+    <mat-card class="settings-card">
+      <div class="card-header">
+        <div class="ch-icon-wrap cat">
+          <mat-icon>category</mat-icon>
+        </div>
+        <div>
+          <h2 class="ch-title">Master Categories ({{ categories().length }})</h2>
+          <p class="ch-sub">Classify consumable items and fixed capital assets</p>
+        </div>
+      </div>
+
+      <div class="chips-editor-container">
+        <div class="add-chip-row">
+          <mat-form-field appearance="outline" class="chip-input" subscriptSizing="dynamic">
+            <mat-label>Add New Category</mat-label>
+            <input matInput [(ngModel)]="newCategoryInput" [ngModelOptions]="{standalone: true}" placeholder="e.g. Laboratory Chemicals, Safety Equipment" (keydown.enter)="addCategory()">
+            <mat-icon matPrefix>add_circle_outline</mat-icon>
+          </mat-form-field>
+          <button type="button" mat-stroked-button color="primary" [disabled]="!newCategoryInput.trim()" (click)="addCategory()">
+            Add Category
+          </button>
+        </div>
+
+        <div class="chips-list">
+          <span class="editable-chip" *ngFor="let cat of categories()">
+            {{ cat }}
+            <button type="button" class="remove-chip-btn" (click)="removeCategory(cat)" matTooltip="Remove category">
+              <mat-icon>close</mat-icon>
+            </button>
+          </span>
+        </div>
+      </div>
+    </mat-card>
+
+    <!-- CARD 4: STORAGE LOCATIONS & OFFICE ROOMS -->
+    <mat-card class="settings-card">
+      <div class="card-header">
+        <div class="ch-icon-wrap loc">
+          <mat-icon>place</mat-icon>
+        </div>
+        <div>
+          <h2 class="ch-title">Storage Shelves & Office Rooms ({{ locations().length }})</h2>
+          <p class="ch-sub">Designated storage locations for items and placement rooms for immovable assets</p>
+        </div>
+      </div>
+
+      <div class="chips-editor-container">
+        <div class="add-chip-row">
+          <mat-form-field appearance="outline" class="chip-input" subscriptSizing="dynamic">
+            <mat-label>Add New Storage Rack / Room</mat-label>
+            <input matInput [(ngModel)]="newLocationInput" [ngModelOptions]="{standalone: true}" placeholder="e.g. Stationery Rack 3, Room 204 - Legal Branch" (keydown.enter)="addLocation()">
+            <mat-icon matPrefix>add_location_alt</mat-icon>
+          </mat-form-field>
+          <button type="button" mat-stroked-button color="primary" [disabled]="!newLocationInput.trim()" (click)="addLocation()">
+            Add Location
+          </button>
+        </div>
+
+        <div class="chips-list">
+          <span class="editable-chip" *ngFor="let loc of locations()">
+            {{ loc }}
+            <button type="button" class="remove-chip-btn" (click)="removeLocation(loc)" matTooltip="Remove location">
+              <mat-icon>close</mat-icon>
+            </button>
+          </span>
+        </div>
+      </div>
+    </mat-card>
+
+    <!-- CARD 5: UNITS OF MEASUREMENT -->
+    <mat-card class="settings-card">
+      <div class="card-header">
+        <div class="ch-icon-wrap unit">
+          <mat-icon>straighten</mat-icon>
+        </div>
+        <div>
+          <h2 class="ch-title">Units of Measure ({{ units().length }})</h2>
+          <p class="ch-sub">Quantification units for store items (Pieces, Reams, Boxes, etc.)</p>
+        </div>
+      </div>
+
+      <div class="chips-editor-container">
+        <div class="add-chip-row">
+          <mat-form-field appearance="outline" class="chip-input" subscriptSizing="dynamic">
+            <mat-label>Add Unit of Measure</mat-label>
+            <input matInput [(ngModel)]="newUnitInput" [ngModelOptions]="{standalone: true}" placeholder="e.g. Bottle, Tube, Tin" (keydown.enter)="addUnit()">
+            <mat-icon matPrefix>format_shapes</mat-icon>
+          </mat-form-field>
+          <button type="button" mat-stroked-button color="primary" [disabled]="!newUnitInput.trim()" (click)="addUnit()">
+            Add Unit
+          </button>
+        </div>
+
+        <div class="chips-list">
+          <span class="editable-chip" *ngFor="let u of units()">
+            {{ u }}
+            <button type="button" class="remove-chip-btn" (click)="removeUnit(u)" matTooltip="Remove unit">
+              <mat-icon>close</mat-icon>
+            </button>
+          </span>
+        </div>
+      </div>
+    </mat-card>
+
+    <!-- Bottom Save Toolbar -->
+    <div class="bottom-save-bar">
+      <span class="save-status-text">Changes are applied across all inventory catalog & requisition forms once saved.</span>
+      <button type="submit" mat-flat-button color="primary" class="save-btn-bottom">
+        <mat-icon>save</mat-icon> Save Configuration
+      </button>
+    </div>
+  </form>
+</div>

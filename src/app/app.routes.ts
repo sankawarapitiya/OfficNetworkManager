@@ -208,6 +208,46 @@ export const routes: Routes = [
         ]
       },
       {
+        path: 'inventory',
+        children: [
+          {
+            path: '',
+            redirectTo: 'items',
+            pathMatch: 'full'
+          },
+          {
+            path: 'items',
+            loadComponent: () => import('./features/inventory/pages/inventory-items/inventory-items.component').then(m => m.InventoryItemsComponent),
+            canActivate: [rbacGuard],
+            data: { module: 'inventory', permission: 'inventory:view' }
+          },
+          {
+            path: 'requests',
+            loadComponent: () => import('./features/inventory/pages/inventory-requests/inventory-requests.component').then(m => m.InventoryRequestsComponent),
+            canActivate: [rbacGuard],
+            data: { module: 'inventory', permission: 'inventory:request' }
+          },
+          {
+            path: 'ledger',
+            loadComponent: () => import('./features/inventory/pages/inventory-ledger/inventory-ledger.component').then(m => m.InventoryLedgerComponent),
+            canActivate: [rbacGuard],
+            data: { module: 'inventory', permission: 'inventory:view' }
+          },
+          {
+            path: 'reports',
+            loadComponent: () => import('./features/inventory/pages/inventory-reports/inventory-reports.component').then(m => m.InventoryReportsComponent),
+            canActivate: [rbacGuard],
+            data: { module: 'inventory', permission: 'inventory:view' }
+          },
+          {
+            path: 'settings',
+            loadComponent: () => import('./features/inventory/pages/inventory-settings/inventory-settings.component').then(m => m.InventorySettingsComponent),
+            canActivate: [rbacGuard],
+            data: { module: 'inventory', requireRoles: ['Super Admin', 'Divisional Admin', 'Department Head', 'Store Manager'] }
+          }
+        ]
+      },
+      {
         path: 'settings',
         loadComponent: () => import('./features/settings/settings/settings.component').then(m => m.SettingsComponent),
         canActivate: [rbacGuard],

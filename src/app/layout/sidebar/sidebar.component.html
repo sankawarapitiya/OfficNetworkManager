@@ -182,6 +182,43 @@
       </div>
     </div>
 
+    <!-- Inventory & Stores with Sub-categories -->
+    <div class="nav-expandable-group" *ngIf="canAccessInventory()">
+      <div class="nav-parent-item" [class.expanded]="inventoryExpanded()" [class.parent-active]="isInventoryActive()">
+        <a routerLink="/inventory/items" class="parent-link">
+          <mat-icon class="parent-icon">inventory_2</mat-icon>
+          <span class="parent-label">Inventory & Store</span>
+        </a>
+        <button type="button" class="expand-btn" (click)="toggleInventory($event)" matTooltip="Toggle Sub-menu">
+          <mat-icon class="expand-icon">{{ inventoryExpanded() ? 'expand_less' : 'expand_more' }}</mat-icon>
+        </button>
+      </div>
+
+      <!-- Nested Sub-Categories -->
+      <div class="sub-nav-list" *ngIf="inventoryExpanded()">
+        <a routerLink="/inventory/items" routerLinkActive="active-sub-link" class="sub-nav-item">
+          <mat-icon class="sub-icon">category</mat-icon>
+          <span class="sub-title">Items & Assets</span>
+        </a>
+        <a routerLink="/inventory/requests" routerLinkActive="active-sub-link" class="sub-nav-item">
+          <mat-icon class="sub-icon">shopping_bag</mat-icon>
+          <span class="sub-title">Requisitions</span>
+        </a>
+        <a routerLink="/inventory/ledger" routerLinkActive="active-sub-link" class="sub-nav-item">
+          <mat-icon class="sub-icon">receipt_long</mat-icon>
+          <span class="sub-title">Stock Ledger</span>
+        </a>
+        <a routerLink="/inventory/reports" routerLinkActive="active-sub-link" class="sub-nav-item">
+          <mat-icon class="sub-icon">summarize</mat-icon>
+          <span class="sub-title">Stock Reports</span>
+        </a>
+        <a *ngIf="canManageInventorySettings()" routerLink="/inventory/settings" routerLinkActive="active-sub-link" class="sub-nav-item">
+          <mat-icon class="sub-icon">tune</mat-icon>
+          <span class="sub-title">Settings</span>
+        </a>
+      </div>
+    </div>
+
     <a mat-list-item *ngIf="rbacService.canAccessModule('hr')" routerLink="/hr" routerLinkActive="active-link">
       <mat-icon matListItemIcon>badge</mat-icon>
       <span matListItemTitle>HR Directory</span>

@@ -1,0 +1,305 @@
+<div class="inventory-page">
+  <!-- Top Page Header -->
+  <div class="page-header">
+    <div class="header-left">
+      <div class="header-badge">
+        <mat-icon>inventory_2</mat-icon>
+        <span>Stores & Asset Management</span>
+      </div>
+      <h1 class="page-title">Inventory & Fixed Assets Register</h1>
+      <p class="page-subtitle">Track movable consumable supplies, monitor stock on hand, and manage office fixed assets</p>
+    </div>
+
+    <div class="header-right">
+      <button mat-stroked-button color="primary" (click)="openRequestDialog()" class="action-btn">
+        <mat-icon>shopping_bag</mat-icon>
+        Request Items
+      </button>
+
+      <button mat-flat-button color="primary" [matMenuTriggerFor]="addMenu" class="action-btn primary-add">
+        <mat-icon>add</mat-icon>
+        Register New...
+        <mat-icon>arrow_drop_down</mat-icon>
+      </button>
+
+      <mat-menu #addMenu="matMenu">
+        <button mat-menu-item (click)="openAddItemDialog('movable')">
+          <mat-icon color="primary">inventory_2</mat-icon>
+          <span>Movable & Consumable Item</span>
+        </button>
+        <button mat-menu-item (click)="openAddItemDialog('immovable')">
+          <mat-icon style="color: #d97706;">apartment</mat-icon>
+          <span>Immovable & Fixed Asset</span>
+        </button>
+      </mat-menu>
+
+      <button mat-stroked-button (click)="exportToExcel()" class="action-btn" matTooltip="Export to Excel Spreadsheet">
+        <mat-icon>download</mat-icon>
+        Export
+      </button>
+    </div>
+  </div>
+
+  <!-- Key Metrics Row -->
+  <div class="metrics-grid">
+    <!-- Total Items -->
+    <mat-card class="metric-card" (click)="setTypeFilter('ALL')">
+      <div class="metric-icon-wrap total">
+        <mat-icon>category</mat-icon>
+      </div>
+      <div class="metric-info">
+        <span class="metric-lbl">Total Catalog Items</span>
+        <span class="metric-val">{{ totalItemsCount() }}</span>
+        <span class="metric-sub">Across all categories</span>
+      </div>
+    </mat-card>
+
+    <!-- Movable Items -->
+    <mat-card class="metric-card" (click)="setTypeFilter('MOVABLE')" [class.active-card]="selectedTypeFilter() === 'MOVABLE'">
+      <div class="metric-icon-wrap movable">
+        <mat-icon>inventory_2</mat-icon>
+      </div>
+      <div class="metric-info">
+        <span class="metric-lbl">Movable & Consumable</span>
+        <span class="metric-val">{{ movableCount() }}</span>
+        <span class="metric-sub">Eligible for requisition</span>
+      </div>
+    </mat-card>
+
+    <!-- Immovable Assets -->
+    <mat-card class="metric-card" (click)="setTypeFilter('IMMOVABLE')" [class.active-card]="selectedTypeFilter() === 'IMMOVABLE'">
+      <div class="metric-icon-wrap immovable">
+        <mat-icon>apartment</mat-icon>
+      </div>
+      <div class="metric-info">
+        <span class="metric-lbl">Immovable Fixed Assets</span>
+        <span class="metric-val">{{ immovableCount() }}</span>
+        <span class="metric-sub">Tracked with Asset Tags</span>
+      </div>
+    </mat-card>
+
+    <!-- Low Stock Alerts -->
+    <mat-card class="metric-card" (click)="setTypeFilter('LOW_STOCK')" [class.active-card]="selectedTypeFilter() === 'LOW_STOCK'">
+      <div class="metric-icon-wrap warning" [class.alert-active]="lowStockCount() > 0">
+        <mat-icon>notification_important</mat-icon>
+      </div>
+      <div class="metric-info">
+        <span class="metric-lbl">Low Stock Alerts</span>
+        <span class="metric-val" [class.danger-val]="lowStockCount() > 0">{{ lowStockCount() }}</span>
+        <span class="metric-sub">Require replenishment</span>
+      </div>
+    </mat-card>
+  </div>
+
+  <!-- Filter & Search Toolbar -->
+  <mat-card class="filter-card">
+    <!-- Filter Tabs / Pills -->
+    <div class="filter-tabs-row">
+      <div class="filter-pills-group">
+        <button type="button" class="pill-btn" [class.active]="selectedTypeFilter() === 'ALL'" (click)="setTypeFilter('ALL')">
+          All Records ({{ totalItemsCount() }})
+        </button>
+        <button type="button" class="pill-btn" [class.active]="selectedTypeFilter() === 'MOVABLE'" (click)="setTypeFilter('MOVABLE')">
+          <mat-icon class="pill-icon">inventory_2</mat-icon>
+          Movable Consumables ({{ movableCount() }})
+        </button>
+        <button type="button" class="pill-btn" [class.active]="selectedTypeFilter() === 'IMMOVABLE'" (click)="setTypeFilter('IMMOVABLE')">
+          <mat-icon class="pill-icon">apartment</mat-icon>
+          Immovable Assets ({{ immovableCount() }})
+        </button>
+        <button type="button" class="pill-btn alert-pill" [class.active]="selectedTypeFilter() === 'LOW_STOCK'" (click)="setTypeFilter('LOW_STOCK')">
+          <mat-icon class="pill-icon">warning</mat-icon>
+          Low Stock ({{ lowStockCount() }})
+        </button>
+      </div>
+    </div>
+
+    <!-- Dropdown Filters & Search Bar -->
+    <div class="filter-controls-row">
+      <!-- Search Input -->
+      <mat-form-field appearance="outline" class="search-field" subscriptSizing="dynamic">
+        <mat-label>Search Inventory (Name, Code, Asset Tag, Custodian, Serial)...</mat-label>
+        <input matInput [ngModel]="searchQuery()" (ngModelChange)="searchQuery.set($event)" placeholder="Type to filter...">
+        <mat-icon matPrefix>search</mat-icon>
+        <button *ngIf="searchQuery()" mat-icon-button matSuffix (click)="searchQuery.set('')">
+          <mat-icon>close</mat-icon>
+        </button>
+      </mat-form-field>
+
+      <!-- Category Filter -->
+      <mat-form-field appearance="outline" class="select-field" subscriptSizing="dynamic">
+        <mat-label>Category</mat-label>
+        <mat-select [ngModel]="selectedCategory()" (ngModelChange)="selectedCategory.set($event)">
+          <mat-option value="All">All Categories</mat-option>
+          <mat-option *ngFor="let cat of categoriesList()" [value]="cat">{{ cat }}</mat-option>
+        </mat-select>
+        <mat-icon matPrefix>category</mat-icon>
+      </mat-form-field>
+
+      <!-- Location Filter -->
+      <mat-form-field appearance="outline" class="select-field" subscriptSizing="dynamic">
+        <mat-label>Location / Room</mat-label>
+        <mat-select [ngModel]="selectedLocation()" (ngModelChange)="selectedLocation.set($event)">
+          <mat-option value="All">All Locations</mat-option>
+          <mat-option *ngFor="let loc of locationsList()" [value]="loc">{{ loc }}</mat-option>
+        </mat-select>
+        <mat-icon matPrefix>place</mat-icon>
+      </mat-form-field>
+    </div>
+  </mat-card>
+
+  <!-- Items Data Table Card -->
+  <mat-card class="table-card">
+    <div *ngIf="isLoading()" class="loading-state">
+      <mat-icon class="spin-icon">sync</mat-icon>
+      <span>Loading inventory records...</span>
+    </div>
+
+    <div *ngIf="!isLoading() && filteredItems().length === 0" class="empty-state">
+      <mat-icon class="empty-icon">inventory_2</mat-icon>
+      <h3>No inventory records found</h3>
+      <p>Try adjusting your search filters or register a new store item or fixed asset above.</p>
+      <button mat-flat-button color="primary" (click)="openAddItemDialog('movable')">
+        <mat-icon>add</mat-icon> Register Item
+      </button>
+    </div>
+
+    <div class="table-container" *ngIf="!isLoading() && filteredItems().length > 0">
+      <table mat-table [dataSource]="filteredItems()" class="inventory-table">
+        <!-- Code / Tag Column -->
+        <ng-container matColumnDef="code">
+          <th mat-header-cell *matHeaderCellDef>Item / Asset Code</th>
+          <td mat-cell *matCellDef="let it">
+            <div class="code-cell">
+              <span class="main-code">{{ it.itemCode }}</span>
+              <span class="sub-tag" *ngIf="it.assetTag && it.assetTag !== it.itemCode">Tag: {{ it.assetTag }}</span>
+            </div>
+          </td>
+        </ng-container>
+
+        <!-- Name Column -->
+        <ng-container matColumnDef="name">
+          <th mat-header-cell *matHeaderCellDef>Item & Specifications</th>
+          <td mat-cell *matCellDef="let it">
+            <div class="name-cell">
+              <span class="item-name" (click)="viewItemDetails(it)">{{ it.name }}</span>
+              <span class="item-desc" *ngIf="it.description">{{ it.description }}</span>
+            </div>
+          </td>
+        </ng-container>
+
+        <!-- Classification / Type Column -->
+        <ng-container matColumnDef="type">
+          <th mat-header-cell *matHeaderCellDef>Classification</th>
+          <td mat-cell *matCellDef="let it">
+            <span class="type-pill" [ngClass]="it.itemType">
+              <mat-icon class="type-icon">{{ it.itemType === 'immovable' ? 'apartment' : 'inventory_2' }}</mat-icon>
+              {{ it.itemType === 'immovable' ? 'Immovable Asset' : 'Movable Store' }}
+            </span>
+          </td>
+        </ng-container>
+
+        <!-- Category Column -->
+        <ng-container matColumnDef="category">
+          <th mat-header-cell *matHeaderCellDef>Category</th>
+          <td mat-cell *matCellDef="let it">
+            <span class="category-text">{{ it.category }}</span>
+          </td>
+        </ng-container>
+
+        <!-- Stock on Hand / Custodian Column -->
+        <ng-container matColumnDef="stockOrTag">
+          <th mat-header-cell *matHeaderCellDef>Stock / Custodian</th>
+          <td mat-cell *matCellDef="let it">
+            <!-- For Movable: Show stock count and unit -->
+            <div *ngIf="it.itemType === 'movable'" class="stock-cell">
+              <div class="stock-qty-row">
+                <span class="stock-val" [class.danger]="it.quantity <= 0" [class.warning]="it.quantity > 0 && it.quantity <= it.minStockAlert">
+                  {{ it.quantity }}
+                </span>
+                <span class="unit-text">{{ it.unit }}</span>
+              </div>
+              <span class="min-alert-text" *ngIf="it.minStockAlert">Alert at &le; {{ it.minStockAlert }}</span>
+            </div>
+
+            <!-- For Immovable: Show Custodian and Serial -->
+            <div *ngIf="it.itemType === 'immovable'" class="custodian-cell">
+              <span class="custodian-name" *ngIf="it.custodianName">
+                <mat-icon class="cell-icon">person</mat-icon> {{ it.custodianName }}
+              </span>
+              <span class="serial-text" *ngIf="it.serialNumber">SN: {{ it.serialNumber }}</span>
+              <span class="unassigned-text" *ngIf="!it.custodianName">Unassigned Custodian</span>
+            </div>
+          </td>
+        </ng-container>
+
+        <!-- Location Column -->
+        <ng-container matColumnDef="location">
+          <th mat-header-cell *matHeaderCellDef>Storage / Room</th>
+          <td mat-cell *matCellDef="let it">
+            <div class="location-cell">
+              <span class="loc-main"><mat-icon class="loc-icon">place</mat-icon> {{ it.location }}</span>
+              <span class="loc-sub" *ngIf="it.division">{{ it.division }}</span>
+            </div>
+          </td>
+        </ng-container>
+
+        <!-- Status Column -->
+        <ng-container matColumnDef="status">
+          <th mat-header-cell *matHeaderCellDef>Status / Condition</th>
+          <td mat-cell *matCellDef="let it">
+            <!-- Immovable: Condition badge -->
+            <span *ngIf="it.itemType === 'immovable'" class="condition-badge" [ngClass]="(it.condition || 'Good').toLowerCase().replace(' ', '-')">
+              {{ it.condition || 'Good' }}
+            </span>
+
+            <!-- Movable: Stock level badge -->
+            <span *ngIf="it.itemType === 'movable'" class="status-badge" [ngClass]="it.status.toLowerCase().replace(' ', '-')">
+              {{ it.status }}
+            </span>
+          </td>
+        </ng-container>
+
+        <!-- Actions Column -->
+        <ng-container matColumnDef="actions">
+          <th mat-header-cell *matHeaderCellDef class="text-right">Actions</th>
+          <td mat-cell *matCellDef="let it" class="text-right">
+            <button mat-icon-button [matMenuTriggerFor]="actionMenu" matTooltip="Item Actions">
+              <mat-icon>more_vert</mat-icon>
+            </button>
+
+            <mat-menu #actionMenu="matMenu">
+              <button mat-menu-item (click)="viewItemDetails(it)">
+                <mat-icon color="primary">visibility</mat-icon>
+                <span>View Full Dossier</span>
+              </button>
+
+              <button mat-menu-item *ngIf="it.itemType === 'movable'" (click)="openAdjustDialog(it)">
+                <mat-icon style="color: #059669;">sync_alt</mat-icon>
+                <span>Adjust Stock / Stock-In</span>
+              </button>
+
+              <button mat-menu-item (click)="openEditDialog(it)">
+                <mat-icon>edit</mat-icon>
+                <span>Edit Record</span>
+              </button>
+
+              <button mat-menu-item color="warn" (click)="deleteItem(it)">
+                <mat-icon color="warn">delete</mat-icon>
+                <span>Delete Record</span>
+              </button>
+            </mat-menu>
+          </td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+        <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+      </table>
+    </div>
+
+    <!-- Table Footer Meta -->
+    <div class="table-footer-bar" *ngIf="!isLoading() && filteredItems().length > 0">
+      <span>Showing <strong>{{ filteredItems().length }}</strong> of <strong>{{ totalItemsCount() }}</strong> inventory records</span>
+    </div>
+  </mat-card>
+</div>

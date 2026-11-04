@@ -1,0 +1,189 @@
+<div class="ledger-page">
+  <!-- Top Page Header -->
+  <div class="page-header">
+    <div class="header-left">
+      <div class="header-badge">
+        <mat-icon>receipt_long</mat-icon>
+        <span>Stock Movements Audit Trail</span>
+      </div>
+      <h1 class="page-title">Stock Transactions & Balance Ledger</h1>
+      <p class="page-subtitle">Immutable audit trail of every stock inflow, store requisition dispatch, purchase, and inventory adjustment</p>
+    </div>
+
+    <div class="header-right">
+      <button mat-stroked-button (click)="exportToExcel()" class="action-btn" matTooltip="Export to Excel Spreadsheet">
+        <mat-icon>download</mat-icon>
+        Export Ledger
+      </button>
+    </div>
+  </div>
+
+  <!-- Metrics Grid -->
+  <div class="metrics-grid">
+    <mat-card class="metric-card">
+      <div class="metric-icon-wrap total">
+        <mat-icon>history</mat-icon>
+      </div>
+      <div class="metric-info">
+        <span class="metric-lbl">Total Transactions</span>
+        <span class="metric-val">{{ totalTxnCount() }}</span>
+        <span class="metric-sub">Recorded in database</span>
+      </div>
+    </mat-card>
+
+    <mat-card class="metric-card">
+      <div class="metric-icon-wrap inward">
+        <mat-icon>arrow_downward</mat-icon>
+      </div>
+      <div class="metric-info">
+        <span class="metric-lbl">Stock Inward / Purchases</span>
+        <span class="metric-val">{{ inwardCount() }}</span>
+        <span class="metric-sub">Replenishments & receipts</span>
+      </div>
+    </mat-card>
+
+    <mat-card class="metric-card">
+      <div class="metric-icon-wrap outward">
+        <mat-icon>arrow_upward</mat-icon>
+      </div>
+      <div class="metric-info">
+        <span class="metric-lbl">Dispatches / Store Issues</span>
+        <span class="metric-val">{{ outwardCount() }}</span>
+        <span class="metric-sub">Released to staff</span>
+      </div>
+    </mat-card>
+  </div>
+
+  <!-- Filter Card -->
+  <mat-card class="filter-card">
+    <div class="filter-controls-row">
+      <mat-form-field appearance="outline" class="search-field" subscriptSizing="dynamic">
+        <mat-label>Search Transactions (Txn No, Item, Reference, Officer, Notes)...</mat-label>
+        <input matInput [ngModel]="searchQuery()" (ngModelChange)="searchQuery.set($event)" placeholder="Type to search ledger...">
+        <mat-icon matPrefix>search</mat-icon>
+        <button *ngIf="searchQuery()" mat-icon-button matSuffix (click)="searchQuery.set('')">
+          <mat-icon>close</mat-icon>
+        </button>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="select-field" subscriptSizing="dynamic">
+        <mat-label>Movement Type</mat-label>
+        <mat-select [ngModel]="selectedTypeFilter()" (ngModelChange)="selectedTypeFilter.set($event)">
+          <mat-option value="All">All Movements</mat-option>
+          <mat-option value="IN">Inward / Additions (+)</mat-option>
+          <mat-option value="OUT">Outward / Deductions (-)</mat-option>
+          <mat-option value="IN_PURCHASE">Purchase / GRN Inward</mat-option>
+          <mat-option value="OUT_RELEASE">Requisition Dispatch</mat-option>
+          <mat-option value="IN_ADJUSTMENT">Stock Reconciliation Surplus</mat-option>
+          <mat-option value="OUT_DAMAGE">Damaged / Broken Write-off</mat-option>
+          <mat-option value="OUT_WRITE_OFF">Expired / Obsolete</mat-option>
+        </mat-select>
+        <mat-icon matPrefix>filter_list</mat-icon>
+      </mat-form-field>
+    </div>
+  </mat-card>
+
+  <!-- Ledger Table Card -->
+  <mat-card class="table-card">
+    <div *ngIf="isLoading()" class="loading-state">
+      <mat-icon class="spin-icon">sync</mat-icon>
+      <span>Loading transaction history...</span>
+    </div>
+
+    <div *ngIf="!isLoading() && filteredTransactions().length === 0" class="empty-state">
+      <mat-icon class="empty-icon">receipt_long</mat-icon>
+      <h3>No stock transactions found</h3>
+      <p>Transactions are recorded automatically whenever items are received into inventory or released via store requisitions.</p>
+    </div>
+
+    <div class="table-container" *ngIf="!isLoading() && filteredTransactions().length > 0">
+      <table mat-table [dataSource]="filteredTransactions()" class="ledger-table">
+        <!-- Date -->
+        <ng-container matColumnDef="date">
+          <th mat-header-cell *matHeaderCellDef>Date & Time</th>
+          <td mat-cell *matCellDef="let t">
+            <span class="date-text">{{ t.performedAt | date:'yyyy-MM-dd HH:mm' }}</span>
+          </td>
+        </ng-container>
+
+        <!-- Txn No -->
+        <ng-container matColumnDef="txnNo">
+          <th mat-header-cell *matHeaderCellDef>Transaction No</th>
+          <td mat-cell *matCellDef="let t">
+            <strong class="txn-no font-mono">{{ t.transactionNo }}</strong>
+          </td>
+        </ng-container>
+
+        <!-- Item -->
+        <ng-container matColumnDef="item">
+          <th mat-header-cell *matHeaderCellDef>Item Description</th>
+          <td mat-cell *matCellDef="let t">
+            <div class="item-cell">
+              <span class="it-title">{{ t.itemName }}</span>
+              <span class="it-code font-mono">{{ t.itemCode }}</span>
+            </div>
+          </td>
+        </ng-container>
+
+        <!-- Movement Type -->
+        <ng-container matColumnDef="type">
+          <th mat-header-cell *matHeaderCellDef>Movement</th>
+          <td mat-cell *matCellDef="let t">
+            <span class="type-pill" [ngClass]="t.transactionType.toLowerCase()">
+              <mat-icon class="tp-icon">{{ t.transactionType.startsWith('IN_') ? 'add' : 'remove' }}</mat-icon>
+              {{ t.transactionType.replace('IN_', '').replace('OUT_', '').replace('_', ' ') }}
+            </span>
+          </td>
+        </ng-container>
+
+        <!-- Quantity Changed -->
+        <ng-container matColumnDef="quantity">
+          <th mat-header-cell *matHeaderCellDef class="text-center">Quantity</th>
+          <td mat-cell *matCellDef="let t" class="text-center">
+            <strong class="qty-text" [class.qty-in]="t.transactionType.startsWith('IN_')" [class.qty-out]="t.transactionType.startsWith('OUT_')">
+              {{ t.transactionType.startsWith('IN_') ? '+' : '-' }}{{ t.quantity }}
+            </strong>
+          </td>
+        </ng-container>
+
+        <!-- Balance After -->
+        <ng-container matColumnDef="balance">
+          <th mat-header-cell *matHeaderCellDef class="text-center">Balance After</th>
+          <td mat-cell *matCellDef="let t" class="text-center">
+            <div class="balance-flow">
+              <span class="prev-qty">{{ t.previousQty }}</span>
+              <mat-icon class="flow-icon">arrow_forward</mat-icon>
+              <strong class="new-qty">{{ t.balanceQty }}</strong>
+            </div>
+          </td>
+        </ng-container>
+
+        <!-- Reference / Request No -->
+        <ng-container matColumnDef="reference">
+          <th mat-header-cell *matHeaderCellDef>Reference / Notes</th>
+          <td mat-cell *matCellDef="let t">
+            <div class="ref-cell">
+              <span class="ref-no font-mono" *ngIf="t.referenceNo">{{ t.referenceNo }}</span>
+              <span class="notes-text" *ngIf="t.notes" [matTooltip]="t.notes">{{ t.notes }}</span>
+            </div>
+          </td>
+        </ng-container>
+
+        <!-- Handled By Officer -->
+        <ng-container matColumnDef="officer">
+          <th mat-header-cell *matHeaderCellDef>Handled By</th>
+          <td mat-cell *matCellDef="let t">
+            <span class="officer-name">{{ t.performedBy }}</span>
+          </td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+        <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+      </table>
+    </div>
+
+    <div class="table-footer-bar" *ngIf="!isLoading() && filteredTransactions().length > 0">
+      <span>Showing <strong>{{ filteredTransactions().length }}</strong> of <strong>{{ totalTxnCount() }}</strong> ledger transactions</span>
+    </div>
+  </mat-card>
+</div>

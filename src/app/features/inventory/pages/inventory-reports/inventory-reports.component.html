@@ -1,0 +1,874 @@
+<div class="inventory-reports-page">
+
+  <!-- ======================================================== -->
+  <!-- 1. SCREEN HERO BANNER (Hidden on Print)                   -->
+  <!-- ======================================================== -->
+  <div class="hero-banner no-print">
+    <div class="hero-content">
+      <div class="hero-tag-row">
+        <span class="status-pill amber">
+          <mat-icon class="pill-icon">inventory_2</mat-icon>
+          Stores & Logistics Division
+        </span>
+        <span class="sync-indicator">Official Inventory Reporting Engine</span>
+      </div>
+      <h1 class="hero-title">Stock & Asset Management Reports</h1>
+      <p class="hero-subtitle">
+        Generate official government registers, audit valuation sheets, procurement reorder advisories, and cross-departmental material consumption dossiers.
+      </p>
+    </div>
+    <div class="hero-actions">
+      <button mat-stroked-button class="action-btn" (click)="exportToCsv()" matTooltip="Download currently filtered report as CSV">
+        <mat-icon>file_download</mat-icon> Export Excel (CSV)
+      </button>
+      <button mat-flat-button class="primary-action-btn" (click)="printReport()" matTooltip="Print or save as official PDF">
+        <mat-icon>print</mat-icon> Print Official Report
+      </button>
+    </div>
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- 2. REPORT TYPE SELECTOR TABS (Hidden on Print)           -->
+  <!-- ======================================================== -->
+  <div class="report-tabs-grid no-print">
+    <div 
+      *ngFor="let tab of reportTabs"
+      class="report-tab-card"
+      [class.active]="activeReport() === tab.id"
+      (click)="activeReport.set(tab.id)">
+      <div class="tab-icon-box">
+        <mat-icon>{{ tab.icon }}</mat-icon>
+      </div>
+      <div class="tab-info">
+        <h3 class="tab-title">{{ tab.label }}</h3>
+        <p class="tab-desc">{{ tab.description }}</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- 3. PARAMETERS & FILTERS TOOLBAR (Hidden on Print)        -->
+  <!-- ======================================================== -->
+  <mat-card class="filter-card no-print">
+    <div class="filter-card-header">
+      <div class="section-badge">
+        <mat-icon>filter_list</mat-icon>
+        <span>REPORT PARAMETERS & DATE FILTERS</span>
+      </div>
+      <div class="timeframe-presets">
+        <button 
+          mat-button 
+          class="preset-btn" 
+          [class.active]="timeframe() === 'all'" 
+          (click)="setTimeframePreset('all')">All Time</button>
+        <button 
+          mat-button 
+          class="preset-btn" 
+          [class.active]="timeframe() === 'today'" 
+          (click)="setTimeframePreset('today')">Today</button>
+        <button 
+          mat-button 
+          class="preset-btn" 
+          [class.active]="timeframe() === 'this-week'" 
+          (click)="setTimeframePreset('this-week')">This Week</button>
+        <button 
+          mat-button 
+          class="preset-btn" 
+          [class.active]="timeframe() === 'this-month'" 
+          (click)="setTimeframePreset('this-month')">This Month</button>
+        <button 
+          mat-button 
+          class="preset-btn" 
+          [class.active]="timeframe() === 'this-quarter'" 
+          (click)="setTimeframePreset('this-quarter')">This Quarter</button>
+        <button 
+          mat-button 
+          class="preset-btn" 
+          [class.active]="timeframe() === 'this-year'" 
+          (click)="setTimeframePreset('this-year')">This Year</button>
+      </div>
+    </div>
+
+    <div class="filter-inputs-grid">
+      <!-- Date From -->
+      <mat-form-field appearance="outline" class="filter-field" subscriptSizing="dynamic">
+        <mat-label>Date From</mat-label>
+        <input matInput [matDatepicker]="pickerFrom" [ngModel]="dateFrom()" (ngModelChange)="dateFrom.set($event)" (click)="pickerFrom.open()" placeholder="Select start date">
+        <mat-datepicker-toggle matIconSuffix [for]="pickerFrom"></mat-datepicker-toggle>
+        <mat-datepicker #pickerFrom></mat-datepicker>
+      </mat-form-field>
+
+      <!-- Date To -->
+      <mat-form-field appearance="outline" class="filter-field" subscriptSizing="dynamic">
+        <mat-label>Date To</mat-label>
+        <input matInput [matDatepicker]="pickerTo" [ngModel]="dateTo()" (ngModelChange)="dateTo.set($event)" (click)="pickerTo.open()" placeholder="Select end date">
+        <mat-datepicker-toggle matIconSuffix [for]="pickerTo"></mat-datepicker-toggle>
+        <mat-datepicker #pickerTo></mat-datepicker>
+      </mat-form-field>
+
+      <!-- Category Filter -->
+      <mat-form-field appearance="outline" class="filter-field" subscriptSizing="dynamic">
+        <mat-label>Category</mat-label>
+        <mat-select [ngModel]="selectedCategory()" (ngModelChange)="selectedCategory.set($event)">
+          <mat-option value="ALL">All Categories</mat-option>
+          <mat-option *ngFor="let cat of settings().categories" [value]="cat">{{ cat }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <!-- Division Filter (relevant for issues, requisitions, assets) -->
+      <mat-form-field appearance="outline" class="filter-field" subscriptSizing="dynamic">
+        <mat-label>Division / Office</mat-label>
+        <mat-select [ngModel]="selectedDivision()" (ngModelChange)="selectedDivision.set($event)">
+          <mat-option value="ALL">All Divisions</mat-option>
+          <mat-option *ngFor="let div of divisions()" [value]="div.name">{{ div.name }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <!-- Condition Filter (for Fixed Assets) -->
+      <mat-form-field appearance="outline" class="filter-field" subscriptSizing="dynamic" *ngIf="activeReport() === 'fixed-assets'">
+        <mat-label>Asset Condition</mat-label>
+        <mat-select [ngModel]="selectedCondition()" (ngModelChange)="selectedCondition.set($event)">
+          <mat-option value="ALL">All Conditions</mat-option>
+          <mat-option value="Good">Good</mat-option>
+          <mat-option value="Fair">Fair</mat-option>
+          <mat-option value="Needs Repair">Needs Repair</mat-option>
+          <mat-option value="Damaged">Damaged</mat-option>
+          <mat-option value="Written Off">Written Off</mat-option>
+          <mat-option value="Disposed">Disposed</mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <!-- Search Query -->
+      <mat-form-field appearance="outline" class="filter-field search-field" subscriptSizing="dynamic">
+        <mat-label>Search Query</mat-label>
+        <mat-icon matPrefix class="search-icon">search</mat-icon>
+        <input matInput [ngModel]="searchQuery()" (ngModelChange)="searchQuery.set($event)" placeholder="Search code, item, officer, tag...">
+        <button *ngIf="searchQuery()" mat-icon-button matSuffix (click)="searchQuery.set('')">
+          <mat-icon>close</mat-icon>
+        </button>
+      </mat-form-field>
+    </div>
+  </mat-card>
+
+  <!-- ======================================================== -->
+  <!-- 4. OFFICIAL PRINT HEADER (Visible on Print & Review)     -->
+  <!-- ======================================================== -->
+  <div class="print-official-header">
+    <div class="gov-crest-box">
+      <mat-icon class="gov-emblem">assured_workload</mat-icon>
+    </div>
+    <div class="gov-titles">
+      <span class="gov-republic">DEMOCRATIC SOCIALIST REPUBLIC OF SRI LANKA</span>
+      <h2 class="gov-office">OFFICE OF THE DIVISIONAL SECRETARIAT</h2>
+      <h3 class="gov-sub-dept">STORES MANAGEMENT & INVENTORY CONTROL DIVISION</h3>
+      <div class="report-main-title">{{ getCurrentReportTitle() }}</div>
+    </div>
+    <div class="report-meta-box">
+      <div class="meta-row"><strong>Period:</strong> {{ getTimeframeSummary() }}</div>
+      <div class="meta-row"><strong>Generated:</strong> {{ generatedAt() | date:'medium' }}</div>
+      <div class="meta-row"><strong>Officer:</strong> {{ generatedBy() }}</div>
+      <div class="meta-row"><strong>Doc Ref:</strong> STM-{{ activeReport() | uppercase }}-{{ generatedAt() | date:'HHmmss' }}</div>
+    </div>
+  </div>
+
+  <!-- Loading State -->
+  <mat-progress-bar mode="indeterminate" *ngIf="isLoading()" class="mb-4"></mat-progress-bar>
+
+  <!-- ======================================================== -->
+  <!-- 5. REPORT 1: STOCK BALANCE & VALUATION REGISTER          -->
+  <!-- ======================================================== -->
+  <div *ngIf="activeReport() === 'stock-balance'" class="report-body-section">
+    <!-- Executive KPI Cards -->
+    <div class="kpi-grid">
+      <div class="kpi-card">
+        <div class="kpi-label">Catalog Items Tracked</div>
+        <div class="kpi-value">{{ stockBalanceMetrics().totalItems }}</div>
+        <div class="kpi-sub">Active consumable lines</div>
+      </div>
+      <div class="kpi-card highlight-blue">
+        <div class="kpi-label">Total Stock On-Hand</div>
+        <div class="kpi-value">{{ stockBalanceMetrics().totalQty | number }}</div>
+        <div class="kpi-sub">Cumulative physical units</div>
+      </div>
+      <div class="kpi-card highlight-green">
+        <div class="kpi-label">Total Stock Valuation</div>
+        <div class="kpi-value text-green">Rs. {{ stockBalanceMetrics().totalValuation | number:'1.2-2' }}</div>
+        <div class="kpi-sub">Calculated at current unit cost</div>
+      </div>
+      <div class="kpi-card" [class.highlight-amber]="stockBalanceMetrics().lowStockCount > 0">
+        <div class="kpi-label">Low Stock Warnings</div>
+        <div class="kpi-value text-amber">{{ stockBalanceMetrics().lowStockCount }}</div>
+        <div class="kpi-sub">{{ stockBalanceMetrics().outOfStockCount }} completely depleted</div>
+      </div>
+    </div>
+
+    <!-- Data Table -->
+    <div class="table-container printable-table-box">
+      <div class="table-title-bar">
+        <h4>Physical Stock Balance & Valuation Register</h4>
+        <span class="count-badge">{{ filteredStockBalanceItems().length }} Records</span>
+      </div>
+
+      <table class="report-table">
+        <thead>
+          <tr>
+            <th class="w-12">#</th>
+            <th>Item Code</th>
+            <th>Item Description</th>
+            <th>Category</th>
+            <th>UOM</th>
+            <th class="text-right">Unit Cost (LKR)</th>
+            <th class="text-right">Balance Qty</th>
+            <th class="text-right">Min Alert</th>
+            <th class="text-right">Valuation (LKR)</th>
+            <th class="text-center">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let item of filteredStockBalanceItems(); let i = index">
+            <td>{{ i + 1 }}</td>
+            <td class="font-mono text-bold">{{ item.itemCode }}</td>
+            <td class="font-semibold">{{ item.name }}</td>
+            <td>{{ item.category }}</td>
+            <td>{{ item.unit }}</td>
+            <td class="text-right">{{ (item.unitCost || 0) | number:'1.2-2' }}</td>
+            <td class="text-right font-bold" [class.text-danger]="(item.quantity || 0) <= 0" [class.text-warning]="(item.quantity || 0) <= (item.minStockAlert || 10) && (item.quantity || 0) > 0">
+              {{ item.quantity || 0 }}
+            </td>
+            <td class="text-right text-muted">{{ item.minStockAlert || 10 }}</td>
+            <td class="text-right font-mono font-bold">{{ ((item.quantity || 0) * (item.unitCost || 0)) | number:'1.2-2' }}</td>
+            <td class="text-center">
+              <span class="status-pill-table" [ngClass]="(item.quantity || 0) <= 0 ? 'depleted' : ((item.quantity || 0) <= (item.minStockAlert || 10) ? 'low' : 'ok')">
+                {{ (item.quantity || 0) <= 0 ? 'Depleted' : ((item.quantity || 0) <= (item.minStockAlert || 10) ? 'Low Stock' : 'Adequate') }}
+              </span>
+            </td>
+          </tr>
+          <tr *ngIf="filteredStockBalanceItems().length === 0">
+            <td colspan="10" class="empty-state-cell">No inventory stock records matching the selected parameters.</td>
+          </tr>
+        </tbody>
+        <tfoot>
+          <tr class="total-row">
+            <td colspan="6" class="text-right text-bold">GRAND TOTALS:</td>
+            <td class="text-right text-bold">{{ stockBalanceMetrics().totalQty | number }}</td>
+            <td></td>
+            <td class="text-right text-bold text-green font-mono">Rs. {{ stockBalanceMetrics().totalValuation | number:'1.2-2' }}</td>
+            <td></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+
+    <!-- Category Summary Breakdown -->
+    <div class="secondary-table-box mt-6" *ngIf="categoryBalanceSummary().length > 0">
+      <h4 class="secondary-title">Stock Valuation Summary by Category</h4>
+      <table class="report-table summary-table">
+        <thead>
+          <tr>
+            <th>Category</th>
+            <th class="text-right">Line Items</th>
+            <th class="text-right">Cumulative Quantity</th>
+            <th class="text-right">Valuation (LKR)</th>
+            <th class="text-right">% of Store Value</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let cat of categoryBalanceSummary()">
+            <td class="font-semibold">{{ cat.category }}</td>
+            <td class="text-right">{{ cat.count }}</td>
+            <td class="text-right font-mono">{{ cat.qty | number }}</td>
+            <td class="text-right font-mono font-bold">{{ cat.valuation | number:'1.2-2' }}</td>
+            <td class="text-right">
+              {{ (stockBalanceMetrics().totalValuation > 0 ? ((cat.valuation / stockBalanceMetrics().totalValuation) * 100) : 0) | number:'1.1-1' }}%
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- 6. REPORT 2: LOW STOCK & REORDER ADVISORY                -->
+  <!-- ======================================================== -->
+  <div *ngIf="activeReport() === 'low-stock'" class="report-body-section">
+    <!-- Executive KPI Cards -->
+    <div class="kpi-grid">
+      <div class="kpi-card highlight-amber">
+        <div class="kpi-label">Items Needing Reorder</div>
+        <div class="kpi-value text-amber">{{ lowStockMetrics().totalAlertItems }}</div>
+        <div class="kpi-sub">Below safety threshold</div>
+      </div>
+      <div class="kpi-card highlight-red">
+        <div class="kpi-label">Out of Stock Lines</div>
+        <div class="kpi-value text-danger">{{ lowStockMetrics().outOfStockCount }}</div>
+        <div class="kpi-sub">Immediate procurement critical</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Total Unit Deficit</div>
+        <div class="kpi-value font-mono">{{ lowStockMetrics().totalDeficit | number }}</div>
+        <div class="kpi-sub">Units needed to meet min balance</div>
+      </div>
+      <div class="kpi-card highlight-green">
+        <div class="kpi-label">Estimated Reorder Budget</div>
+        <div class="kpi-value text-green">Rs. {{ lowStockMetrics().totalBudgetRequired | number:'1.2-2' }}</div>
+        <div class="kpi-sub">Estimated capital for 2x replenishment</div>
+      </div>
+    </div>
+
+    <!-- Data Table -->
+    <div class="table-container printable-table-box">
+      <div class="table-title-bar">
+        <h4>Store Reorder Advisory & Deficit Ledger</h4>
+        <span class="count-badge warning-badge">{{ filteredLowStockItems().length }} Items Requiring Purchase</span>
+      </div>
+
+      <table class="report-table">
+        <thead>
+          <tr>
+            <th class="w-12">#</th>
+            <th>Item Code</th>
+            <th>Item Name</th>
+            <th>Category</th>
+            <th class="text-right">Balance Qty</th>
+            <th class="text-right">Min Level</th>
+            <th class="text-right">Deficit</th>
+            <th class="text-right">Suggested Order</th>
+            <th class="text-right">Est. Unit Cost</th>
+            <th class="text-right">Budget Needed (LKR)</th>
+            <th class="text-center">Severity</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let item of filteredLowStockItems(); let i = index">
+            <td>{{ i + 1 }}</td>
+            <td class="font-mono text-bold">{{ item.itemCode }}</td>
+            <td class="font-semibold">{{ item.name }}</td>
+            <td>{{ item.category }}</td>
+            <td class="text-right font-bold" [class.text-danger]="(item.quantity || 0) <= 0">
+              {{ item.quantity || 0 }}
+            </td>
+            <td class="text-right text-muted">{{ item.minStockAlert || 10 }}</td>
+            <td class="text-right text-danger font-bold">
+              {{ ((item.minStockAlert || 10) - (item.quantity || 0)) > 0 ? ((item.minStockAlert || 10) - (item.quantity || 0)) : 0 }}
+            </td>
+            <td class="text-right font-bold text-blue">
+              {{ (((item.minStockAlert || 10) * 2) - (item.quantity || 0)) > 0 ? (((item.minStockAlert || 10) * 2) - (item.quantity || 0)) : 0 }}
+            </td>
+            <td class="text-right font-mono">{{ (item.unitCost || 0) | number:'1.2-2' }}</td>
+            <td class="text-right font-mono font-bold text-green">
+              {{ ((((item.minStockAlert || 10) * 2) - (item.quantity || 0)) * (item.unitCost || 0)) | number:'1.2-2' }}
+            </td>
+            <td class="text-center">
+              <span class="status-pill-table" [ngClass]="(item.quantity || 0) <= 0 ? 'depleted' : 'low'">
+                {{ (item.quantity || 0) <= 0 ? 'CRITICAL - OUT' : 'REORDER SOON' }}
+              </span>
+            </td>
+          </tr>
+          <tr *ngIf="filteredLowStockItems().length === 0">
+            <td colspan="11" class="empty-state-cell text-green">
+              <mat-icon class="inline-icon">check_circle</mat-icon>
+              All inventory items currently exceed minimum stock safety thresholds.
+            </td>
+          </tr>
+        </tbody>
+        <tfoot *ngIf="filteredLowStockItems().length > 0">
+          <tr class="total-row">
+            <td colspan="6" class="text-right text-bold">ESTIMATED PROCUREMENT TOTALS:</td>
+            <td class="text-right text-danger text-bold">{{ lowStockMetrics().totalDeficit | number }}</td>
+            <td></td>
+            <td></td>
+            <td class="text-right text-bold text-green font-mono">Rs. {{ lowStockMetrics().totalBudgetRequired | number:'1.2-2' }}</td>
+            <td></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- 7. REPORT 3: FIXED ASSETS & IMMOVABLE REGISTER           -->
+  <!-- ======================================================== -->
+  <div *ngIf="activeReport() === 'fixed-assets'" class="report-body-section">
+    <!-- Executive KPI Cards -->
+    <div class="kpi-grid">
+      <div class="kpi-card highlight-blue">
+        <div class="kpi-label">Registered Fixed Assets</div>
+        <div class="kpi-value text-blue">{{ fixedAssetsMetrics().totalAssets }}</div>
+        <div class="kpi-sub">Total capital items logged</div>
+      </div>
+      <div class="kpi-card highlight-green">
+        <div class="kpi-label">Total Capital Book Value</div>
+        <div class="kpi-value text-green">Rs. {{ fixedAssetsMetrics().totalBookValue | number:'1.2-2' }}</div>
+        <div class="kpi-sub">Government asset book worth</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Operational Condition</div>
+        <div class="kpi-value">{{ fixedAssetsMetrics().goodCount }}</div>
+        <div class="kpi-sub">Assets verified Good or Fair</div>
+      </div>
+      <div class="kpi-card" [class.highlight-red]="(fixedAssetsMetrics().repairCount + fixedAssetsMetrics().damagedCount) > 0">
+        <div class="kpi-label">Repair / Damaged Assets</div>
+        <div class="kpi-value text-danger">{{ fixedAssetsMetrics().repairCount + fixedAssetsMetrics().damagedCount }}</div>
+        <div class="kpi-sub">Requiring maintenance or disposal</div>
+      </div>
+    </div>
+
+    <!-- Data Table -->
+    <div class="table-container printable-table-box">
+      <div class="table-title-bar">
+        <h4>Official Fixed Assets & Immovable Property Register</h4>
+        <span class="count-badge">{{ filteredFixedAssets().length }} Assets</span>
+      </div>
+
+      <table class="report-table">
+        <thead>
+          <tr>
+            <th class="w-12">#</th>
+            <th>Asset Tag</th>
+            <th>Serial Number</th>
+            <th>Asset Description</th>
+            <th>Category</th>
+            <th>Location / Room</th>
+            <th>Custodian Officer</th>
+            <th class="text-center">Condition</th>
+            <th>Acquisition Date</th>
+            <th class="text-right">Book Value (LKR)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let asset of filteredFixedAssets(); let i = index">
+            <td>{{ i + 1 }}</td>
+            <td class="font-mono text-bold text-blue">{{ asset.assetTag || asset.itemCode }}</td>
+            <td class="font-mono text-muted">{{ asset.serialNumber || '-' }}</td>
+            <td class="font-semibold">{{ asset.name }}</td>
+            <td>{{ asset.category }}</td>
+            <td><strong>{{ asset.location || 'General Store' }}</strong></td>
+            <td>{{ asset.custodianName || 'Unassigned' }}</td>
+            <td class="text-center">
+              <span class="status-pill-table" [ngClass]="asset.condition === 'Good' ? 'ok' : (asset.condition === 'Needs Repair' ? 'low' : 'depleted')">
+                {{ asset.condition || 'Good' }}
+              </span>
+            </td>
+            <td>{{ asset.acquisitionDate || '-' }}</td>
+            <td class="text-right font-mono font-bold">{{ (asset.unitCost || 0) | number:'1.2-2' }}</td>
+          </tr>
+          <tr *ngIf="filteredFixedAssets().length === 0">
+            <td colspan="10" class="empty-state-cell">No fixed assets matching the selected filters.</td>
+          </tr>
+        </tbody>
+        <tfoot>
+          <tr class="total-row">
+            <td colspan="9" class="text-right text-bold">TOTAL CAPITAL BOOK VALUE:</td>
+            <td class="text-right text-bold text-green font-mono">Rs. {{ fixedAssetsMetrics().totalBookValue | number:'1.2-2' }}</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+
+    <!-- Location Distribution Summary -->
+    <div class="secondary-table-box mt-6" *ngIf="locationAssetSummary().length > 0">
+      <h4 class="secondary-title">Asset Allocation by Room / Location</h4>
+      <table class="report-table summary-table">
+        <thead>
+          <tr>
+            <th>Room / Location</th>
+            <th class="text-right">Asset Count</th>
+            <th class="text-right">Total Capital Value (LKR)</th>
+            <th class="text-right">% of Fixed Assets</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let loc of locationAssetSummary()">
+            <td class="font-semibold">{{ loc.location }}</td>
+            <td class="text-right font-bold">{{ loc.count }}</td>
+            <td class="text-right font-mono font-bold">{{ loc.bookValue | number:'1.2-2' }}</td>
+            <td class="text-right">
+              {{ (fixedAssetsMetrics().totalAssets > 0 ? ((loc.count / fixedAssetsMetrics().totalAssets) * 100) : 0) | number:'1.1-1' }}%
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- 8. REPORT 4: STOCK DISPATCHES & CONSUMPTION              -->
+  <!-- ======================================================== -->
+  <div *ngIf="activeReport() === 'stock-issue'" class="report-body-section">
+    <!-- Executive KPI Cards -->
+    <div class="kpi-grid">
+      <div class="kpi-card highlight-blue">
+        <div class="kpi-label">Dispatched Issue Lines</div>
+        <div class="kpi-value text-blue">{{ stockIssueMetrics().totalIssuesCount }}</div>
+        <div class="kpi-sub">Fulfillments during period</div>
+      </div>
+      <div class="kpi-card highlight-green">
+        <div class="kpi-label">Total Units Dispatched</div>
+        <div class="kpi-value text-green font-mono">{{ stockIssueMetrics().totalQty | number }}</div>
+        <div class="kpi-sub">Materials released from store</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Total Value Dispatched</div>
+        <div class="kpi-value font-mono">Rs. {{ stockIssueMetrics().totalValue | number:'1.2-2' }}</div>
+        <div class="kpi-sub">Financial cost of items issued</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Beneficiary Divisions</div>
+        <div class="kpi-value">{{ stockIssueMetrics().uniqueDivisions }}</div>
+        <div class="kpi-sub">Divisions receiving supplies</div>
+      </div>
+    </div>
+
+    <!-- Data Table -->
+    <div class="table-container printable-table-box">
+      <div class="table-title-bar">
+        <h4>Store Dispatches & Material Consumption Sheet</h4>
+        <span class="count-badge">{{ filteredStockIssues().length }} Dispatches</span>
+      </div>
+
+      <table class="report-table">
+        <thead>
+          <tr>
+            <th class="w-12">#</th>
+            <th>Issue Date</th>
+            <th>Req #</th>
+            <th>Item Description</th>
+            <th>Category</th>
+            <th class="text-right">Issued Qty</th>
+            <th>UOM</th>
+            <th class="text-right">Unit Price</th>
+            <th class="text-right">Total (LKR)</th>
+            <th>Division / Recipient</th>
+            <th>Issued By</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let row of filteredStockIssues(); let i = index">
+            <td>{{ i + 1 }}</td>
+            <td class="font-mono">{{ row.date | date:'yyyy-MM-dd' }}</td>
+            <td class="font-mono text-bold text-blue">{{ row.requestNo }}</td>
+            <td class="font-semibold">{{ row.itemName }}</td>
+            <td>{{ row.category }}</td>
+            <td class="text-right font-bold text-blue">{{ row.quantity }}</td>
+            <td>{{ row.unit }}</td>
+            <td class="text-right font-mono">{{ row.unitPrice | number:'1.2-2' }}</td>
+            <td class="text-right font-mono font-bold">{{ row.totalValue | number:'1.2-2' }}</td>
+            <td>
+              <strong>{{ row.division }}</strong><br>
+              <small class="text-muted">{{ row.requesterName }}</small>
+            </td>
+            <td>{{ row.releasedBy }}</td>
+          </tr>
+          <tr *ngIf="filteredStockIssues().length === 0">
+            <td colspan="11" class="empty-state-cell">No stock dispatches recorded during the selected period.</td>
+          </tr>
+        </tbody>
+        <tfoot>
+          <tr class="total-row">
+            <td colspan="5" class="text-right text-bold">TOTAL CONSUMPTION:</td>
+            <td class="text-right text-bold text-blue">{{ stockIssueMetrics().totalQty | number }}</td>
+            <td></td>
+            <td></td>
+            <td class="text-right text-bold text-green font-mono">Rs. {{ stockIssueMetrics().totalValue | number:'1.2-2' }}</td>
+            <td colspan="2"></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+
+    <!-- Division Breakdown Table -->
+    <div class="secondary-table-box mt-6" *ngIf="divisionConsumptionSummary().length > 0">
+      <h4 class="secondary-title">Consumption Breakdown by Office / Division</h4>
+      <table class="report-table summary-table">
+        <thead>
+          <tr>
+            <th>Division / Office</th>
+            <th class="text-right">Dispatch Count</th>
+            <th class="text-right">Total Units Received</th>
+            <th class="text-right">Total Consumption Value (LKR)</th>
+            <th class="text-right">% of Store Consumption</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let div of divisionConsumptionSummary()">
+            <td class="font-semibold">{{ div.division }}</td>
+            <td class="text-right">{{ div.dispatches }}</td>
+            <td class="text-right font-mono">{{ div.qty | number }}</td>
+            <td class="text-right font-mono font-bold">{{ div.value | number:'1.2-2' }}</td>
+            <td class="text-right">
+              {{ (stockIssueMetrics().totalValue > 0 ? ((div.value / stockIssueMetrics().totalValue) * 100) : 0) | number:'1.1-1' }}%
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- 9. REPORT 5: REQUISITIONS FULFILLMENT                    -->
+  <!-- ======================================================== -->
+  <div *ngIf="activeReport() === 'requisitions'" class="report-body-section">
+    <!-- Executive KPI Cards -->
+    <div class="kpi-grid">
+      <div class="kpi-card highlight-blue">
+        <div class="kpi-label">Total Requisitions</div>
+        <div class="kpi-value text-blue">{{ requisitionMetrics().total }}</div>
+        <div class="kpi-sub">Logged in selected period</div>
+      </div>
+      <div class="kpi-card highlight-green">
+        <div class="kpi-label">Fulfillment Rate</div>
+        <div class="kpi-value text-green">{{ requisitionMetrics().fulfillmentRate }}%</div>
+        <div class="kpi-sub">{{ requisitionMetrics().fullyReleased }} fully released</div>
+      </div>
+      <div class="kpi-card highlight-amber">
+        <div class="kpi-label">Pending Fulfillment</div>
+        <div class="kpi-value text-amber">{{ requisitionMetrics().pendingAction }}</div>
+        <div class="kpi-sub">Awaiting approval or dispatch</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Rejected / Cancelled</div>
+        <div class="kpi-value text-danger">{{ requisitionMetrics().rejected }}</div>
+        <div class="kpi-sub">Unfulfilled requisitions</div>
+      </div>
+    </div>
+
+    <!-- Data Table -->
+    <div class="table-container printable-table-box">
+      <div class="table-title-bar">
+        <h4>Requisition Flow & Store Turnaround Log</h4>
+        <span class="count-badge">{{ filteredRequisitions().length }} Requisitions</span>
+      </div>
+
+      <table class="report-table">
+        <thead>
+          <tr>
+            <th class="w-12">#</th>
+            <th>Req #</th>
+            <th>Submission Date</th>
+            <th>Requester Name</th>
+            <th>Division</th>
+            <th class="text-center">Priority</th>
+            <th class="text-center">Lines</th>
+            <th class="text-center">Workflow Status</th>
+            <th>Supervisor Approval</th>
+            <th>Store Dispatch</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let req of filteredRequisitions(); let i = index">
+            <td>{{ i + 1 }}</td>
+            <td class="font-mono text-bold text-blue">{{ req.requestNo }}</td>
+            <td class="font-mono">{{ req.requestDate }}</td>
+            <td class="font-semibold">{{ req.requesterName }}</td>
+            <td>{{ req.division || req.department }}</td>
+            <td class="text-center">
+              <span class="priority-badge" [ngClass]="(req.urgency || 'Normal').toLowerCase()">
+                {{ req.urgency }}
+              </span>
+            </td>
+            <td class="text-center font-bold">{{ req.items.length }}</td>
+            <td class="text-center">
+              <span class="status-pill-table" [ngClass]="req.status === 'Released' ? 'ok' : (req.status === 'Rejected' ? 'depleted' : 'low')">
+                {{ req.status }}
+              </span>
+            </td>
+            <td>
+              <span *ngIf="req.supervisorApproval">
+                {{ req.supervisorApproval.approvedBy }}<br>
+                <small class="text-muted">{{ req.supervisorApproval.approvedAt | date:'shortDate' }}</small>
+              </span>
+              <span *ngIf="!req.supervisorApproval" class="text-muted">-</span>
+            </td>
+            <td>
+              <span *ngIf="req.releaseDetails">
+                {{ req.releaseDetails.releasedBy }}<br>
+                <small class="text-muted">{{ req.releaseDetails.releasedAt | date:'shortDate' }}</small>
+              </span>
+              <span *ngIf="!req.releaseDetails" class="text-muted">-</span>
+            </td>
+          </tr>
+          <tr *ngIf="filteredRequisitions().length === 0">
+            <td colspan="10" class="empty-state-cell">No requisition records matching the specified criteria.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- 10. REPORT 6: MOVEMENTS AUDIT LEDGER                     -->
+  <!-- ======================================================== -->
+  <div *ngIf="activeReport() === 'audit-ledger'" class="report-body-section">
+    <!-- Executive KPI Cards -->
+    <div class="kpi-grid">
+      <div class="kpi-card highlight-blue">
+        <div class="kpi-label">Audit Transactions</div>
+        <div class="kpi-value text-blue">{{ auditLedgerMetrics().totalTxns }}</div>
+        <div class="kpi-sub">Total physical movements</div>
+      </div>
+      <div class="kpi-card highlight-green">
+        <div class="kpi-label">Cumulative Stock IN</div>
+        <div class="kpi-value text-green font-mono">+{{ auditLedgerMetrics().totalInUnits | number }}</div>
+        <div class="kpi-sub">Purchases & additions logged</div>
+      </div>
+      <div class="kpi-card highlight-red">
+        <div class="kpi-label">Cumulative Stock OUT</div>
+        <div class="kpi-value text-danger font-mono">-{{ auditLedgerMetrics().totalOutUnits | number }}</div>
+        <div class="kpi-sub">Releases & write-offs logged</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Stock Adjustments</div>
+        <div class="kpi-value font-mono">{{ auditLedgerMetrics().adjustmentsCount }}</div>
+        <div class="kpi-sub">Manual balance calibrations</div>
+      </div>
+    </div>
+
+    <!-- Data Table -->
+    <div class="table-container printable-table-box">
+      <div class="table-title-bar">
+        <h4>Complete Physical Stock Audit & Movement Trail</h4>
+        <span class="count-badge">{{ filteredAuditLedger().length }} Ledger Entries</span>
+      </div>
+
+      <table class="report-table">
+        <thead>
+          <tr>
+            <th class="w-12">#</th>
+            <th>Date & Time</th>
+            <th>Tx No</th>
+            <th>Item Code & Description</th>
+            <th>Movement Type</th>
+            <th class="text-right">Qty</th>
+            <th class="text-right">Prev Balance</th>
+            <th class="text-right">New Balance</th>
+            <th>Ref Document</th>
+            <th>Officer</th>
+            <th>Remarks</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let tx of filteredAuditLedger(); let i = index">
+            <td>{{ i + 1 }}</td>
+            <td class="font-mono text-muted">{{ tx.performedAt | date:'yyyy-MM-dd HH:mm' }}</td>
+            <td class="font-mono font-semibold">{{ tx.transactionNo }}</td>
+            <td>
+              <span class="font-mono text-bold text-blue">{{ tx.itemCode }}</span> - {{ tx.itemName }}
+            </td>
+            <td>
+              <span class="movement-badge" [ngClass]="tx.transactionType.toLowerCase()">
+                {{ tx.transactionType }}
+              </span>
+            </td>
+            <td class="text-right font-bold" [class.text-green]="tx.transactionType.startsWith('IN')" [class.text-danger]="tx.transactionType.startsWith('OUT')">
+              {{ tx.transactionType.startsWith('IN') ? '+' : (tx.transactionType.startsWith('OUT') ? '-' : '') }}{{ tx.quantity }}
+            </td>
+            <td class="text-right font-mono text-muted">{{ tx.previousQty }}</td>
+            <td class="text-right font-mono font-bold">{{ tx.balanceQty }}</td>
+            <td class="font-mono">{{ tx.referenceNo || '-' }}</td>
+            <td>{{ tx.performedBy }}</td>
+            <td class="text-muted"><small>{{ tx.notes || '-' }}</small></td>
+          </tr>
+          <tr *ngIf="filteredAuditLedger().length === 0">
+            <td colspan="11" class="empty-state-cell">No stock movements found within the selected date window.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- 11. REPORT 7: CONSUMPTION MATRIX                         -->
+  <!-- ======================================================== -->
+  <div *ngIf="activeReport() === 'consumption-matrix'" class="report-body-section">
+    <!-- Executive KPI Cards -->
+    <div class="kpi-grid">
+      <div class="kpi-card highlight-blue">
+        <div class="kpi-label">Active Divisions</div>
+        <div class="kpi-value text-blue">{{ consumptionMatrix().length }}</div>
+        <div class="kpi-sub">Beneficiary offices analyzed</div>
+      </div>
+      <div class="kpi-card highlight-green">
+        <div class="kpi-label">Total Material Units</div>
+        <div class="kpi-value text-green font-mono">{{ matrixTotals().grandQty | number }}</div>
+        <div class="kpi-sub">Across all product categories</div>
+      </div>
+      <div class="kpi-card highlight-green">
+        <div class="kpi-label">Total Dispatched Valuation</div>
+        <div class="kpi-value text-green font-mono">Rs. {{ matrixTotals().grandValue | number:'1.2-2' }}</div>
+        <div class="kpi-sub">Aggregate cost allocation</div>
+      </div>
+    </div>
+
+    <!-- Cross-Tabulation Matrix Table -->
+    <div class="table-container printable-table-box">
+      <div class="table-title-bar">
+        <h4>Departmental Consumption vs Category Matrix</h4>
+        <span class="count-badge">Multi-dimensional Pivot</span>
+      </div>
+
+      <table class="report-table matrix-table">
+        <thead>
+          <tr>
+            <th>Office / Division</th>
+            <th *ngFor="let cat of matrixCategories()" class="text-right">{{ cat }}</th>
+            <th class="text-right text-bold highlight-col">Total Units</th>
+            <th class="text-right text-bold highlight-col">Total Value (LKR)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let row of consumptionMatrix()">
+            <td class="font-bold">{{ row.department }}</td>
+            <td *ngFor="let cat of matrixCategories()" class="text-right font-mono">
+              <span [class.text-muted]="!row.categories[cat]" [class.font-semibold]="row.categories[cat] > 0">
+                {{ (row.categories[cat] || 0) | number }}
+              </span>
+            </td>
+            <td class="text-right font-bold text-blue highlight-col font-mono">{{ row.totalQty | number }}</td>
+            <td class="text-right font-bold text-green highlight-col font-mono">Rs. {{ row.totalValue | number:'1.2-2' }}</td>
+          </tr>
+          <tr *ngIf="consumptionMatrix().length === 0">
+            <td [attr.colspan]="matrixCategories().length + 3" class="empty-state-cell">No consumption data recorded for matrix analysis during this period.</td>
+          </tr>
+        </tbody>
+        <tfoot *ngIf="consumptionMatrix().length > 0">
+          <tr class="total-row">
+            <td class="text-bold">TOTAL CONSUMPTION:</td>
+            <td *ngFor="let cat of matrixCategories()" class="text-right font-bold font-mono">
+              {{ matrixTotals().catTotals[cat] | number }}
+            </td>
+            <td class="text-right font-bold text-blue highlight-col font-mono">{{ matrixTotals().grandQty | number }}</td>
+            <td class="text-right font-bold text-green highlight-col font-mono">Rs. {{ matrixTotals().grandValue | number:'1.2-2' }}</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- 12. OFFICIAL GOVERNMENT SIGN-OFF BLOCK                   -->
+  <!-- ======================================================== -->
+  <div class="print-signatures-block">
+    <div class="sig-column">
+      <div class="sig-line"></div>
+      <div class="sig-label">Prepared By:</div>
+      <div class="sig-title">Store Keeper / Inventory Officer</div>
+      <div class="sig-meta">Name: ....................................................</div>
+      <div class="sig-meta">Date: ......./......./2026</div>
+    </div>
+    <div class="sig-column">
+      <div class="sig-line"></div>
+      <div class="sig-label">Checked & Audited By:</div>
+      <div class="sig-title">Internal Auditor / Accountant</div>
+      <div class="sig-meta">Name: ....................................................</div>
+      <div class="sig-meta">Date: ......./......./2026</div>
+    </div>
+    <div class="sig-column">
+      <div class="sig-line"></div>
+      <div class="sig-label">Certified & Approved By:</div>
+      <div class="sig-title">Divisional Secretary / Head of Office</div>
+      <div class="sig-meta">Name: ....................................................</div>
+      <div class="sig-meta">Date: ......./......./2026</div>
+    </div>
+  </div>
+
+</div>

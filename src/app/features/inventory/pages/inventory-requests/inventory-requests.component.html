@@ -1,0 +1,299 @@
+<div class="requests-page">
+  <!-- Top Header -->
+  <div class="page-header">
+    <div class="header-left">
+      <div class="header-badge">
+        <mat-icon>shopping_bag</mat-icon>
+        <span>Store Requisitions</span>
+      </div>
+      <h1 class="page-title">Store Requisitions & Dispatches</h1>
+      <p class="page-subtitle">Submit item requests, track approval workflows, and release store items to divisions</p>
+    </div>
+
+    <div class="header-right">
+      <button mat-flat-button color="primary" (click)="openCreateRequestDialog()" class="action-btn">
+        <mat-icon>add</mat-icon>
+        New Requisition
+      </button>
+    </div>
+  </div>
+
+  <!-- Metrics Grid -->
+  <div class="metrics-grid">
+    <mat-card class="metric-card">
+      <div class="metric-icon-wrap total">
+        <mat-icon>receipt_long</mat-icon>
+      </div>
+      <div class="metric-info">
+        <span class="metric-lbl">Total Requisitions</span>
+        <span class="metric-val">{{ totalCount() }}</span>
+        <span class="metric-sub">Across all offices</span>
+      </div>
+    </mat-card>
+
+    <mat-card class="metric-card" [class.highlight-pending]="pendingCount() > 0">
+      <div class="metric-icon-wrap pending">
+        <mat-icon>pending_actions</mat-icon>
+      </div>
+      <div class="metric-info">
+        <span class="metric-lbl">Pending Review / Release</span>
+        <span class="metric-val" [class.amber-val]="pendingCount() > 0">{{ pendingCount() }}</span>
+        <span class="metric-sub">Action required</span>
+      </div>
+    </mat-card>
+
+    <mat-card class="metric-card">
+      <div class="metric-icon-wrap released">
+        <mat-icon>task_alt</mat-icon>
+      </div>
+      <div class="metric-info">
+        <span class="metric-lbl">Dispatched / Released</span>
+        <span class="metric-val">{{ releasedCount() }}</span>
+        <span class="metric-sub">Issued to departments</span>
+      </div>
+    </mat-card>
+
+    <mat-card class="metric-card">
+      <div class="metric-icon-wrap rejected">
+        <mat-icon>block</mat-icon>
+      </div>
+      <div class="metric-info">
+        <span class="metric-lbl">Rejected / Cancelled</span>
+        <span class="metric-val">{{ rejectedCount() }}</span>
+        <span class="metric-sub">Unfulfilled requests</span>
+      </div>
+    </mat-card>
+  </div>
+
+  <!-- Filter & Navigation Card -->
+  <mat-card class="filter-card">
+    <div class="main-tabs-row">
+      <!-- Tabs: Store Management vs My Requisitions -->
+      <div class="tab-pills-wrap">
+        <button type="button" class="tab-pill-btn" [class.active]="activeTab() === 'ALL'" (click)="setTab('ALL')">
+          <mat-icon>storefront</mat-icon>
+          <span>Store Management ({{ totalCount() }})</span>
+        </button>
+        <button type="button" class="tab-pill-btn" [class.active]="activeTab() === 'MY'" (click)="setTab('MY')">
+          <mat-icon>person</mat-icon>
+          <span>My Requisitions ({{ myRequestsCount() }})</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Status Chips & Search Bar -->
+    <div class="controls-row">
+      <mat-form-field appearance="outline" class="search-field" subscriptSizing="dynamic">
+        <mat-label>Search Requisitions (Req No, Requester, Division, Purpose, Items)...</mat-label>
+        <input matInput [ngModel]="searchQuery()" (ngModelChange)="searchQuery.set($event)" placeholder="Type to search...">
+        <mat-icon matPrefix>search</mat-icon>
+        <button *ngIf="searchQuery()" mat-icon-button matSuffix (click)="searchQuery.set('')">
+          <mat-icon>close</mat-icon>
+        </button>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="select-field" subscriptSizing="dynamic">
+        <mat-label>Status Filter</mat-label>
+        <mat-select [ngModel]="selectedStatusFilter()" (ngModelChange)="selectedStatusFilter.set($event)">
+          <mat-option value="All">All Statuses</mat-option>
+          <mat-option value="Pending">Pending Review</mat-option>
+          <mat-option value="Supervisor Approved">Supervisor Approved</mat-option>
+          <mat-option value="Released">Released (Full)</mat-option>
+          <mat-option value="Partially Released">Partially Released</mat-option>
+          <mat-option value="Rejected">Rejected</mat-option>
+          <mat-option value="Cancelled">Cancelled</mat-option>
+        </mat-select>
+        <mat-icon matPrefix>filter_list</mat-icon>
+      </mat-form-field>
+    </div>
+  </mat-card>
+
+  <!-- Requisitions Table Card -->
+  <mat-card class="table-card">
+    <div *ngIf="isLoading()" class="loading-state">
+      <mat-icon class="spin-icon">sync</mat-icon>
+      <span>Loading store requisitions...</span>
+    </div>
+
+    <div *ngIf="!isLoading() && filteredRequests().length === 0" class="empty-state">
+      <mat-icon class="empty-icon">inbox</mat-icon>
+      <h3>No requisitions found</h3>
+      <p>There are no item requests matching the active filter criteria.</p>
+      <button mat-flat-button color="primary" (click)="openCreateRequestDialog()">
+        <mat-icon>add</mat-icon> Submit Requisition
+      </button>
+    </div>
+
+    <div class="table-container" *ngIf="!isLoading() && filteredRequests().length > 0">
+      <table mat-table [dataSource]="filteredRequests()" class="requests-table">
+        <!-- Request No -->
+        <ng-container matColumnDef="requestNo">
+          <th mat-header-cell *matHeaderCellDef>Requisition No</th>
+          <td mat-cell *matCellDef="let r">
+            <div class="req-no-cell" (click)="toggleRowExpansion(r.id)">
+              <mat-icon class="expand-arrow" [class.expanded]="expandedRequestId() === r.id">chevron_right</mat-icon>
+              <strong class="req-no-text">{{ r.requestNo }}</strong>
+            </div>
+          </td>
+        </ng-container>
+
+        <!-- Date -->
+        <ng-container matColumnDef="date">
+          <th mat-header-cell *matHeaderCellDef>Date</th>
+          <td mat-cell *matCellDef="let r">
+            <span class="date-text">{{ r.requestDate }}</span>
+          </td>
+        </ng-container>
+
+        <!-- Requester -->
+        <ng-container matColumnDef="requester">
+          <th mat-header-cell *matHeaderCellDef>Requester</th>
+          <td mat-cell *matCellDef="let r">
+            <div class="requester-cell">
+              <span class="req-name">{{ r.requesterName }}</span>
+              <span class="req-email" *ngIf="r.requesterEmail">{{ r.requesterEmail }}</span>
+            </div>
+          </td>
+        </ng-container>
+
+        <!-- Division -->
+        <ng-container matColumnDef="division">
+          <th mat-header-cell *matHeaderCellDef>Division / Branch</th>
+          <td mat-cell *matCellDef="let r">
+            <span class="division-text">{{ r.division }}</span>
+          </td>
+        </ng-container>
+
+        <!-- Items Count & Summary -->
+        <ng-container matColumnDef="itemsCount">
+          <th mat-header-cell *matHeaderCellDef>Items Requested</th>
+          <td mat-cell *matCellDef="let r">
+            <span class="items-badge" (click)="toggleRowExpansion(r.id)">
+              <mat-icon class="ib-icon">list</mat-icon>
+              {{ r.items.length }} {{ r.items.length === 1 ? 'Item' : 'Items' }}
+            </span>
+          </td>
+        </ng-container>
+
+        <!-- Urgency -->
+        <ng-container matColumnDef="urgency">
+          <th mat-header-cell *matHeaderCellDef>Urgency</th>
+          <td mat-cell *matCellDef="let r">
+            <span class="urgency-pill" [ngClass]="r.urgency.toLowerCase()">
+              {{ r.urgency }}
+            </span>
+          </td>
+        </ng-container>
+
+        <!-- Status -->
+        <ng-container matColumnDef="status">
+          <th mat-header-cell *matHeaderCellDef>Status</th>
+          <td mat-cell *matCellDef="let r">
+            <span class="status-pill" [ngClass]="r.status.toLowerCase().replace(' ', '-')">
+              {{ r.status }}
+            </span>
+          </td>
+        </ng-container>
+
+        <!-- Actions -->
+        <ng-container matColumnDef="actions">
+          <th mat-header-cell *matHeaderCellDef class="text-right">Actions</th>
+          <td mat-cell *matCellDef="let r" class="text-right">
+            <!-- Supervisor Approve (in 2-step workflow) -->
+            <button mat-stroked-button color="primary" *ngIf="canSupervisorApprove(r)" (click)="approveAsSupervisor(r)" class="quick-action-btn">
+              <mat-icon>thumb_up</mat-icon> Approve
+            </button>
+
+            <!-- Store Manager Review & Release -->
+            <button mat-flat-button color="primary" *ngIf="canStoreManagerRelease(r)" (click)="openReleaseDialog(r)" class="quick-action-btn release-btn">
+              <mat-icon>send</mat-icon> Review & Release
+            </button>
+
+            <!-- More menu -->
+            <button mat-icon-button [matMenuTriggerFor]="rMenu">
+              <mat-icon>more_vert</mat-icon>
+            </button>
+
+            <mat-menu #rMenu="matMenu">
+              <button mat-menu-item (click)="toggleRowExpansion(r.id)">
+                <mat-icon>visibility</mat-icon>
+                <span>{{ expandedRequestId() === r.id ? 'Collapse Details' : 'View Item Details' }}</span>
+              </button>
+
+              <button mat-menu-item color="warn" *ngIf="r.status === 'Pending'" (click)="cancelRequest(r)">
+                <mat-icon color="warn">cancel</mat-icon>
+                <span>Cancel Requisition</span>
+              </button>
+            </mat-menu>
+          </td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+        <tr mat-row *matRowDef="let row; columns: displayedColumns;" class="req-table-row"></tr>
+      </table>
+    </div>
+
+    <!-- EXPANDED ITEM DETAILS DRAWER (Shown when a row is clicked) -->
+    <div class="expanded-drawer-container" *ngIf="expandedRequestId()">
+      <ng-container *ngFor="let r of requests()">
+        <div class="drawer-card" *ngIf="r.id === expandedRequestId()">
+          <div class="drawer-header">
+            <div class="dh-title">
+              <mat-icon>inventory_2</mat-icon>
+              <span>Items Breakdown for Requisition <strong>{{ r.requestNo }}</strong></span>
+            </div>
+            <span class="dh-purpose"><strong>Purpose:</strong> {{ r.purpose }}</span>
+            <button mat-icon-button (click)="expandedRequestId.set(null)" class="close-drawer-btn">
+              <mat-icon>close</mat-icon>
+            </button>
+          </div>
+
+          <table class="nested-items-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Item Code</th>
+                <th>Item Description</th>
+                <th class="text-center">Requested Qty</th>
+                <th class="text-center">Released Qty</th>
+                <th>Notes / Specifications</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let it of r.items; let i = index">
+                <td>{{ i + 1 }}</td>
+                <td class="font-mono">{{ it.itemCode }}</td>
+                <td><strong>{{ it.itemName }}</strong></td>
+                <td class="text-center">{{ it.requestedQty }} {{ it.unit }}</td>
+                <td class="text-center">
+                  <span [class.released-tag]="it.releasedQty && it.releasedQty > 0">
+                    {{ it.releasedQty !== undefined ? it.releasedQty : '—' }} {{ it.unit }}
+                  </span>
+                </td>
+                <td class="notes-text">{{ it.notes || '—' }}</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <!-- Sign-off & Audit Meta Block -->
+          <div class="drawer-meta-bar" *ngIf="r.releaseDetails || r.supervisorApproval || r.rejectionReason">
+            <div class="meta-pill-item" *ngIf="r.supervisorApproval">
+              <mat-icon class="meta-icon">verified_user</mat-icon>
+              <span>Supervisor Approved by <strong>{{ r.supervisorApproval.approvedBy }}</strong> on {{ r.supervisorApproval.approvedAt | date:'yyyy-MM-dd HH:mm' }}</span>
+            </div>
+
+            <div class="meta-pill-item success" *ngIf="r.releaseDetails">
+              <mat-icon class="meta-icon">storefront</mat-icon>
+              <span>Dispatched by <strong>{{ r.releaseDetails.releasedBy }}</strong> to <strong>{{ r.releaseDetails.receivedBy || r.requesterName }}</strong> on {{ r.releaseDetails.releasedAt | date:'yyyy-MM-dd HH:mm' }}</span>
+            </div>
+
+            <div class="meta-pill-item danger" *ngIf="r.rejectionReason">
+              <mat-icon class="meta-icon">block</mat-icon>
+              <span>Rejected: <strong>{{ r.rejectionReason }}</strong></span>
+            </div>
+          </div>
+        </div>
+      </ng-container>
+    </div>
+  </mat-card>
+</div>
