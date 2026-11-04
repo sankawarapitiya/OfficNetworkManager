@@ -262,7 +262,7 @@ import { Voucher, VoucherType, PaymentMethod, VoucherPaymentSplit, VoucherPayeeS
                           <mat-icon class="sub-v-icon">tag</mat-icon>
                           Sub Voucher: <strong>{{ getSubVoucherNo(j, i) }}</strong>
                         </span>
-                        <span class="client-type-tag" *ngIf="pGroup.get('clientType')?.value">
+                        <span class="client-type-tag" *ngIf="pGroup.get('clientType')?.value && pGroup.get('isClientSelected')?.value">
                           {{ pGroup.get('clientType')?.value }}
                         </span>
                       </div>
@@ -270,7 +270,7 @@ import { Voucher, VoucherType, PaymentMethod, VoucherPaymentSplit, VoucherPayeeS
                       <button type="button" 
                               mat-button 
                               class="switch-client-btn" 
-                              *ngIf="pGroup.get('payeeName')?.value"
+                              *ngIf="pGroup.get('isClientSelected')?.value"
                               (click)="clearPayeeClient(j, i)"
                               matTooltip="Switch or choose a different client">
                         <mat-icon>swap_horiz</mat-icon> Switch Client
@@ -287,17 +287,19 @@ import { Voucher, VoucherType, PaymentMethod, VoucherPaymentSplit, VoucherPayeeS
                     </div>
 
                     <!-- Client Selection Bar (Visible when client is NOT yet chosen) -->
-                    <div class="client-search-block" *ngIf="!pGroup.get('payeeName')?.value">
+                    <div class="client-search-block" *ngIf="!pGroup.get('isClientSelected')?.value">
                       <mat-form-field appearance="outline" class="w-full" subscriptSizing="dynamic">
                         <mat-label>Select Client / Payee (Search Name, NIC / BRN, or Phone)</mat-label>
                         <input matInput 
-                               formControlName="payeeName" 
+                               formControlName="clientSearch" 
+                               #autoTrigger="matAutocompleteTrigger"
                                [matAutocomplete]="autoClient" 
-                               placeholder="Type to search Account Clients ledger..." 
-                               required>
+                               (focus)="autoTrigger.openPanel()"
+                               placeholder="Type to search Account Clients ledger (Name, NIC, Phone, Bank)..." 
+                               (keydown.enter)="$event.preventDefault()">
                         <mat-icon matPrefix>person_search</mat-icon>
                         <mat-autocomplete #autoClient="matAutocomplete" (optionSelected)="onClientSelected(j, i, $event)">
-                          <mat-option *ngFor="let c of getMatchingClients(pGroup.get('payeeName')?.value)" [value]="c">
+                          <mat-option *ngFor="let c of getMatchingClients(pGroup.get('clientSearch')?.value)" [value]="c">
                             <div class="cust-option-row">
                               <div class="cust-opt-main">
                                 <span class="cust-opt-name">{{ c.name }}</span>
@@ -308,6 +310,37 @@ import { Voucher, VoucherType, PaymentMethod, VoucherPaymentSplit, VoucherPayeeS
                                 <span *ngIf="c.phone">• {{ c.phone }}</span>
                                 <span *ngIf="c.bankName">• {{ c.bankName }}</span>
                               </div>
+                            </div>
+                          </mat-option>
+
+                          <!-- Empty results state -->
+                          <mat-option *ngIf="clients().length > 0 && getMatchingClients(pGroup.get('clientSearch')?.value).length === 0" disabled class="no-clients-opt">
+                            <div class="cust-opt-empty">
+                              <mat-icon class="empty-icon">search_off</mat-icon>
+                              <span>No existing client profile matches "{{ pGroup.get('clientSearch')?.value }}"</span>
+                            </div>
+                          </mat-option>
+
+                          <mat-option *ngIf="clients().length === 0" disabled class="no-clients-opt">
+                            <div class="cust-opt-empty">
+                              <mat-icon class="empty-icon">group_off</mat-icon>
+                              <span>No registered clients in dataset. Click "+ Register New Client Profile"</span>
+                            </div>
+                          </mat-option>
+
+                          <!-- Register option if search query entered -->
+                          <mat-option *ngIf="pGroup.get('clientSearch')?.value?.trim()" [value]="{ isRegister: true, name: pGroup.get('clientSearch')?.value?.trim() }" class="register-payee-opt">
+                            <div class="cust-opt-register">
+                              <mat-icon class="opt-action-icon">person_add</mat-icon>
+                              <span>+ Register <strong>"{{ pGroup.get('clientSearch')?.value?.trim() }}"</strong> as New Client Profile...</span>
+                            </div>
+                          </mat-option>
+
+                          <!-- Quick use typed name as one-time payee -->
+                          <mat-option *ngIf="pGroup.get('clientSearch')?.value?.trim()" [value]="{ isCustom: true, name: pGroup.get('clientSearch')?.value?.trim() }" class="custom-payee-opt">
+                            <div class="cust-opt-custom">
+                              <mat-icon class="opt-action-icon">person</mat-icon>
+                              <span>Use <strong>"{{ pGroup.get('clientSearch')?.value?.trim() }}"</strong> as one-time Payee</span>
                             </div>
                           </mat-option>
                         </mat-autocomplete>
@@ -323,7 +356,7 @@ import { Voucher, VoucherType, PaymentMethod, VoucherPaymentSplit, VoucherPayeeS
                     </div>
 
                     <!-- READ-ONLY CLIENT DETAILS STRIP (Visible once client is selected) -->
-                    <div class="client-details-display-box" *ngIf="pGroup.get('payeeName')?.value">
+                    <div class="client-details-display-box" *ngIf="pGroup.get('isClientSelected')?.value">
                       <div class="cd-avatar" [ngClass]="getAvatarColorClass(pGroup.get('clientType')?.value)">
                         <mat-icon>{{ getClientTypeIcon(pGroup.get('clientType')?.value) }}</mat-icon>
                       </div>
@@ -1041,6 +1074,36 @@ import { Voucher, VoucherType, PaymentMethod, VoucherPaymentSplit, VoucherPayeeS
     }
 
     /* Autocomplete option */
+    .cust-opt-empty {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      color: #94a3b8;
+      padding: 4px 0;
+      .empty-icon { font-size: 16px; width: 16px; height: 16px; color: #94a3b8; }
+    }
+
+    .cust-opt-register {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12.5px;
+      color: #16a34a;
+      padding: 4px 0;
+      .opt-action-icon { font-size: 16px; width: 16px; height: 16px; color: #16a34a; }
+    }
+
+    .cust-opt-custom {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12.5px;
+      color: #0284c7;
+      padding: 4px 0;
+      .opt-action-icon { font-size: 16px; width: 16px; height: 16px; color: #0284c7; }
+    }
+
     .cust-option-row {
       display: flex;
       flex-direction: column;
@@ -1639,6 +1702,7 @@ export class VoucherDialogComponent implements OnInit {
 
   // --- Payee Management under a Payment Method ---
   createPayeeGroup(initial?: Partial<VoucherPayeeSplit>): FormGroup {
+    const isSelected = !!(initial?.payeeName && initial.payeeName.trim());
     return this.fb.group({
       id: [initial?.id || ''],
       subVoucherNo: [initial?.subVoucherNo || ''],
@@ -1650,7 +1714,9 @@ export class VoucherDialogComponent implements OnInit {
       bankName: [initial?.bankName || ''],
       accountNumber: [initial?.accountNumber || ''],
       amount: [initial?.amount !== undefined ? initial.amount : '', [Validators.required, Validators.min(0.01)]],
-      notes: [initial?.notes || '']
+      notes: [initial?.notes || ''],
+      clientSearch: [''],
+      isClientSelected: [isSelected]
     });
   }
 
@@ -1677,7 +1743,9 @@ export class VoucherDialogComponent implements OnInit {
       payeeNic: '',
       payeePhone: '',
       bankName: '',
-      accountNumber: ''
+      accountNumber: '',
+      isClientSelected: false,
+      clientSearch: ''
     });
     this.recalcTrigger.update(n => n + 1);
   }
@@ -1735,24 +1803,48 @@ export class VoucherDialogComponent implements OnInit {
 
   // --- Autocomplete & Client Registration ---
   getMatchingClients(query: string | null | undefined): AccountClient[] {
-    const list = this.clients();
-    if (!query || typeof query !== 'string') return list.slice(0, 6);
+    const list = this.clients() || [];
+    if (!query || typeof query !== 'string') return list.slice(0, 8);
     const q = query.toLowerCase().trim();
-    if (!q) return list.slice(0, 6);
+    if (!q) return list.slice(0, 8);
 
     return list.filter(c =>
-      c.name.toLowerCase().includes(q) ||
+      (c.name && c.name.toLowerCase().includes(q)) ||
       (c.nicOrBrn && c.nicOrBrn.toLowerCase().includes(q)) ||
-      (c.phone && c.phone.includes(q)) ||
-      (c.bankName && c.bankName.toLowerCase().includes(q))
-    ).slice(0, 8);
+      (c.phone && c.phone.toLowerCase().includes(q)) ||
+      (c.bankName && c.bankName.toLowerCase().includes(q)) ||
+      (c.clientType && c.clientType.toLowerCase().includes(q))
+    ).slice(0, 10);
   }
 
   onClientSelected(paymentIndex: number, payeeIndex: number, event: MatAutocompleteSelectedEvent) {
-    const client: AccountClient = event.option.value;
-    if (!client) return;
+    const val = event.option.value;
+    if (!val) return;
 
     const payeeRow = this.getPayeesArray(paymentIndex).at(payeeIndex);
+
+    if (val.isRegister) {
+      this.openRegisterClientModal(paymentIndex, payeeIndex);
+      return;
+    }
+
+    if (val.isCustom) {
+      payeeRow.patchValue({
+        clientId: '',
+        clientType: 'Individual / Citizen',
+        payeeName: val.name,
+        payeeNic: '',
+        payeePhone: '',
+        bankName: '',
+        accountNumber: '',
+        isClientSelected: true,
+        clientSearch: ''
+      });
+      this.recalcTrigger.update(n => n + 1);
+      return;
+    }
+
+    const client: AccountClient = val;
     payeeRow.patchValue({
       clientId: client.id || '',
       clientType: client.clientType || 'Business / Vendor',
@@ -1760,14 +1852,16 @@ export class VoucherDialogComponent implements OnInit {
       payeeNic: client.nicOrBrn || '',
       payeePhone: client.phone || '',
       bankName: client.bankName ? `${client.bankName}${client.accountNumber ? ' - Acc ' + client.accountNumber : ''}` : (payeeRow.get('bankName')?.value || ''),
-      accountNumber: client.accountNumber || ''
+      accountNumber: client.accountNumber || '',
+      isClientSelected: true,
+      clientSearch: ''
     });
     this.recalcTrigger.update(n => n + 1);
   }
 
   openRegisterClientModal(paymentIndex: number, payeeIndex: number) {
     const payeeRow = this.getPayeesArray(paymentIndex).at(payeeIndex);
-    const initialName = payeeRow?.get('payeeName')?.value || '';
+    const initialName = payeeRow?.get('clientSearch')?.value || payeeRow?.get('payeeName')?.value || '';
 
     const dialogRef = this.dialog.open(AccountClientDialogComponent, {
       width: '640px',
@@ -1791,7 +1885,9 @@ export class VoucherDialogComponent implements OnInit {
             payeeNic: fullClient.nicOrBrn || '',
             payeePhone: fullClient.phone || '',
             bankName: fullClient.bankName || '',
-            accountNumber: fullClient.accountNumber || ''
+            accountNumber: fullClient.accountNumber || '',
+            isClientSelected: true,
+            clientSearch: ''
           });
           this.recalcTrigger.update(n => n + 1);
         } catch (e) {
