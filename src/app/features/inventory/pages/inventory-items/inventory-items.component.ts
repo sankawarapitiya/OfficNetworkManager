@@ -12,6 +12,8 @@ import { MatChipsModule } from '@angular/material/chips';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatDialogModule, MatDialog } from '@angular/material/dialog';
 import { MatMenuModule } from '@angular/material/menu';
+import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
+import { MatDividerModule } from '@angular/material/divider';
 import * as XLSX from 'xlsx';
 
 import { InventoryItem, ItemType } from '../../models/inventory.model';
@@ -39,7 +41,9 @@ import { RbacService } from '../../../../auth/rbac.service';
     MatChipsModule,
     MatTooltipModule,
     MatDialogModule,
-    MatMenuModule
+    MatMenuModule,
+    MatPaginatorModule,
+    MatDividerModule
   ],
   templateUrl: './inventory-items.component.html',
   styleUrl: './inventory-items.component.scss'
@@ -152,6 +156,24 @@ export class InventoryItemsComponent implements OnInit {
     return list;
   });
 
+  // Pagination
+  pageSize = signal<number>(10);
+  currentPage = signal<number>(1);
+
+  paginatedItems = computed(() => {
+    const start = (this.currentPage() - 1) * this.pageSize();
+    return this.filteredItems().slice(start, start + this.pageSize());
+  });
+
+  onPageChange(event: PageEvent) {
+    this.currentPage.set(event.pageIndex + 1);
+    this.pageSize.set(event.pageSize);
+  }
+
+  onFilterChange() {
+    this.currentPage.set(1);
+  }
+
   ngOnInit() {
     this.loadItems();
   }
@@ -173,27 +195,47 @@ export class InventoryItemsComponent implements OnInit {
 
   setTypeFilter(filter: 'ALL' | 'MOVABLE' | 'IMMOVABLE' | 'LOW_STOCK') {
     this.selectedTypeFilter.set(filter);
+    this.currentPage.set(1);
   }
 
-  openAddItemDialog(defaultType: ItemType = 'movable') {
+  openAddItemDialog(defaultType: ItemType = 'movable', defaultMode: 'single' | 'excel' = 'single') {
     if (!this.canManageItems()) {
       this.notif.error('Permission denied: You do not have permission to register inventory items.');
       return;
     }
     const dialogRef = this.dialog.open(ItemDialogComponent, {
-      width: '740px',
+      width: defaultMode === 'excel' ? '880px' : '780px',
       maxWidth: '96vw',
-      data: { defaultType }
+      data: { defaultType, defaultMode }
     });
 
     dialogRef.afterClosed().subscribe(async (result) => {
       if (result) {
-        try {
-          await this.inventoryService.addItem(result);
-          this.notif.success(`Registered ${result.itemType === 'immovable' ? 'Asset' : 'Item'} "${result.name}" successfully!`);
-        } catch (e: any) {
-          console.error('Failed to add item:', e);
-          this.notif.error(e?.message || 'Failed to register item');
+        if (result.batch && Array.isArray(result.items)) {
+          try {
+            this.isLoading.set(true);
+            const res = await this.inventoryService.addItemsBatch(result.items);
+            if (res.success > 0) {
+              this.notif.success(`Successfully registered ${res.success} inventory records in bulk!`);
+            }
+            if (res.failed > 0) {
+              this.notif.error(`${res.failed} items failed to import. Check system logs.`);
+            }
+          } catch (e: any) {
+            console.error('Batch import error:', e);
+            this.notif.error('Failed to import items batch.');
+          } finally {
+            this.loadItems();
+          }
+        } else {
+          try {
+            await this.inventoryService.addItem(result);
+            this.notif.success(`Registered ${result.itemType === 'immovable' ? 'Asset' : 'Item'} "${result.name}" successfully!`);
+            this.loadItems();
+          } catch (e: any) {
+            console.error('Failed to add item:', e);
+            this.notif.error(e?.message || 'Failed to register item');
+          }
         }
       }
     });
@@ -237,7 +279,7 @@ export class InventoryItemsComponent implements OnInit {
       return;
     }
     const dialogRef = this.dialog.open(StockAdjustDialogComponent, {
-      width: '600px',
+      width: '680px',
       maxWidth: '96vw',
       data: { item }
     });
@@ -250,7 +292,8 @@ export class InventoryItemsComponent implements OnInit {
             res.quantityChange,
             res.transactionType,
             res.notes,
-            res.referenceNo
+            res.referenceNo,
+            res.unitCost
           );
           this.notif.success(`Stock adjusted for "${item.name}"`);
         } catch (e: any) {

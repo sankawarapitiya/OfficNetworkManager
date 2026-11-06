@@ -85,16 +85,16 @@
     <div class="controls-row">
       <mat-form-field appearance="outline" class="search-field" subscriptSizing="dynamic">
         <mat-label>Search Requisitions (Req No, Requester, Division, Purpose, Items)...</mat-label>
-        <input matInput [ngModel]="searchQuery()" (ngModelChange)="searchQuery.set($event)" placeholder="Type to search...">
+        <input matInput [ngModel]="searchQuery()" (ngModelChange)="searchQuery.set($event); onFilterChange()" placeholder="Type to search...">
         <mat-icon matPrefix>search</mat-icon>
-        <button *ngIf="searchQuery()" mat-icon-button matSuffix (click)="searchQuery.set('')">
+        <button *ngIf="searchQuery()" mat-icon-button matSuffix (click)="searchQuery.set(''); onFilterChange()">
           <mat-icon>close</mat-icon>
         </button>
       </mat-form-field>
 
       <mat-form-field appearance="outline" class="select-field" subscriptSizing="dynamic">
         <mat-label>Status Filter</mat-label>
-        <mat-select [ngModel]="selectedStatusFilter()" (ngModelChange)="selectedStatusFilter.set($event)">
+        <mat-select [ngModel]="selectedStatusFilter()" (ngModelChange)="selectedStatusFilter.set($event); onFilterChange()">
           <mat-option value="All">All Statuses</mat-option>
           <mat-option value="Pending">Pending Review</mat-option>
           <mat-option value="Supervisor Approved">Supervisor Approved</mat-option>
@@ -125,7 +125,7 @@
     </div>
 
     <div class="table-container" *ngIf="!isLoading() && filteredRequests().length > 0">
-      <table mat-table [dataSource]="filteredRequests()" class="requests-table">
+      <table mat-table [dataSource]="paginatedRequests()" class="requests-table">
         <!-- Request No -->
         <ng-container matColumnDef="requestNo">
           <th mat-header-cell *matHeaderCellDef>Requisition No</th>
@@ -232,6 +232,16 @@
         <tr mat-row *matRowDef="let row; columns: displayedColumns;" class="req-table-row"></tr>
       </table>
     </div>
+
+    <!-- Pagination -->
+    <mat-paginator
+      [length]="filteredRequests().length"
+      [pageSize]="pageSize()"
+      [pageSizeOptions]="[5, 10, 25, 50]"
+      [pageIndex]="currentPage() - 1"
+      (page)="onPageChange($event)"
+      showFirstLastButtons>
+    </mat-paginator>
 
     <!-- EXPANDED ITEM DETAILS DRAWER (Shown when a row is clicked) -->
     <div class="expanded-drawer-container" *ngIf="expandedRequestId()">

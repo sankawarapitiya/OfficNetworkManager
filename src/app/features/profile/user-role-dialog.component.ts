@@ -19,6 +19,8 @@ import {
   ALL_SYSTEM_MODULE_ROUTES,
   SystemModuleRouteDef
 } from '../../core/models/permission.model';
+import { AuthService } from '../../auth/auth.service';
+import { NotificationService } from '../../core/services/notification.service';
 
 @Component({
   selector: 'app-user-role-dialog',
@@ -233,11 +235,23 @@ import {
         </div>
       </form>
     </mat-dialog-content>
-    <mat-dialog-actions align="end">
-      <button mat-button mat-dialog-close>Cancel</button>
-      <button mat-flat-button color="primary" [disabled]="userForm.invalid || isSaving" (click)="onSave()">
-        {{ data.user ? 'Save Access & Permissions' : 'Create User' }}
+    <mat-dialog-actions class="dialog-actions-footer">
+      <button *ngIf="data.user" 
+              mat-stroked-button 
+              color="warn" 
+              type="button" 
+              class="delete-user-dialog-btn" 
+              (click)="onDeleteUser()"
+              [disabled]="isSelf()"
+              [matTooltip]="isSelf() ? 'You cannot delete your own logged-in account' : 'Permanently delete this user'">
+        <mat-icon>delete_forever</mat-icon> Delete User
       </button>
+      <div class="actions-right">
+        <button mat-button mat-dialog-close>Cancel</button>
+        <button mat-flat-button color="primary" [disabled]="userForm.invalid || isSaving" (click)="onSave()">
+          {{ data.user ? 'Save Access & Permissions' : 'Create User' }}
+        </button>
+      </div>
     </mat-dialog-actions>
   `,
   styles: [`
@@ -725,6 +739,37 @@ import {
       }
     }
 
+    .dialog-actions-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      width: 100%;
+      padding: 12px 0 0 0;
+
+      .actions-right {
+        display: flex;
+        gap: 8px;
+        margin-left: auto;
+      }
+
+      .delete-user-dialog-btn {
+        color: #dc2626;
+        border-color: #fca5a5;
+
+        &:hover:not([disabled]) {
+          background-color: #fef2f2;
+          border-color: #dc2626;
+        }
+
+        mat-icon {
+          font-size: 18px;
+          width: 18px;
+          height: 18px;
+          margin-right: 4px;
+        }
+      }
+    }
+
     .error-banner {
       padding: 12px;
       background-color: #ffebee;
@@ -735,6 +780,8 @@ import {
 })
 export class UserRoleDialogComponent {
   private fb = inject(FormBuilder);
+  private authService = inject(AuthService);
+  private notif = inject(NotificationService);
   
   readonly moduleDefinitions = SYSTEM_MODULE_PERMISSIONS;
   readonly totalSystemPerms = ALL_SYSTEM_PERMISSION_IDS.length;
@@ -938,6 +985,28 @@ export class UserRoleDialogComponent {
       case 'Store Manager': return 'Store warehouse management, inventory settings, and stock dispatch';
       case 'Inventory Officer': return 'Store items management, stock adjustments, and item issuances';
       default: return 'Custom operational privilege';
+    }
+  }
+
+  isSelf(): boolean {
+    return !!this.data.user?.id && this.data.user.id === this.authService.currentUser()?.uid;
+  }
+
+  async onDeleteUser() {
+    if (!this.data.user?.id) return;
+    if (this.isSelf()) {
+      this.notif.error('Security Restriction: You cannot delete your own logged-in user account.');
+      return;
+    }
+
+    const userName = this.data.user.displayName ? `user "${this.data.user.displayName}" (${this.data.user.email})` : `user "${this.data.user.email}"`;
+    const confirmed = await this.notif.confirmDelete(
+      userName,
+      'This will permanently delete their account record, roles, and assigned access from the platform.'
+    );
+
+    if (confirmed) {
+      this.dialogRef.close({ delete: true, userId: this.data.user.id });
     }
   }
 

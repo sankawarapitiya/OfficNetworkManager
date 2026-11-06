@@ -23,13 +23,18 @@
       </button>
 
       <mat-menu #addMenu="matMenu">
-        <button mat-menu-item (click)="openAddItemDialog('movable')">
+        <button mat-menu-item (click)="openAddItemDialog('movable', 'single')">
           <mat-icon color="primary">inventory_2</mat-icon>
           <span>Movable & Consumable Item</span>
         </button>
-        <button mat-menu-item (click)="openAddItemDialog('immovable')">
+        <button mat-menu-item (click)="openAddItemDialog('immovable', 'single')">
           <mat-icon style="color: #d97706;">apartment</mat-icon>
           <span>Immovable & Fixed Asset</span>
+        </button>
+        <mat-divider></mat-divider>
+        <button mat-menu-item (click)="openAddItemDialog('movable', 'excel')">
+          <mat-icon style="color: #059669;">upload_file</mat-icon>
+          <span>Bulk Upload via Excel...</span>
         </button>
       </mat-menu>
 
@@ -119,9 +124,9 @@
       <!-- Search Input -->
       <mat-form-field appearance="outline" class="search-field" subscriptSizing="dynamic">
         <mat-label>Search Inventory (Name, Code, Asset Tag, Custodian, Serial)...</mat-label>
-        <input matInput [ngModel]="searchQuery()" (ngModelChange)="searchQuery.set($event)" placeholder="Type to filter...">
+        <input matInput [ngModel]="searchQuery()" (ngModelChange)="searchQuery.set($event); onFilterChange()" placeholder="Type to filter...">
         <mat-icon matPrefix>search</mat-icon>
-        <button *ngIf="searchQuery()" mat-icon-button matSuffix (click)="searchQuery.set('')">
+        <button *ngIf="searchQuery()" mat-icon-button matSuffix (click)="searchQuery.set(''); onFilterChange()">
           <mat-icon>close</mat-icon>
         </button>
       </mat-form-field>
@@ -129,7 +134,7 @@
       <!-- Category Filter -->
       <mat-form-field appearance="outline" class="select-field" subscriptSizing="dynamic">
         <mat-label>Category</mat-label>
-        <mat-select [ngModel]="selectedCategory()" (ngModelChange)="selectedCategory.set($event)">
+        <mat-select [ngModel]="selectedCategory()" (ngModelChange)="selectedCategory.set($event); onFilterChange()">
           <mat-option value="All">All Categories</mat-option>
           <mat-option *ngFor="let cat of categoriesList()" [value]="cat">{{ cat }}</mat-option>
         </mat-select>
@@ -139,7 +144,7 @@
       <!-- Location Filter -->
       <mat-form-field appearance="outline" class="select-field" subscriptSizing="dynamic">
         <mat-label>Location / Room</mat-label>
-        <mat-select [ngModel]="selectedLocation()" (ngModelChange)="selectedLocation.set($event)">
+        <mat-select [ngModel]="selectedLocation()" (ngModelChange)="selectedLocation.set($event); onFilterChange()">
           <mat-option value="All">All Locations</mat-option>
           <mat-option *ngFor="let loc of locationsList()" [value]="loc">{{ loc }}</mat-option>
         </mat-select>
@@ -165,7 +170,7 @@
     </div>
 
     <div class="table-container" *ngIf="!isLoading() && filteredItems().length > 0">
-      <table mat-table [dataSource]="filteredItems()" class="inventory-table">
+      <table mat-table [dataSource]="paginatedItems()" class="inventory-table">
         <!-- Code / Tag Column -->
         <ng-container matColumnDef="code">
           <th mat-header-cell *matHeaderCellDef>Item / Asset Code</th>
@@ -297,9 +302,19 @@
       </table>
     </div>
 
+    <!-- Pagination -->
+    <mat-paginator
+      [length]="filteredItems().length"
+      [pageSize]="pageSize()"
+      [pageSizeOptions]="[5, 10, 25, 50, 100]"
+      [pageIndex]="currentPage() - 1"
+      (page)="onPageChange($event)"
+      showFirstLastButtons>
+    </mat-paginator>
+
     <!-- Table Footer Meta -->
     <div class="table-footer-bar" *ngIf="!isLoading() && filteredItems().length > 0">
-      <span>Showing <strong>{{ filteredItems().length }}</strong> of <strong>{{ totalItemsCount() }}</strong> inventory records</span>
+      <span>Showing <strong>{{ paginatedItems().length }}</strong> of <strong>{{ filteredItems().length }}</strong> (Total: <strong>{{ totalItemsCount() }}</strong> inventory records)</span>
     </div>
   </mat-card>
 </div>

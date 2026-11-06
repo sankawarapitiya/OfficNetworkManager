@@ -9,6 +9,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import * as XLSX from 'xlsx';
 
 import { StockTransaction, StockTransactionType } from '../../models/inventory.model';
@@ -28,7 +29,8 @@ import { NotificationService } from '../../../../core/services/notification.serv
     MatFormFieldModule,
     MatInputModule,
     MatSelectModule,
-    MatTooltipModule
+    MatTooltipModule,
+    MatPaginatorModule
   ],
   templateUrl: './inventory-ledger.component.html',
   styleUrl: './inventory-ledger.component.scss'
@@ -95,6 +97,24 @@ export class InventoryLedgerComponent implements OnInit {
     return list;
   });
 
+  // Pagination
+  pageSize = signal<number>(10);
+  currentPage = signal<number>(1);
+
+  paginatedTransactions = computed(() => {
+    const start = (this.currentPage() - 1) * this.pageSize();
+    return this.filteredTransactions().slice(start, start + this.pageSize());
+  });
+
+  onPageChange(event: PageEvent) {
+    this.currentPage.set(event.pageIndex + 1);
+    this.pageSize.set(event.pageSize);
+  }
+
+  onFilterChange() {
+    this.currentPage.set(1);
+  }
+
   ngOnInit() {
     this.loadTransactions();
   }
@@ -124,6 +144,9 @@ export class InventoryLedgerComponent implements OnInit {
       'Quantity Changed': t.transactionType.startsWith('IN_') ? `+${t.quantity}` : `-${t.quantity}`,
       'Previous Balance': t.previousQty,
       'New Balance': t.balanceQty,
+      'Unit Cost (LKR)': t.unitCost !== undefined && t.unitCost !== null ? t.unitCost.toFixed(2) : '',
+      'Total Cost (LKR)': t.totalCost !== undefined && t.totalCost !== null ? t.totalCost.toFixed(2) : '',
+      'FIFO Batch Details': t.batchDetails || '',
       'Reference No': t.referenceNo || '',
       'Notes': t.notes || '',
       'Performed By': t.performedBy

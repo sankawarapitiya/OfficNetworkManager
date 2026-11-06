@@ -59,16 +59,16 @@
     <div class="filter-controls-row">
       <mat-form-field appearance="outline" class="search-field" subscriptSizing="dynamic">
         <mat-label>Search Transactions (Txn No, Item, Reference, Officer, Notes)...</mat-label>
-        <input matInput [ngModel]="searchQuery()" (ngModelChange)="searchQuery.set($event)" placeholder="Type to search ledger...">
+        <input matInput [ngModel]="searchQuery()" (ngModelChange)="searchQuery.set($event); onFilterChange()" placeholder="Type to search ledger...">
         <mat-icon matPrefix>search</mat-icon>
-        <button *ngIf="searchQuery()" mat-icon-button matSuffix (click)="searchQuery.set('')">
+        <button *ngIf="searchQuery()" mat-icon-button matSuffix (click)="searchQuery.set(''); onFilterChange()">
           <mat-icon>close</mat-icon>
         </button>
       </mat-form-field>
 
       <mat-form-field appearance="outline" class="select-field" subscriptSizing="dynamic">
         <mat-label>Movement Type</mat-label>
-        <mat-select [ngModel]="selectedTypeFilter()" (ngModelChange)="selectedTypeFilter.set($event)">
+        <mat-select [ngModel]="selectedTypeFilter()" (ngModelChange)="selectedTypeFilter.set($event); onFilterChange()">
           <mat-option value="All">All Movements</mat-option>
           <mat-option value="IN">Inward / Additions (+)</mat-option>
           <mat-option value="OUT">Outward / Deductions (-)</mat-option>
@@ -97,7 +97,7 @@
     </div>
 
     <div class="table-container" *ngIf="!isLoading() && filteredTransactions().length > 0">
-      <table mat-table [dataSource]="filteredTransactions()" class="ledger-table">
+      <table mat-table [dataSource]="paginatedTransactions()" class="ledger-table">
         <!-- Date -->
         <ng-container matColumnDef="date">
           <th mat-header-cell *matHeaderCellDef>Date & Time</th>
@@ -136,13 +136,16 @@
           </td>
         </ng-container>
 
-        <!-- Quantity Changed -->
+        <!-- Quantity Changed & Cost -->
         <ng-container matColumnDef="quantity">
-          <th mat-header-cell *matHeaderCellDef class="text-center">Quantity</th>
+          <th mat-header-cell *matHeaderCellDef class="text-center">Quantity & Cost</th>
           <td mat-cell *matCellDef="let t" class="text-center">
             <strong class="qty-text" [class.qty-in]="t.transactionType.startsWith('IN_')" [class.qty-out]="t.transactionType.startsWith('OUT_')">
               {{ t.transactionType.startsWith('IN_') ? '+' : '-' }}{{ t.quantity }}
             </strong>
+            <div class="cost-sub font-mono" *ngIf="t.totalCost">
+              LKR {{ t.totalCost | number:'1.2-2' }}
+            </div>
           </td>
         </ng-container>
 
@@ -158,12 +161,16 @@
           </td>
         </ng-container>
 
-        <!-- Reference / Request No -->
+        <!-- Reference / FIFO Batch / Notes -->
         <ng-container matColumnDef="reference">
-          <th mat-header-cell *matHeaderCellDef>Reference / Notes</th>
+          <th mat-header-cell *matHeaderCellDef>Reference & FIFO Batch</th>
           <td mat-cell *matCellDef="let t">
             <div class="ref-cell">
               <span class="ref-no font-mono" *ngIf="t.referenceNo">{{ t.referenceNo }}</span>
+              <span class="batch-detail-pill font-mono" *ngIf="t.batchDetails" [matTooltip]="t.batchDetails">
+                <mat-icon class="batch-mini-icon">layers</mat-icon>
+                {{ t.batchDetails }}
+              </span>
               <span class="notes-text" *ngIf="t.notes" [matTooltip]="t.notes">{{ t.notes }}</span>
             </div>
           </td>
@@ -182,8 +189,18 @@
       </table>
     </div>
 
+    <!-- Pagination -->
+    <mat-paginator
+      [length]="filteredTransactions().length"
+      [pageSize]="pageSize()"
+      [pageSizeOptions]="[10, 25, 50, 100]"
+      [pageIndex]="currentPage() - 1"
+      (page)="onPageChange($event)"
+      showFirstLastButtons>
+    </mat-paginator>
+
     <div class="table-footer-bar" *ngIf="!isLoading() && filteredTransactions().length > 0">
-      <span>Showing <strong>{{ filteredTransactions().length }}</strong> of <strong>{{ totalTxnCount() }}</strong> ledger transactions</span>
+      <span>Showing <strong>{{ paginatedTransactions().length }}</strong> of <strong>{{ filteredTransactions().length }}</strong> (Total: <strong>{{ totalTxnCount() }}</strong> ledger transactions)</span>
     </div>
   </mat-card>
 </div>

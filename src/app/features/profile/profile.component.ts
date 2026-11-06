@@ -262,9 +262,11 @@ export class ProfileComponent implements OnInit {
       }
     });
 
-    dialogRef.afterClosed().subscribe(result => {
+    dialogRef.afterClosed().subscribe(async result => {
       if (result) {
-        if (user) {
+        if (result.delete && user) {
+          await this.deleteUser(user);
+        } else if (user) {
           this.saveUserRoles(user.id!, result);
         } else {
           this.createNewUser(result);
@@ -335,6 +337,33 @@ export class ProfileComponent implements OnInit {
     } catch (err: any) {
       console.error('Error saving user roles', err);
       this.notif.error(err?.message || 'Failed to update user roles');
+    }
+  }
+
+  async deleteUser(user: AppUser) {
+    if (!user || !user.id) return;
+
+    const currentUid = this.authService.currentUser()?.uid;
+    if (user.id === currentUid) {
+      this.notif.error('Security Restriction: You cannot delete your own logged-in user account.');
+      return;
+    }
+
+    const userName = user.displayName ? `user "${user.displayName}" (${user.email})` : `user "${user.email}"`;
+    const confirmed = await this.notif.confirmDelete(
+      userName,
+      'This will permanently delete their account record, roles, and assigned access from the platform.'
+    );
+
+    if (!confirmed) return;
+
+    try {
+      await this.firestoreService.deleteDocument('users', user.id);
+      this.allUsers.update(list => list.filter(u => u.id !== user.id));
+      this.notif.success(`User "${user.displayName || user.email}" was successfully deleted.`);
+    } catch (err: any) {
+      console.error('Error deleting user:', err);
+      this.notif.error(err?.message || 'Failed to delete user account');
     }
   }
 }

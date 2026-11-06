@@ -12,6 +12,7 @@ import { MatChipsModule } from '@angular/material/chips';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatDialogModule, MatDialog } from '@angular/material/dialog';
 import { MatMenuModule } from '@angular/material/menu';
+import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 
 import { InventoryRequest, InventorySettings, DEFAULT_INVENTORY_SETTINGS } from '../../models/inventory.model';
 import { InventoryService } from '../../services/inventory.service';
@@ -37,7 +38,8 @@ import { RbacService } from '../../../../auth/rbac.service';
     MatChipsModule,
     MatTooltipModule,
     MatDialogModule,
-    MatMenuModule
+    MatMenuModule,
+    MatPaginatorModule
   ],
   templateUrl: './inventory-requests.component.html',
   styleUrl: './inventory-requests.component.scss'
@@ -132,6 +134,24 @@ export class InventoryRequestsComponent implements OnInit {
     return list;
   });
 
+  // Pagination
+  pageSize = signal<number>(10);
+  currentPage = signal<number>(1);
+
+  paginatedRequests = computed(() => {
+    const start = (this.currentPage() - 1) * this.pageSize();
+    return this.filteredRequests().slice(start, start + this.pageSize());
+  });
+
+  onPageChange(event: PageEvent) {
+    this.currentPage.set(event.pageIndex + 1);
+    this.pageSize.set(event.pageSize);
+  }
+
+  onFilterChange() {
+    this.currentPage.set(1);
+  }
+
   ngOnInit() {
     if (!this.canManageRequests()) {
       this.activeTab.set('MY');
@@ -160,6 +180,7 @@ export class InventoryRequestsComponent implements OnInit {
 
   setTab(tab: 'ALL' | 'MY') {
     this.activeTab.set(tab);
+    this.currentPage.set(1);
   }
 
   toggleRowExpansion(reqId: string) {

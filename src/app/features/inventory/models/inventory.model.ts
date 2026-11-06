@@ -4,6 +4,18 @@ export type ItemCondition = 'Good' | 'Fair' | 'Needs Repair' | 'Damaged' | 'Writ
 
 export type ItemStatus = 'Active' | 'Low Stock' | 'Out of Stock' | 'Damaged' | 'Disposed';
 
+export interface InventoryBatch {
+  id: string;               // e.g. BATCH-1730912345678-abc
+  batchNo: string;          // Invoice / GRN reference or auto-generated BATCH-YYYY-001
+  receivedDate: string;     // YYYY-MM-DD
+  receivedAt: number;       // Unix timestamp in ms
+  initialQty: number;       // Original quantity in this batch
+  remainingQty: number;     // Remaining quantity under FIFO
+  unitCost: number;         // Unit price in LKR for this specific batch
+  referenceNo?: string;     // GRN, Invoice, PO reference
+  notes?: string;           // Optional note
+}
+
 export interface InventoryItem {
   id?: string;
   itemCode: string;          // e.g. INV-M-1001 or AST-2026-0042
@@ -15,6 +27,7 @@ export interface InventoryItem {
   quantity: number;          // Current stock on hand (0 for purely tracked fixed assets, or count)
   minStockAlert: number;     // Low stock warning threshold
   unitCost?: number;
+  batches?: InventoryBatch[]; // FIFO Stock Batches queue
   location: string;          // Store shelf/rack, or office room/hall
   division?: string;         // Assigned DS Division or Section
   
@@ -106,6 +119,9 @@ export interface StockTransaction {
   quantity: number;          // Absolute quantity of transaction
   previousQty: number;
   balanceQty: number;
+  unitCost?: number;          // Unit price or average unit cost for this transaction
+  totalCost?: number;         // Total transaction cost valuation (qty * unitCost)
+  batchDetails?: string;      // FIFO batch allocation details
   referenceNo?: string;      // Requisition No (REQ/...) or GRN/Invoice No
   notes?: string;
   performedBy: string;

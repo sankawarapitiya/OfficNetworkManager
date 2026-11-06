@@ -6,6 +6,7 @@ import { AuthService } from '../../../auth/auth.service';
 import { EventLogService } from '../../../core/services/event-log.service';
 import { 
   InventoryItem, 
+  InventoryBatch,
   InventoryRequest, 
   StockTransaction, 
   InventorySettings, 
@@ -66,8 +67,27 @@ export class InventoryService {
 
     const status = this.computeItemStatus(itemData);
 
+    // If movable item with stock > 0, generate initial FIFO batch
+    let initialBatches: InventoryBatch[] = [];
+    if (itemData.itemType === 'movable' && (itemData.quantity || 0) > 0) {
+      const initCost = itemData.unitCost || 0;
+      const initialBatch: InventoryBatch = {
+        id: `BATCH-${now}-${Math.random().toString(36).substring(2, 7)}`,
+        batchNo: `BATCH-${new Date(now).getFullYear()}-001`,
+        receivedDate: new Date(now).toISOString().split('T')[0],
+        receivedAt: now,
+        initialQty: itemData.quantity,
+        remainingQty: itemData.quantity,
+        unitCost: initCost,
+        referenceNo: 'INITIAL-STOCK',
+        notes: 'Initial inventory registration'
+      };
+      initialBatches = [initialBatch];
+    }
+
     const item: Omit<InventoryItem, 'id'> = {
       ...itemData,
+      batches: initialBatches.length > 0 ? initialBatches : (itemData.batches || []),
       status,
       createdAt: now,
       updatedAt: now,
@@ -79,6 +99,7 @@ export class InventoryService {
 
     // If initial stock is greater than 0 for movable item, record initial stock-in transaction
     if (item.itemType === 'movable' && item.quantity > 0) {
+      const initialCost = item.unitCost || 0;
       await this.recordStockTransaction({
         transactionNo: this.generateTransactionNo(),
         itemId: docId,
@@ -88,6 +109,9 @@ export class InventoryService {
         quantity: item.quantity,
         previousQty: 0,
         balanceQty: item.quantity,
+        unitCost: initialCost,
+        totalCost: item.quantity * initialCost,
+        batchDetails: `Initial Batch BATCH-${new Date(now).getFullYear()}-001 (${item.quantity} @ LKR ${initialCost.toFixed(2)})`,
         referenceNo: 'INITIAL-STOCK',
         notes: 'Initial inventory stock registration',
         performedBy: officerName,
@@ -102,6 +126,24 @@ export class InventoryService {
     );
 
     return docId;
+  }
+
+  async addItemsBatch(itemsList: Omit<InventoryItem, 'id'>[]): Promise<{ success: number; failed: number; errors: string[] }> {
+    let success = 0;
+    let failed = 0;
+    const errors: string[] = [];
+
+    for (const item of itemsList) {
+      try {
+        await this.addItem(item);
+        success++;
+      } catch (err: any) {
+        failed++;
+        errors.push(`Item "${item.name}": ${err?.message || 'Failed to save'}`);
+      }
+    }
+
+    return { success, failed, errors };
   }
 
   async updateItem(id: string, updates: Partial<InventoryItem>): Promise<void> {
@@ -137,13 +179,14 @@ export class InventoryService {
     );
   }
 
-  // Quick Stock Adjustment (Stock-in / Purchase, Loss, Damage write-off)
+  // Quick Stock Adjustment (Stock-in / Purchase, Loss, Damage write-off) with FIFO & New Item Price
   async adjustStock(
     item: InventoryItem, 
     qtyChange: number, 
     type: StockTransactionType, 
     notes?: string,
-    refNo?: string
+    refNo?: string,
+    unitCost?: number
   ): Promise<void> {
     if (!item.id) return;
     const user = this.authService.currentUser();
@@ -151,12 +194,71 @@ export class InventoryService {
     const now = Date.now();
 
     const prevQty = item.quantity || 0;
+    const absQty = Math.abs(qtyChange);
     let newQty: number;
+    let newUnitCost = item.unitCost;
+    let txnUnitCost = 0;
+    let txnTotalCost = 0;
+    let batchDetails = '';
+
+    // Initialize or clone batches queue
+    let batches: InventoryBatch[] = (item.batches || []).map(b => ({ ...b }));
+
+    // If existing item has stock > 0 but no batches array yet (legacy items), create legacy opening batch
+    if (batches.length === 0 && prevQty > 0) {
+      batches = [{
+        id: `BATCH-LEGACY-${item.createdAt || now}`,
+        batchNo: 'BATCH-LEGACY',
+        receivedDate: new Date(item.createdAt || now).toISOString().split('T')[0],
+        receivedAt: item.createdAt || now,
+        initialQty: prevQty,
+        remainingQty: prevQty,
+        unitCost: item.unitCost || 0,
+        referenceNo: 'LEGACY-STOCK',
+        notes: 'Legacy stock opening balance'
+      }];
+    }
 
     if (type.startsWith('IN_')) {
-      newQty = prevQty + Math.abs(qtyChange);
+      newQty = prevQty + absQty;
+      // New incoming unit price (defaults to entered unitCost or existing item.unitCost)
+      const incomingPrice = unitCost !== undefined && unitCost !== null && !isNaN(unitCost) 
+        ? Math.max(0, unitCost) 
+        : (item.unitCost || 0);
+
+      newUnitCost = incomingPrice;
+      txnUnitCost = incomingPrice;
+      txnTotalCost = absQty * incomingPrice;
+
+      // Create new FIFO batch
+      const batchCount = batches.length + 1;
+      const cleanRef = refNo?.trim();
+      const generatedBatchNo = cleanRef 
+        ? cleanRef 
+        : `BATCH-${new Date(now).getFullYear()}-${String(batchCount).padStart(3, '0')}`;
+
+      const newBatch: InventoryBatch = {
+        id: `BATCH-${now}-${Math.random().toString(36).substring(2, 7)}`,
+        batchNo: generatedBatchNo,
+        receivedDate: new Date(now).toISOString().split('T')[0],
+        receivedAt: now,
+        initialQty: absQty,
+        remainingQty: absQty,
+        unitCost: incomingPrice,
+        referenceNo: cleanRef || '',
+        notes: notes || ''
+      };
+
+      batches.push(newBatch);
+      batchDetails = `New FIFO Batch: ${newBatch.batchNo} (+${absQty} @ LKR ${incomingPrice.toFixed(2)})`;
     } else {
-      newQty = Math.max(0, prevQty - Math.abs(qtyChange));
+      // Outward adjustment (damage / write-off) - consume from FIFO queue (oldest first)
+      newQty = Math.max(0, prevQty - absQty);
+      const fifo = this.consumeBatchesFIFO(batches, absQty, item.unitCost || 0);
+      batches = fifo.updatedBatches;
+      txnTotalCost = fifo.totalCost;
+      txnUnitCost = fifo.effectiveUnitCost;
+      batchDetails = fifo.summaryText ? `FIFO Deducted: ${fifo.summaryText}` : 'FIFO Deducted from stock';
     }
 
     const updatedStatus = this.computeItemStatus({
@@ -166,6 +268,8 @@ export class InventoryService {
 
     await this.firestoreService.updateDocument(this.itemsCollection, item.id, {
       quantity: newQty,
+      unitCost: newUnitCost,
+      batches: batches,
       status: updatedStatus,
       updatedAt: now,
       updatedBy: officerName
@@ -177,9 +281,12 @@ export class InventoryService {
       itemName: item.name,
       itemCode: item.itemCode,
       transactionType: type,
-      quantity: Math.abs(qtyChange),
+      quantity: absQty,
       previousQty: prevQty,
       balanceQty: newQty,
+      unitCost: txnUnitCost,
+      totalCost: txnTotalCost,
+      batchDetails: batchDetails,
       referenceNo: refNo || '',
       notes: notes || '',
       performedBy: officerName,
@@ -189,8 +296,72 @@ export class InventoryService {
     this.eventLogService.logAction(
       'UPDATED',
       'inventory',
-      `Stock adjustment for [${item.itemCode}] ${item.name}: ${prevQty} -> ${newQty} (${type})`
+      `Stock adjustment for [${item.itemCode}] ${item.name}: ${prevQty} -> ${newQty} (${type}, Unit Price: LKR ${txnUnitCost.toFixed(2)})`
     );
+  }
+
+  /**
+   * Helper to consume quantities from inventory batches using First-In, First-Out (FIFO) queue.
+   */
+  consumeBatchesFIFO(
+    batches: InventoryBatch[] = [],
+    qtyToConsume: number,
+    fallbackUnitCost: number = 0
+  ): {
+    updatedBatches: InventoryBatch[];
+    consumedDetails: { batchNo: string; qty: number; unitCost: number; cost: number }[];
+    totalCost: number;
+    effectiveUnitCost: number;
+    summaryText: string;
+  } {
+    let remainingToConsume = Math.abs(qtyToConsume);
+    let totalCost = 0;
+    const consumedDetails: { batchNo: string; qty: number; unitCost: number; cost: number }[] = [];
+
+    // Clone batches and sort by receivedAt ascending (oldest first = FIFO)
+    const sortedBatches: InventoryBatch[] = (batches || []).map(b => ({ ...b })).sort((a, b) => (a.receivedAt || 0) - (b.receivedAt || 0));
+
+    for (const b of sortedBatches) {
+      if (remainingToConsume <= 0) break;
+      if (b.remainingQty > 0) {
+        const take = Math.min(b.remainingQty, remainingToConsume);
+        b.remainingQty -= take;
+        remainingToConsume -= take;
+        const lineCost = take * (b.unitCost || 0);
+        totalCost += lineCost;
+        consumedDetails.push({
+          batchNo: b.batchNo,
+          qty: take,
+          unitCost: b.unitCost || 0,
+          cost: lineCost
+        });
+      }
+    }
+
+    // If remainingToConsume > 0 (e.g. unbatched legacy stock), deduct with fallback unit cost
+    if (remainingToConsume > 0) {
+      const lineCost = remainingToConsume * (fallbackUnitCost || 0);
+      totalCost += lineCost;
+      consumedDetails.push({
+        batchNo: 'LEGACY-STOCK',
+        qty: remainingToConsume,
+        unitCost: fallbackUnitCost || 0,
+        cost: lineCost
+      });
+    }
+
+    const effectiveUnitCost = qtyToConsume > 0 ? (totalCost / qtyToConsume) : fallbackUnitCost;
+    const summaryText = consumedDetails
+      .map(cd => `${cd.qty} from ${cd.batchNo} @ LKR ${cd.unitCost.toFixed(2)}`)
+      .join('; ');
+
+    return {
+      updatedBatches: sortedBatches,
+      consumedDetails,
+      totalCost,
+      effectiveUnitCost,
+      summaryText
+    };
   }
 
   // ==========================================
@@ -288,9 +459,28 @@ export class InventoryService {
           const newQty = Math.max(0, prevQty - releaseQty);
           const newStatus = this.computeItemStatus({ ...itemObj, quantity: newQty });
 
+          // Deduct from FIFO batches
+          let batches: InventoryBatch[] = (itemObj.batches || []).map(b => ({ ...b }));
+          if (batches.length === 0 && prevQty > 0) {
+            batches = [{
+              id: `BATCH-LEGACY-${itemObj.createdAt || now}`,
+              batchNo: 'BATCH-LEGACY',
+              receivedDate: new Date(itemObj.createdAt || now).toISOString().split('T')[0],
+              receivedAt: itemObj.createdAt || now,
+              initialQty: prevQty,
+              remainingQty: prevQty,
+              unitCost: itemObj.unitCost || 0,
+              referenceNo: 'LEGACY-STOCK',
+              notes: 'Legacy stock opening balance'
+            }];
+          }
+
+          const fifo = this.consumeBatchesFIFO(batches, releaseQty, itemObj.unitCost || 0);
+
           // Deduct from item in Firestore
           await this.firestoreService.updateDocument(this.itemsCollection, line.itemId, {
             quantity: newQty,
+            batches: fifo.updatedBatches,
             status: newStatus,
             updatedAt: now,
             updatedBy: storeManagerName
@@ -306,6 +496,9 @@ export class InventoryService {
             quantity: releaseQty,
             previousQty: prevQty,
             balanceQty: newQty,
+            unitCost: fifo.effectiveUnitCost,
+            totalCost: fifo.totalCost,
+            batchDetails: fifo.summaryText ? `FIFO Released: ${fifo.summaryText}` : 'FIFO Released from stock',
             referenceNo: req.requestNo,
             notes: `Issued to ${req.requesterName} (${req.division}) - ${remarks || 'Store Requisition'}`,
             performedBy: storeManagerName,

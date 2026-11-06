@@ -7,7 +7,7 @@ import { MatChipsModule } from '@angular/material/chips';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatTableModule } from '@angular/material/table';
 
-import { InventoryItem, StockTransaction } from '../../models/inventory.model';
+import { InventoryItem, InventoryBatch, StockTransaction } from '../../models/inventory.model';
 import { InventoryService } from '../../services/inventory.service';
 
 @Component({
@@ -135,6 +135,67 @@ import { InventoryService } from '../../services/inventory.service';
               <td class="val" colspan="3">{{ item.remarks }}</td>
             </tr>
           </table>
+
+          <!-- FIFO Batches & Stock Valuation (For Movable Items) -->
+          <div class="batches-block" *ngIf="item.itemType === 'movable'">
+            <div class="batches-header-bar">
+              <h3 class="history-title">
+                <mat-icon>layers</mat-icon>
+                First-In, First-Out (FIFO) Batches & Stock Valuation
+              </h3>
+              <div class="total-valuation-badge">
+                <span class="v-lbl">Total Inventory Valuation:</span>
+                <strong class="v-val font-mono">LKR {{ getTotalValuation() | number:'1.2-2' }}</strong>
+              </div>
+            </div>
+
+            <table class="batches-detail-table" *ngIf="getItemBatches().length > 0; else noBatchesTpl">
+              <thead>
+                <tr>
+                  <th>FIFO Priority</th>
+                  <th>Batch / Reference</th>
+                  <th>Received Date</th>
+                  <th>Initial Qty</th>
+                  <th>Remaining Qty</th>
+                  <th>Batch Unit Price</th>
+                  <th>Valuation (LKR)</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let b of getItemBatches(); let i = index" [class.exhausted]="b.remainingQty <= 0" [class.active-head]="i === 0 && b.remainingQty > 0">
+                  <td>
+                    <span class="batch-order-pill" [class.active]="b.remainingQty > 0" [class.first-pill]="i === 0 && b.remainingQty > 0">
+                      {{ b.remainingQty > 0 ? (i === 0 ? 'Next Out (#1)' : '#' + (i + 1) + ' In Queue') : 'Exhausted' }}
+                    </span>
+                  </td>
+                  <td class="font-mono">
+                    <strong>{{ b.batchNo }}</strong>
+                    <span class="sub-ref" *ngIf="b.referenceNo && b.referenceNo !== b.batchNo">({{ b.referenceNo }})</span>
+                  </td>
+                  <td>{{ b.receivedDate || '—' }}</td>
+                  <td>{{ b.initialQty }} {{ item.unit }}</td>
+                  <td>
+                    <strong [class.text-success]="b.remainingQty > 0">{{ b.remainingQty }} {{ item.unit }}</strong>
+                  </td>
+                  <td class="font-mono">LKR {{ b.unitCost | number:'1.2-2' }}</td>
+                  <td class="font-mono val-col">LKR {{ (b.remainingQty * b.unitCost) | number:'1.2-2' }}</td>
+                  <td>
+                    <span class="batch-status-chip" [class.in-stock]="b.remainingQty > 0" [class.depleted]="b.remainingQty <= 0">
+                      {{ b.remainingQty > 0 ? 'Active' : 'Depleted' }}
+                    </span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+
+            <ng-template #noBatchesTpl>
+              <div class="no-batches-box">
+                <mat-icon>info</mat-icon>
+                <span>No FIFO batches tracked yet. Current inventory is {{ item.quantity }} {{ item.unit }} at reference price LKR {{ (item.unitCost || 0) | number:'1.2-2' }}.</span>
+              </div>
+            </ng-template>
+          </div>
 
           <!-- Transaction Movement History (For Movable Items) -->
           <div class="history-block" *ngIf="item.itemType === 'movable'">
@@ -379,6 +440,122 @@ import { InventoryService } from '../../services/inventory.service';
         }
       }
 
+      .batches-block {
+        margin-top: 24px;
+
+        .batches-header-bar {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 10px;
+
+          .history-title {
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 13.5px;
+            font-weight: 800;
+            color: #0f172a;
+            mat-icon { font-size: 18px; width: 18px; height: 18px; color: #4f46e5; }
+          }
+
+          .total-valuation-badge {
+            background: #ecfdf5;
+            border: 1px solid #a7f3d0;
+            border-radius: 6px;
+            padding: 4px 10px;
+            display: flex;
+            align-items: baseline;
+            gap: 6px;
+
+            .v-lbl { font-size: 11px; color: #065f46; font-weight: 600; }
+            .v-val { font-size: 13.5px; font-weight: 800; color: #047857; }
+          }
+        }
+
+        .batches-detail-table {
+          width: 100%;
+          border-collapse: collapse;
+          font-size: 11.5px;
+
+          th {
+            background: #f8fafc;
+            color: #64748b;
+            font-weight: 700;
+            text-align: left;
+            padding: 6px 8px;
+            border-bottom: 2px solid #e2e8f0;
+          }
+
+          td {
+            padding: 6px 8px;
+            border-bottom: 1px solid #f1f5f9;
+            color: #1e293b;
+            vertical-align: middle;
+
+            &.val-col { font-weight: 700; color: #047857; }
+          }
+
+          tr.active-head {
+            background: #f0fdf4;
+          }
+
+          tr.exhausted {
+            opacity: 0.6;
+            background: #f8fafc;
+          }
+
+          .batch-order-pill {
+            display: inline-block;
+            font-size: 9.5px;
+            font-weight: 700;
+            padding: 2px 6px;
+            border-radius: 4px;
+            background: #e2e8f0;
+            color: #475569;
+
+            &.first-pill {
+              background: #dcfce7;
+              color: #15803d;
+              border: 1px solid #86efac;
+            }
+          }
+
+          .sub-ref {
+            font-size: 10px;
+            color: #64748b;
+            margin-left: 4px;
+          }
+
+          .text-success { color: #15803d; }
+
+          .batch-status-chip {
+            display: inline-block;
+            font-size: 9.5px;
+            font-weight: 700;
+            padding: 1px 6px;
+            border-radius: 4px;
+
+            &.in-stock { background: #dcfce7; color: #166534; }
+            &.depleted { background: #f1f5f9; color: #94a3b8; }
+          }
+        }
+
+        .no-batches-box {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          color: #1e40af;
+          font-size: 11.5px;
+          padding: 10px 14px;
+          background: #eff6ff;
+          border: 1px solid #bfdbfe;
+          border-radius: 6px;
+          mat-icon { font-size: 18px; width: 18px; height: 18px; color: #3b82f6; }
+        }
+      }
+
       .history-block {
         margin-top: 20px;
         border-top: 1px solid #e2e8f0;
@@ -498,6 +675,18 @@ export class ItemDetailDialogComponent implements OnInit {
         this.itemTransactions.set(filtered);
       });
     }
+  }
+
+  getItemBatches(): InventoryBatch[] {
+    return [...(this.item.batches || [])].sort((a, b) => (a.receivedAt || 0) - (b.receivedAt || 0));
+  }
+
+  getTotalValuation(): number {
+    const active = (this.item.batches || []).filter(b => b.remainingQty > 0);
+    if (active.length > 0) {
+      return active.reduce((sum, b) => sum + (b.remainingQty * (b.unitCost || 0)), 0);
+    }
+    return (this.item.quantity || 0) * (this.item.unitCost || 0);
   }
 
   printDossier() {

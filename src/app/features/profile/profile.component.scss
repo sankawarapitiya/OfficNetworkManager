@@ -401,6 +401,43 @@ table {
   color: #94a3b8;
 }
 
+.user-action-buttons {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+
+  .manage-access-btn {
+    font-size: 12px;
+    height: 32px;
+    line-height: 32px;
+    padding: 0 10px;
+
+    mat-icon {
+      font-size: 16px;
+      width: 16px;
+      height: 16px;
+      margin-right: 4px;
+    }
+  }
+
+  .delete-user-btn {
+    width: 32px;
+    height: 32px;
+    line-height: 32px;
+
+    mat-icon {
+      font-size: 18px;
+      width: 18px;
+      height: 18px;
+    }
+
+    &:hover:not([disabled]) {
+      background-color: #fef2f2;
+    }
+  }
+}
+
 /* Mobile Responsive Breakpoints */
 @media (max-width: 768px) {
   .avatar-header {
