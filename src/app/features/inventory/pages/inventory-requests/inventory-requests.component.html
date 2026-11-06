@@ -11,7 +11,7 @@
     </div>
 
     <div class="header-right">
-      <button mat-flat-button color="primary" (click)="openCreateRequestDialog()" class="action-btn">
+      <button *ngIf="canCreateRequest()" mat-flat-button color="primary" (click)="openCreateRequestDialog()" class="action-btn">
         <mat-icon>add</mat-icon>
         New Requisition
       </button>
@@ -70,7 +70,7 @@
     <div class="main-tabs-row">
       <!-- Tabs: Store Management vs My Requisitions -->
       <div class="tab-pills-wrap">
-        <button type="button" class="tab-pill-btn" [class.active]="activeTab() === 'ALL'" (click)="setTab('ALL')">
+        <button *ngIf="canManageRequests()" type="button" class="tab-pill-btn" [class.active]="activeTab() === 'ALL'" (click)="setTab('ALL')">
           <mat-icon>storefront</mat-icon>
           <span>Store Management ({{ totalCount() }})</span>
         </button>
@@ -220,7 +220,7 @@
                 <span>{{ expandedRequestId() === r.id ? 'Collapse Details' : 'View Item Details' }}</span>
               </button>
 
-              <button mat-menu-item color="warn" *ngIf="r.status === 'Pending'" (click)="cancelRequest(r)">
+              <button mat-menu-item color="warn" *ngIf="canCancelRequest(r)" (click)="cancelRequest(r)">
                 <mat-icon color="warn">cancel</mat-icon>
                 <span>Cancel Requisition</span>
               </button>

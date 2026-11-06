@@ -225,25 +225,25 @@ export const routes: Routes = [
             path: 'requests',
             loadComponent: () => import('./features/inventory/pages/inventory-requests/inventory-requests.component').then(m => m.InventoryRequestsComponent),
             canActivate: [rbacGuard],
-            data: { module: 'inventory', permission: 'inventory:request' }
+            data: { module: 'inventory', requirePermissions: ['inventory:request', 'inventory:manage_requests'] }
           },
           {
             path: 'ledger',
             loadComponent: () => import('./features/inventory/pages/inventory-ledger/inventory-ledger.component').then(m => m.InventoryLedgerComponent),
             canActivate: [rbacGuard],
-            data: { module: 'inventory', permission: 'inventory:view' }
+            data: { module: 'inventory', requirePermissions: ['inventory:view', 'inventory:manage_items'] }
           },
           {
             path: 'reports',
             loadComponent: () => import('./features/inventory/pages/inventory-reports/inventory-reports.component').then(m => m.InventoryReportsComponent),
             canActivate: [rbacGuard],
-            data: { module: 'inventory', permission: 'inventory:view' }
+            data: { module: 'inventory', requirePermissions: ['inventory:reports', 'inventory:view', 'inventory:manage_items'] }
           },
           {
             path: 'settings',
             loadComponent: () => import('./features/inventory/pages/inventory-settings/inventory-settings.component').then(m => m.InventorySettingsComponent),
             canActivate: [rbacGuard],
-            data: { module: 'inventory', requireRoles: ['Super Admin', 'Divisional Admin', 'Department Head', 'Store Manager'] }
+            data: { module: 'inventory', requirePermissions: ['inventory:settings'] }
           }
         ]
       },
@@ -251,13 +251,13 @@ export const routes: Routes = [
         path: 'settings',
         loadComponent: () => import('./features/settings/settings/settings.component').then(m => m.SettingsComponent),
         canActivate: [rbacGuard],
-        data: { requireRole: 'admin' }
+        data: { module: 'settings', requireRole: 'admin' }
       },
       {
         path: 'system-log',
         loadComponent: () => import('./features/system-log/system-log.component').then(m => m.SystemLogComponent),
         canActivate: [rbacGuard],
-        data: { requireRole: 'admin' }
+        data: { module: 'system-log', requireRole: 'admin' }
       },
       {
         path: 'profile',
@@ -267,7 +267,7 @@ export const routes: Routes = [
         path: 'attendance',
         loadComponent: () => import('./features/attendance/attendance.component').then(m => m.AttendanceComponent),
         canActivate: [rbacGuard],
-        data: { requireRole: 'admin' }
+        data: { module: 'attendance' }
       }
     ]
   },

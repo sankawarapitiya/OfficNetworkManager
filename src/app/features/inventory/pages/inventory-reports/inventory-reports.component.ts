@@ -25,6 +25,7 @@ import {
 } from '../../models/inventory.model';
 import { SettingsService, Division } from '../../../settings/settings.service';
 import { AuthService } from '../../../../auth/auth.service';
+import { RbacService } from '../../../../auth/rbac.service';
 
 export type StockReportType = 
   | 'stock-balance'        // Stock Balance & Valuation Register
@@ -94,6 +95,18 @@ export class InventoryReportsComponent implements OnInit {
   private inventoryService = inject(InventoryService);
   private settingsService = inject(SettingsService);
   private authService = inject(AuthService);
+  rbacService = inject(RbacService);
+
+  canViewReports = computed(() => {
+    return this.rbacService.isAdmin() ||
+           this.rbacService.isSuperAdmin() ||
+           this.rbacService.isDivisionalAdmin() ||
+           this.rbacService.isDepartmentHead() ||
+           this.rbacService.hasRole('Store Manager') ||
+           this.rbacService.hasRole('Inventory Officer') ||
+           this.rbacService.hasPermission('inventory:reports') ||
+           this.rbacService.hasPermission('inventory:view');
+  });
 
   // Raw Signals from Firestore
   items = signal<InventoryItem[]>([]);

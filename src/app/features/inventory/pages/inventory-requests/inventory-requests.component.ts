@@ -74,6 +74,22 @@ export class InventoryRequestsComponent implements OnInit {
 
   currentUser = computed(() => this.authService.currentUser());
 
+  canManageRequests = computed(() => {
+    return this.rbacService.isAdmin() ||
+           this.rbacService.isSuperAdmin() ||
+           this.rbacService.isDivisionalAdmin() ||
+           this.rbacService.isDepartmentHead() ||
+           this.rbacService.hasRole('Store Manager') ||
+           this.rbacService.hasRole('Inventory Officer') ||
+           this.rbacService.hasPermission('inventory:manage_requests');
+  });
+
+  canCreateRequest = computed(() => {
+    return this.rbacService.isAdmin() ||
+           this.rbacService.isSuperAdmin() ||
+           this.rbacService.hasPermission('inventory:request');
+  });
+
   // Metrics
   totalCount = computed(() => this.requests().length);
   pendingCount = computed(() => this.requests().filter(r => r.status === 'Pending' || r.status === 'Supervisor Approved').length);
@@ -117,6 +133,9 @@ export class InventoryRequestsComponent implements OnInit {
   });
 
   ngOnInit() {
+    if (!this.canManageRequests()) {
+      this.activeTab.set('MY');
+    }
     this.loadData();
   }
 
@@ -152,6 +171,10 @@ export class InventoryRequestsComponent implements OnInit {
   }
 
   openCreateRequestDialog() {
+    if (!this.canCreateRequest()) {
+      this.notif.error('Permission denied: You do not have permission to submit store requisitions.');
+      return;
+    }
     const dialogRef = this.dialog.open(RequestDialogComponent, {
       width: '740px',
       maxWidth: '96vw'
@@ -171,6 +194,10 @@ export class InventoryRequestsComponent implements OnInit {
   }
 
   openReleaseDialog(req: InventoryRequest) {
+    if (!this.canStoreManagerRelease(req)) {
+      this.notif.error('Permission denied: You do not have permission to release store items.');
+      return;
+    }
     const dialogRef = this.dialog.open(ReleaseDialogComponent, {
       width: '800px',
       maxWidth: '96vw',
@@ -209,6 +236,10 @@ export class InventoryRequestsComponent implements OnInit {
 
   async approveAsSupervisor(req: InventoryRequest) {
     if (!req.id) return;
+    if (!this.canSupervisorApprove(req)) {
+      this.notif.error('Permission denied: You do not have permission to approve requisitions.');
+      return;
+    }
     const confirm = window.confirm(`Approve store requisition "${req.requestNo}" for ${req.requesterName}?`);
     if (confirm) {
       try {
@@ -222,6 +253,10 @@ export class InventoryRequestsComponent implements OnInit {
 
   async cancelRequest(req: InventoryRequest) {
     if (!req.id) return;
+    if (!this.canCancelRequest(req)) {
+      this.notif.error('Permission denied: You can only cancel your own pending requisitions.');
+      return;
+    }
     const confirm = window.confirm(`Are you sure you want to cancel requisition "${req.requestNo}"?`);
     if (confirm) {
       try {
@@ -233,14 +268,32 @@ export class InventoryRequestsComponent implements OnInit {
     }
   }
 
+  canCancelRequest(req: InventoryRequest): boolean {
+    if (req.status !== 'Pending') return false;
+    const uid = this.currentUser()?.uid;
+    const email = this.currentUser()?.email;
+    const isOwner = (!!uid && req.requesterId === uid) || (!!email && req.requesterEmail === email);
+    return isOwner || this.canManageRequests();
+  }
+
   canSupervisorApprove(req: InventoryRequest): boolean {
-    const isSupervisor = this.rbacService.isAdmin() || this.rbacService.isSuperAdmin() || this.rbacService.isDepartmentHead() || this.rbacService.isDivisionalAdmin();
+    const isSupervisor = this.rbacService.isAdmin() ||
+                         this.rbacService.isSuperAdmin() ||
+                         this.rbacService.isDivisionalAdmin() ||
+                         this.rbacService.isDepartmentHead() ||
+                         this.rbacService.hasPermission('inventory:manage_requests');
     const isTwoStep = this.settings().approvalWorkflow === 'supervisor_then_store_manager';
     return isSupervisor && isTwoStep && req.status === 'Pending';
   }
 
   canStoreManagerRelease(req: InventoryRequest): boolean {
-    const isStoreManager = this.rbacService.isAdmin() || this.rbacService.isSuperAdmin() || this.rbacService.hasRole('Store Manager') || this.rbacService.hasRole('Inventory Officer') || this.rbacService.isDepartmentHead();
+    const isStoreManager = this.rbacService.isAdmin() ||
+                           this.rbacService.isSuperAdmin() ||
+                           this.rbacService.isDivisionalAdmin() ||
+                           this.rbacService.isDepartmentHead() ||
+                           this.rbacService.hasRole('Store Manager') ||
+                           this.rbacService.hasRole('Inventory Officer') ||
+                           this.rbacService.hasPermission('inventory:manage_requests');
     const isTwoStep = this.settings().approvalWorkflow === 'supervisor_then_store_manager';
     
     if (isTwoStep) {

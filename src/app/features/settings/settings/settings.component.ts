@@ -114,7 +114,9 @@ export class SettingsComponent implements OnInit, AfterViewInit {
     'Department Head',
     'Staff',
     'HR',
-    'Field Agent'
+    'Field Agent',
+    'Store Manager',
+    'Inventory Officer'
   ];
 
   // Active role selected in Role & Permission tab

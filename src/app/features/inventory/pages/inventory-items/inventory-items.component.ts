@@ -74,6 +74,22 @@ export class InventoryItemsComponent implements OnInit {
   // Metrics
   totalItemsCount = computed(() => this.items().length);
 
+  canManageItems = computed(() => {
+    return this.rbacService.isAdmin() ||
+           this.rbacService.isSuperAdmin() ||
+           this.rbacService.isDivisionalAdmin() ||
+           this.rbacService.isDepartmentHead() ||
+           this.rbacService.hasRole('Store Manager') ||
+           this.rbacService.hasRole('Inventory Officer') ||
+           this.rbacService.hasPermission('inventory:manage_items');
+  });
+
+  canRequestItems = computed(() => {
+    return this.rbacService.isAdmin() ||
+           this.rbacService.isSuperAdmin() ||
+           this.rbacService.hasPermission('inventory:request');
+  });
+
   movableCount = computed(() => {
     return this.items().filter(i => i.itemType === 'movable').length;
   });
@@ -160,6 +176,10 @@ export class InventoryItemsComponent implements OnInit {
   }
 
   openAddItemDialog(defaultType: ItemType = 'movable') {
+    if (!this.canManageItems()) {
+      this.notif.error('Permission denied: You do not have permission to register inventory items.');
+      return;
+    }
     const dialogRef = this.dialog.open(ItemDialogComponent, {
       width: '740px',
       maxWidth: '96vw',
@@ -180,6 +200,10 @@ export class InventoryItemsComponent implements OnInit {
   }
 
   openEditDialog(item: InventoryItem) {
+    if (!this.canManageItems()) {
+      this.notif.error('Permission denied: You do not have permission to edit inventory items.');
+      return;
+    }
     const dialogRef = this.dialog.open(ItemDialogComponent, {
       width: '740px',
       maxWidth: '96vw',
@@ -208,6 +232,10 @@ export class InventoryItemsComponent implements OnInit {
   }
 
   openAdjustDialog(item: InventoryItem) {
+    if (!this.canManageItems()) {
+      this.notif.error('Permission denied: You do not have permission to adjust stock levels.');
+      return;
+    }
     const dialogRef = this.dialog.open(StockAdjustDialogComponent, {
       width: '600px',
       maxWidth: '96vw',
@@ -234,6 +262,10 @@ export class InventoryItemsComponent implements OnInit {
   }
 
   openRequestDialog() {
+    if (!this.canRequestItems()) {
+      this.notif.error('Permission denied: You do not have permission to submit store requisitions.');
+      return;
+    }
     const dialogRef = this.dialog.open(RequestDialogComponent, {
       width: '740px',
       maxWidth: '96vw'
@@ -254,6 +286,10 @@ export class InventoryItemsComponent implements OnInit {
 
   async deleteItem(item: InventoryItem) {
     if (!item.id) return;
+    if (!this.canManageItems()) {
+      this.notif.error('Permission denied: You do not have permission to delete inventory items.');
+      return;
+    }
     const confirm = window.confirm(`Are you sure you want to delete "${item.name}" (${item.itemCode}) from inventory?`);
     if (confirm) {
       try {

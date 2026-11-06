@@ -1,3 +1,103 @@
+export interface SystemModuleRouteDef {
+  id: string;          // Route/module key e.g. 'dashboard', 'account', 'inventory'
+  name: string;        // Human-readable title
+  icon: string;        // Material icon name
+  route: string;       // Primary route path
+  category: 'Core' | 'Operations' | 'Administration';
+  description: string; // Explanatory description
+}
+
+export const ALL_SYSTEM_MODULE_ROUTES: SystemModuleRouteDef[] = [
+  {
+    id: 'dashboard',
+    name: 'Executive Dashboard',
+    icon: 'space_dashboard',
+    route: '/dashboard',
+    category: 'Core',
+    description: 'Central operations overview, telemetry metrics and high-level KPIs'
+  },
+  {
+    id: 'customers',
+    name: 'Customer & Citizen Registry',
+    icon: 'groups',
+    route: '/customers',
+    category: 'Operations',
+    description: 'Citizen directory, client registration, stakeholders, and profile management'
+  },
+  {
+    id: 'account',
+    name: 'Financial Accounts & Vouchers',
+    icon: 'account_balance_wallet',
+    route: '/account',
+    category: 'Operations',
+    description: 'Client accounts, voucher entries, multi-payment reconciliation, and financial records'
+  },
+  {
+    id: 'inventory',
+    name: 'Store & Inventory Management',
+    icon: 'inventory_2',
+    route: '/inventory',
+    category: 'Operations',
+    description: 'Stock management, item master catalog, store requisitions, ledger, and dispatch'
+  },
+  {
+    id: 'land',
+    name: 'Land & Cadastral Management',
+    icon: 'terrain',
+    route: '/land',
+    category: 'Operations',
+    description: 'Land parcel surveys, job registration, deeds, spatial records, and zoning workflows'
+  },
+  {
+    id: 'work-plans',
+    name: 'Work Plans & Operations',
+    icon: 'calendar_month',
+    route: '/work-plans',
+    category: 'Operations',
+    description: 'Divisional work plans, task schedules, supervisor verification, and progress sign-offs'
+  },
+  {
+    id: 'letters',
+    name: 'Official Letters & Correspondence',
+    icon: 'mark_email_read',
+    route: '/letters',
+    category: 'Operations',
+    description: 'Inward and outward letter registry, dispatch tracking, and action follow-ups'
+  },
+  {
+    id: 'hr',
+    name: 'Human Resources & Staffing',
+    icon: 'badge',
+    route: '/hr',
+    category: 'Operations',
+    description: 'Staff directory, departmental assignments, and personnel records'
+  },
+  {
+    id: 'attendance',
+    name: 'User Attendance & Biometrics',
+    icon: 'fingerprint',
+    route: '/attendance',
+    category: 'Administration',
+    description: 'Biometric fingerprint terminal integration, daily check-in logs, and time clocking'
+  },
+  {
+    id: 'settings',
+    name: 'Settings & Schemas',
+    icon: 'tune',
+    route: '/settings',
+    category: 'Administration',
+    description: 'System configurations, departments, voucher schemas, and role permission matrices'
+  },
+  {
+    id: 'system-log',
+    name: 'System Audit Log',
+    icon: 'receipt_long',
+    route: '/system-log',
+    category: 'Administration',
+    description: 'Platform security event logs, user activity trails, and system diagnostic history'
+  }
+];
+
 export interface ModulePartPermission {
   id: string;          // Full permission key, e.g. 'customers:create'
   partKey: string;     // Local action key, e.g. 'create'
@@ -287,6 +387,12 @@ export const SYSTEM_MODULE_PERMISSIONS: ModulePermissionDefinition[] = [
         description: 'Add and edit items, adjust stock levels, and decommission assets'
       },
       {
+        id: 'inventory:reports',
+        partKey: 'reports',
+        name: 'Stock Reports & Analytics',
+        description: 'Access stock valuation registers, reorder advisories, and consumption matrices'
+      },
+      {
         id: 'inventory:settings',
         partKey: 'settings',
         name: 'Inventory Policies & Settings',
@@ -308,6 +414,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<string, string[]> = {
     'inventory:request',
     'inventory:manage_requests',
     'inventory:manage_items',
+    'inventory:reports',
     'inventory:settings',
     'dashboard:view_overview',
     'dashboard:view_analytics',
@@ -339,6 +446,8 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<string, string[]> = {
     'inventory:request',
     'inventory:manage_requests',
     'inventory:manage_items',
+    'inventory:reports',
+    'inventory:settings',
     'dashboard:view_overview',
     'dashboard:view_analytics',
     'customers:view',
@@ -404,6 +513,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<string, string[]> = {
     'inventory:request',
     'inventory:manage_requests',
     'inventory:manage_items',
+    'inventory:reports',
     'inventory:settings',
     'dashboard:view_overview'
   ],
@@ -413,6 +523,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<string, string[]> = {
     'inventory:request',
     'inventory:manage_requests',
     'inventory:manage_items',
+    'inventory:reports',
     'dashboard:view_overview'
   ]
 };

@@ -185,7 +185,7 @@
     <!-- Inventory & Stores with Sub-categories -->
     <div class="nav-expandable-group" *ngIf="canAccessInventory()">
       <div class="nav-parent-item" [class.expanded]="inventoryExpanded()" [class.parent-active]="isInventoryActive()">
-        <a routerLink="/inventory/items" class="parent-link">
+        <a [routerLink]="inventoryRootRoute()" class="parent-link">
           <mat-icon class="parent-icon">inventory_2</mat-icon>
           <span class="parent-label">Inventory & Store</span>
         </a>
@@ -196,19 +196,19 @@
 
       <!-- Nested Sub-Categories -->
       <div class="sub-nav-list" *ngIf="inventoryExpanded()">
-        <a routerLink="/inventory/items" routerLinkActive="active-sub-link" class="sub-nav-item">
+        <a *ngIf="canViewInventoryItems()" routerLink="/inventory/items" routerLinkActive="active-sub-link" class="sub-nav-item">
           <mat-icon class="sub-icon">category</mat-icon>
           <span class="sub-title">Items & Assets</span>
         </a>
-        <a routerLink="/inventory/requests" routerLinkActive="active-sub-link" class="sub-nav-item">
+        <a *ngIf="canAccessInventoryRequests()" routerLink="/inventory/requests" routerLinkActive="active-sub-link" class="sub-nav-item">
           <mat-icon class="sub-icon">shopping_bag</mat-icon>
           <span class="sub-title">Requisitions</span>
         </a>
-        <a routerLink="/inventory/ledger" routerLinkActive="active-sub-link" class="sub-nav-item">
+        <a *ngIf="canViewInventoryLedger()" routerLink="/inventory/ledger" routerLinkActive="active-sub-link" class="sub-nav-item">
           <mat-icon class="sub-icon">receipt_long</mat-icon>
           <span class="sub-title">Stock Ledger</span>
         </a>
-        <a routerLink="/inventory/reports" routerLinkActive="active-sub-link" class="sub-nav-item">
+        <a *ngIf="canViewInventoryReports()" routerLink="/inventory/reports" routerLinkActive="active-sub-link" class="sub-nav-item">
           <mat-icon class="sub-icon">summarize</mat-icon>
           <span class="sub-title">Stock Reports</span>
         </a>
@@ -225,21 +225,21 @@
     </a>
   </mat-nav-list>
 
-  <div class="nav-section-label" *ngIf="rbacService.hasRole('admin')">ADMINISTRATION</div>
+  <div class="nav-section-label" *ngIf="rbacService.hasRole('admin') || rbacService.canAccessModule('attendance')">ADMINISTRATION</div>
   <mat-nav-list class="nav-list">
     <a mat-list-item routerLink="/profile" routerLinkActive="active-link">
       <mat-icon matListItemIcon>manage_accounts</mat-icon>
       <span matListItemTitle>User Profiles & RBAC</span>
     </a>
-    <a mat-list-item *ngIf="rbacService.hasRole('admin')" routerLink="/attendance" routerLinkActive="active-link">
+    <a mat-list-item *ngIf="rbacService.canAccessModule('attendance')" routerLink="/attendance" routerLinkActive="active-link">
       <mat-icon matListItemIcon>fingerprint</mat-icon>
       <span matListItemTitle>User Attendance</span>
     </a>
-    <a mat-list-item *ngIf="rbacService.hasRole('admin')" routerLink="/settings" routerLinkActive="active-link">
+    <a mat-list-item *ngIf="rbacService.hasRole('admin') && rbacService.canAccessModule('settings')" routerLink="/settings" routerLinkActive="active-link">
       <mat-icon matListItemIcon>tune</mat-icon>
       <span matListItemTitle>Settings & Schemas</span>
     </a>
-    <a mat-list-item *ngIf="rbacService.hasRole('admin')" routerLink="/system-log" routerLinkActive="active-link">
+    <a mat-list-item *ngIf="rbacService.hasRole('admin') && rbacService.canAccessModule('system-log')" routerLink="/system-log" routerLinkActive="active-link">
       <mat-icon matListItemIcon>receipt_long</mat-icon>
       <span matListItemTitle>System Audit Log</span>
     </a>

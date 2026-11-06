@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, ReactiveFormsModule, FormsModule } from '@angular/forms';
 import { MatCardModule } from '@angular/material/card';
@@ -44,6 +44,14 @@ export class InventorySettingsComponent implements OnInit {
 
   settingsForm!: FormGroup;
   isLoading = signal<boolean>(true);
+
+  canManageSettings = computed(() => {
+    return this.rbacService.isAdmin() ||
+           this.rbacService.isSuperAdmin() ||
+           this.rbacService.isDivisionalAdmin() ||
+           this.rbacService.hasRole('Store Manager') ||
+           this.rbacService.hasPermission('inventory:settings');
+  });
 
   // Chip lists
   categories = signal<string[]>([...DEFAULT_INVENTORY_SETTINGS.categories]);
@@ -137,6 +145,10 @@ export class InventorySettingsComponent implements OnInit {
   }
 
   async onSaveSettings() {
+    if (!this.canManageSettings()) {
+      this.notif.error('Permission denied: You do not have permission to modify inventory settings.');
+      return;
+    }
     try {
       const val = this.settingsForm.value;
       const updatedSettings: InventorySettings = {
@@ -161,6 +173,10 @@ export class InventorySettingsComponent implements OnInit {
   }
 
   resetToDefaults() {
+    if (!this.canManageSettings()) {
+      this.notif.error('Permission denied: You do not have permission to reset inventory settings.');
+      return;
+    }
     const confirm = window.confirm('Reset all categories, locations, and settings to factory defaults?');
     if (confirm) {
       this.settingsForm.patchValue({

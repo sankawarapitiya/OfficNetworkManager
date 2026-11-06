@@ -11,11 +11,11 @@
     </div>
 
     <div class="header-right">
-      <button mat-stroked-button (click)="resetToDefaults()" class="action-btn">
+      <button mat-stroked-button (click)="resetToDefaults()" [disabled]="!canManageSettings()" class="action-btn">
         <mat-icon>restart_alt</mat-icon> Reset Defaults
       </button>
 
-      <button mat-flat-button color="primary" (click)="onSaveSettings()" class="action-btn save-btn">
+      <button mat-flat-button color="primary" (click)="onSaveSettings()" [disabled]="!canManageSettings()" class="action-btn save-btn">
         <mat-icon>save</mat-icon> Save Configuration
       </button>
     </div>

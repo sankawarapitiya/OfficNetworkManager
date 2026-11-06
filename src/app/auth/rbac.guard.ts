@@ -39,9 +39,13 @@ export const rbacGuard: CanActivateFn = (route, state) => {
 
       // 3. Module Level Access Check
       if (requiredModule && !rbacService.canAccessModule(requiredModule)) {
-        console.warn(`[Access Guard] Access denied to module: ${requiredModule}`);
-        snackBar.open(`Access Denied: You do not have access to the ${requiredModule} module.`, 'Dismiss', { duration: 3500 });
-        return router.parseUrl('/dashboard');
+        const hasSpecificPerm = (requiredPermission && rbacService.hasPermission(requiredPermission)) ||
+                                (requiredPermissions && requiredPermissions.some(p => rbacService.hasPermission(p)));
+        if (!hasSpecificPerm) {
+          console.warn(`[Access Guard] Access denied to module: ${requiredModule}`);
+          snackBar.open(`Access Denied: You do not have access to the ${requiredModule} module.`, 'Dismiss', { duration: 3500 });
+          return router.parseUrl('/dashboard');
+        }
       }
 
       // 4. Specific Permission Check

@@ -15,7 +15,9 @@ import {
   SYSTEM_MODULE_PERMISSIONS, 
   DEFAULT_ROLE_PERMISSIONS, 
   ALL_SYSTEM_PERMISSION_IDS, 
-  ModulePermissionDefinition 
+  ModulePermissionDefinition,
+  ALL_SYSTEM_MODULE_ROUTES,
+  SystemModuleRouteDef
 } from '../../core/models/permission.model';
 
 @Component({
@@ -172,16 +174,61 @@ import {
         </div>
 
         <!-- Modules Global Access -->
-        <div class="policy-section">
-          <h4>Accessible Module Routes</h4>
-          <p class="policy-hint">Controls top-level navigation access in the sidebar menu.</p>
-          <div class="checkbox-group">
-            <mat-checkbox *ngFor="let mod of data.availableModules" 
-                          [checked]="isChecked('accessible_modules', mod)"
-                          (change)="toggle('accessible_modules', mod)"
-                          color="primary">
-              {{ mod | titlecase }}
-            </mat-checkbox>
+        <div class="policy-section modules-section">
+          <div class="policy-title-row">
+            <div class="mod-section-header">
+              <mat-icon class="mod-section-icon">apps</mat-icon>
+              <h4>Accessible Module Routes</h4>
+              <span class="route-count-pill" [class.all-active]="isAllModulesSelected()" [class.none-active]="selectedModulesCount === 0">
+                <ng-container *ngIf="selectedModulesCount > 0">
+                  {{ selectedModulesCount }} / {{ allSystemModules.length }} Active
+                </ng-container>
+                <ng-container *ngIf="selectedModulesCount === 0">
+                  All 11 Modules (Default Full Access)
+                </ng-container>
+              </span>
+            </div>
+            <div class="module-header-actions">
+              <button mat-stroked-button type="button" class="mod-action-btn" (click)="selectAllModules()" matTooltip="Select all 11 modules">
+                <mat-icon>done_all</mat-icon> Select All
+              </button>
+              <button mat-stroked-button type="button" class="mod-action-btn" (click)="clearAllModules()" matTooltip="Reset to default full access (empty restriction list)">
+                <mat-icon>refresh</mat-icon> Default Full Access
+              </button>
+            </div>
+          </div>
+          <p class="policy-hint">
+            Controls top-level navigation access in the sidebar menu. Select specific modules to restrict access, or leave as Default Full Access.
+          </p>
+          
+          <div class="modules-grid">
+            <div *ngFor="let mod of allSystemModules" 
+                 class="module-choice-card"
+                 [class.selected]="isModuleSelected(mod.id)"
+                 (click)="toggleModule(mod.id)">
+              <div class="module-card-top">
+                <div class="mod-icon-box" [ngClass]="mod.category.toLowerCase()">
+                  <mat-icon>{{ mod.icon }}</mat-icon>
+                </div>
+                <div class="mod-meta-col">
+                  <div class="mod-name-row">
+                    <span class="mod-name">{{ mod.name }}</span>
+                    <span class="cat-pill" [ngClass]="mod.category.toLowerCase()">{{ mod.category }}</span>
+                  </div>
+                  <div class="mod-sub-row">
+                    <code class="mod-route">{{ mod.route }}</code>
+                    <span class="mod-key-id">id: {{ mod.id }}</span>
+                  </div>
+                </div>
+                <mat-checkbox [checked]="isModuleSelected(mod.id)" 
+                              (click)="$event.stopPropagation()"
+                              (change)="toggleModule(mod.id)"
+                              color="primary"
+                              class="mod-checkbox">
+                </mat-checkbox>
+              </div>
+              <p class="mod-desc-text">{{ mod.description }}</p>
+            </div>
           </div>
         </div>
       </form>
@@ -449,6 +496,235 @@ import {
       }
     }
 
+    /* Accessible Modules Section */
+    .modules-section {
+      background-color: #fafbfc;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 16px;
+      margin-top: 14px;
+
+      .mod-section-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+
+        .mod-section-icon {
+          color: #4f46e5;
+          font-size: 20px;
+          width: 20px;
+          height: 20px;
+        }
+
+        h4 {
+          margin: 0;
+          font-size: 14px;
+          font-weight: 700;
+          color: #1e293b;
+        }
+
+        .route-count-pill {
+          font-size: 11px;
+          font-weight: 700;
+          padding: 2px 8px;
+          border-radius: 12px;
+          background: #e0e7ff;
+          color: #3730a3;
+
+          &.all-active {
+            background: #dcfce7;
+            color: #15803d;
+          }
+
+          &.none-active {
+            background: #f1f5f9;
+            color: #475569;
+          }
+        }
+      }
+
+      .module-header-actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+
+        .mod-action-btn {
+          font-size: 11px;
+          height: 28px;
+          line-height: 28px;
+          padding: 0 8px;
+          background: #ffffff;
+          mat-icon {
+            font-size: 14px;
+            width: 14px;
+            height: 14px;
+            margin-right: 2px;
+          }
+        }
+      }
+
+      .modules-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
+        margin-top: 10px;
+
+        @media (max-width: 650px) {
+          grid-template-columns: 1fr;
+        }
+
+        .module-choice-card {
+          border: 1px solid #e2e8f0;
+          border-radius: 8px;
+          padding: 10px 12px;
+          background: #ffffff;
+          cursor: pointer;
+          transition: all 0.15s ease;
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+
+          &:hover {
+            border-color: #818cf8;
+            box-shadow: 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+          }
+
+          &.selected {
+            background: #eff6ff;
+            border-color: #3b82f6;
+
+            .mod-name {
+              color: #1d4ed8;
+              font-weight: 700;
+            }
+
+            .mod-icon-box {
+              background: #3b82f6 !important;
+              color: #ffffff !important;
+            }
+          }
+
+          .module-card-top {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+
+            .mod-icon-box {
+              width: 32px;
+              height: 32px;
+              border-radius: 6px;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              flex-shrink: 0;
+              transition: all 0.15s ease;
+
+              mat-icon {
+                font-size: 18px;
+                width: 18px;
+                height: 18px;
+              }
+
+              &.core {
+                background: #eef2ff;
+                color: #4f46e5;
+              }
+
+              &.operations {
+                background: #ecfeff;
+                color: #0891b2;
+              }
+
+              &.administration {
+                background: #fdf4ff;
+                color: #a855f7;
+              }
+            }
+
+            .mod-meta-col {
+              flex: 1;
+              min-width: 0;
+              display: flex;
+              flex-direction: column;
+              gap: 2px;
+
+              .mod-name-row {
+                display: flex;
+                align-items: center;
+                gap: 6px;
+                flex-wrap: wrap;
+
+                .mod-name {
+                  font-size: 13px;
+                  font-weight: 600;
+                  color: #0f172a;
+                  line-height: 1.25;
+                }
+
+                .cat-pill {
+                  font-size: 10px;
+                  font-weight: 600;
+                  padding: 1px 5px;
+                  border-radius: 4px;
+                  text-transform: uppercase;
+                  letter-spacing: 0.02em;
+
+                  &.core {
+                    background: #e0e7ff;
+                    color: #3730a3;
+                  }
+
+                  &.operations {
+                    background: #cffafe;
+                    color: #155e75;
+                  }
+
+                  &.administration {
+                    background: #f3e8ff;
+                    color: #6b21a8;
+                  }
+                }
+              }
+
+              .mod-sub-row {
+                display: flex;
+                align-items: center;
+                gap: 6px;
+
+                .mod-route {
+                  font-size: 10.5px;
+                  font-family: monospace;
+                  background: #f1f5f9;
+                  color: #475569;
+                  padding: 0 4px;
+                  border-radius: 3px;
+                }
+
+                .mod-key-id {
+                  font-size: 10px;
+                  color: #94a3b8;
+                }
+              }
+            }
+
+            .mod-checkbox {
+              margin: 0;
+              flex-shrink: 0;
+            }
+          }
+
+          .mod-desc-text {
+            margin: 0;
+            font-size: 11px;
+            color: #64748b;
+            line-height: 1.35;
+          }
+        }
+      }
+    }
+
     .error-banner {
       padding: 12px;
       background-color: #ffebee;
@@ -462,6 +738,7 @@ export class UserRoleDialogComponent {
   
   readonly moduleDefinitions = SYSTEM_MODULE_PERMISSIONS;
   readonly totalSystemPerms = ALL_SYSTEM_PERMISSION_IDS.length;
+  readonly allSystemModules = ALL_SYSTEM_MODULE_ROUTES;
 
   userForm: FormGroup;
   isSaving = false;
@@ -594,6 +871,42 @@ export class UserRoleDialogComponent {
     this.userForm.get('permissions')?.setValue(perms);
   }
 
+  get selectedModulesCount(): number {
+    return (this.userForm.get('accessible_modules')?.value || []).length;
+  }
+
+  isAllModulesSelected(): boolean {
+    return this.selectedModulesCount === this.allSystemModules.length;
+  }
+
+  isModuleSelected(id: string): boolean {
+    const modules = (this.userForm.get('accessible_modules')?.value as string[]) || [];
+    const norm = (s: string) => s.toLowerCase().replace(/[\s_-]+/g, '');
+    const target = norm(id);
+    return modules.some(m => norm(m) === target);
+  }
+
+  toggleModule(id: string) {
+    const modules = [...((this.userForm.get('accessible_modules')?.value as string[]) || [])];
+    const norm = (s: string) => s.toLowerCase().replace(/[\s_-]+/g, '');
+    const target = norm(id);
+    const idx = modules.findIndex(m => norm(m) === target);
+    if (idx > -1) {
+      modules.splice(idx, 1);
+    } else {
+      modules.push(id);
+    }
+    this.userForm.get('accessible_modules')?.setValue(modules);
+  }
+
+  selectAllModules() {
+    this.userForm.get('accessible_modules')?.setValue(this.allSystemModules.map(m => m.id));
+  }
+
+  clearAllModules() {
+    this.userForm.get('accessible_modules')?.setValue([]);
+  }
+
   isChecked(arrayName: string, item: string): boolean {
     const arr = (this.userForm.get(arrayName)?.value as string[]) || [];
     const norm = (s: string) => s.toLowerCase().replace(/[\s_-]+/g, '');
@@ -622,6 +935,8 @@ export class UserRoleDialogComponent {
       case 'Staff': return 'Execution of tasks & operational records';
       case 'HR': return 'Employee records & personnel administration';
       case 'Field Agent': return 'Mobile field ops & regional reporting';
+      case 'Store Manager': return 'Store warehouse management, inventory settings, and stock dispatch';
+      case 'Inventory Officer': return 'Store items management, stock adjustments, and item issuances';
       default: return 'Custom operational privilege';
     }
   }

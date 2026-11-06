@@ -172,7 +172,42 @@ export class SidebarComponent implements OnInit, OnDestroy {
   canAccessInventory = computed(() => {
     return this.rbacService.canAccessModule('inventory') ||
            this.rbacService.hasPermission('inventory:view') ||
-           this.rbacService.hasPermission('inventory:request');
+           this.rbacService.hasPermission('inventory:request') ||
+           this.rbacService.hasPermission('inventory:manage_requests');
+  });
+
+  canViewInventoryItems = computed(() => {
+    return this.rbacService.isAdmin() ||
+           this.rbacService.isSuperAdmin() ||
+           this.rbacService.hasPermission('inventory:view');
+  });
+
+  canAccessInventoryRequests = computed(() => {
+    return this.rbacService.isAdmin() ||
+           this.rbacService.isSuperAdmin() ||
+           this.rbacService.hasPermission('inventory:request') ||
+           this.rbacService.hasPermission('inventory:manage_requests');
+  });
+
+  canViewInventoryLedger = computed(() => {
+    return this.rbacService.isAdmin() ||
+           this.rbacService.isSuperAdmin() ||
+           this.rbacService.hasPermission('inventory:view') ||
+           this.rbacService.hasPermission('inventory:manage_items');
+  });
+
+  canViewInventoryReports = computed(() => {
+    return this.rbacService.isAdmin() ||
+           this.rbacService.isSuperAdmin() ||
+           this.rbacService.hasPermission('inventory:reports') ||
+           this.rbacService.hasPermission('inventory:view') ||
+           this.rbacService.hasPermission('inventory:manage_items');
+  });
+
+  inventoryRootRoute = computed(() => {
+    if (this.canViewInventoryItems()) return '/inventory/items';
+    if (this.canAccessInventoryRequests()) return '/inventory/requests';
+    return '/inventory/items';
   });
 
   canManageInventorySettings = computed(() => {

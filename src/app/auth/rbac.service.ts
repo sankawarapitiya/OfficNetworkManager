@@ -102,6 +102,14 @@ export class RbacService {
     return this.hasRole('Department Head');
   }
 
+  isStoreManager(): boolean {
+    return this.hasRole('Store Manager');
+  }
+
+  isInventoryOfficer(): boolean {
+    return this.hasRole('Inventory Officer');
+  }
+
   isAdmin(): boolean {
     return this.hasRole('admin');
   }
@@ -113,13 +121,22 @@ export class RbacService {
     // Admins always have access to all modules
     if (this.hasRole('admin')) return true;
 
+    // If user has any explicit or role-derived permission for this module, grant access
+    const effectivePerms = this.userEffectivePermissions();
+    if (effectivePerms.some(p => p.startsWith(`${moduleName}:`))) {
+      return true;
+    }
+
     const modules = rolesData.accessible_modules || [];
     
     // If no specific modules are assigned, we default to full access 
     // (as indicated in the profile UI logic).
     if (modules.length === 0) return true;
 
-    return modules.includes(moduleName);
+    const norm = (str: string) => str.toLowerCase().replace(/[\s_-]+/g, '');
+    const targetNorm = norm(moduleName);
+
+    return modules.some(m => norm(m) === targetNorm);
   }
 
   hasPermission(permissionId: string): boolean {

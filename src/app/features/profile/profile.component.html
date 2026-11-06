@@ -124,10 +124,19 @@
 
               <div class="policy-group">
                 <h4>Accessible Modules</h4>
-                <ul>
-                  <li *ngFor="let mod of roles.accessible_modules">{{ mod | titlecase }}</li>
-                  <li *ngIf="roles.accessible_modules.length === 0">All modules accessible</li>
-                </ul>
+                <div class="accessible-modules-list" *ngIf="roles.accessible_modules && roles.accessible_modules.length > 0; else allModulesAccessible">
+                  <span *ngFor="let modId of roles.accessible_modules" class="module-access-pill">
+                    <mat-icon class="mod-pill-icon">{{ getModuleIcon(modId) }}</mat-icon>
+                    <span class="mod-pill-name">{{ getModuleName(modId) }}</span>
+                    <code class="mod-pill-route">{{ getModuleRoute(modId) }}</code>
+                  </span>
+                </div>
+                <ng-template #allModulesAccessible>
+                  <span class="all-access-badge">
+                    <mat-icon class="check-icon">check_circle</mat-icon>
+                    All 11 system modules accessible (Default)
+                  </span>
+                </ng-template>
               </div>
             </div>
             <ng-template #noRoles>

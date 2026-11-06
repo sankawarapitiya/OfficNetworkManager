@@ -20,7 +20,12 @@ import { FirestoreService } from '../../core/services/firestore.service';
 import { NotificationService } from '../../core/services/notification.service';
 import { SettingsService, Department } from '../settings/settings.service';
 import { UserRoleDialogComponent } from './user-role-dialog.component';
-import { DEFAULT_ROLE_PERMISSIONS, ALL_SYSTEM_PERMISSION_IDS } from '../../core/models/permission.model';
+import { 
+  DEFAULT_ROLE_PERMISSIONS, 
+  ALL_SYSTEM_PERMISSION_IDS, 
+  ALL_SYSTEM_MODULE_ROUTES, 
+  SystemModuleRouteDef 
+} from '../../core/models/permission.model';
 
 export interface AppUser {
   id?: string;
@@ -75,10 +80,28 @@ export class ProfileComponent implements OnInit {
     'Department Head',
     'Staff',
     'HR',
-    'Field Agent'
+    'Field Agent',
+    'Store Manager',
+    'Inventory Officer'
   ];
-  availableModules = ['dashboard', 'customers', 'hr', 'land', 'work-plans', 'letters'];
+  readonly allSystemModules = ALL_SYSTEM_MODULE_ROUTES;
+  availableModules = ALL_SYSTEM_MODULE_ROUTES.map(m => m.id);
   availableLocations = ['North', 'South', 'East', 'West', 'Central'];
+
+  getModuleName(id: string): string {
+    const mod = this.allSystemModules.find(m => m.id.toLowerCase() === id.toLowerCase());
+    return mod ? mod.name : id;
+  }
+
+  getModuleIcon(id: string): string {
+    const mod = this.allSystemModules.find(m => m.id.toLowerCase() === id.toLowerCase());
+    return mod ? mod.icon : 'apps';
+  }
+
+  getModuleRoute(id: string): string {
+    const mod = this.allSystemModules.find(m => m.id.toLowerCase() === id.toLowerCase());
+    return mod ? mod.route : `/${id}`;
+  }
 
   getRoleChipClass(role: string): string {
     const norm = role.toLowerCase().replace(/[\s_-]+/g, '');
@@ -89,6 +112,8 @@ export class ProfileComponent implements OnInit {
       case 'hr': return 'role-hr';
       case 'fieldagent': return 'role-field-agent';
       case 'staff': return 'role-staff';
+      case 'storemanager': return 'role-store-manager';
+      case 'inventoryofficer': return 'role-inv-officer';
       default: return 'role-default';
     }
   }

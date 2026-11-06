@@ -11,12 +11,12 @@
     </div>
 
     <div class="header-right">
-      <button mat-stroked-button color="primary" (click)="openRequestDialog()" class="action-btn">
+      <button *ngIf="canRequestItems()" mat-stroked-button color="primary" (click)="openRequestDialog()" class="action-btn">
         <mat-icon>shopping_bag</mat-icon>
         Request Items
       </button>
 
-      <button mat-flat-button color="primary" [matMenuTriggerFor]="addMenu" class="action-btn primary-add">
+      <button *ngIf="canManageItems()" mat-flat-button color="primary" [matMenuTriggerFor]="addMenu" class="action-btn primary-add">
         <mat-icon>add</mat-icon>
         Register New...
         <mat-icon>arrow_drop_down</mat-icon>
@@ -274,17 +274,17 @@
                 <span>View Full Dossier</span>
               </button>
 
-              <button mat-menu-item *ngIf="it.itemType === 'movable'" (click)="openAdjustDialog(it)">
+              <button mat-menu-item *ngIf="canManageItems() && it.itemType === 'movable'" (click)="openAdjustDialog(it)">
                 <mat-icon style="color: #059669;">sync_alt</mat-icon>
                 <span>Adjust Stock / Stock-In</span>
               </button>
 
-              <button mat-menu-item (click)="openEditDialog(it)">
+              <button mat-menu-item *ngIf="canManageItems()" (click)="openEditDialog(it)">
                 <mat-icon>edit</mat-icon>
                 <span>Edit Record</span>
               </button>
 
-              <button mat-menu-item color="warn" (click)="deleteItem(it)">
+              <button mat-menu-item color="warn" *ngIf="canManageItems()" (click)="deleteItem(it)">
                 <mat-icon color="warn">delete</mat-icon>
                 <span>Delete Record</span>
               </button>
