@@ -427,6 +427,7 @@ export function generateLandJobRef(
     subjectCode?: string; 
     fileNumber?: string; 
     fileVersion?: string;
+    customSeq?: number;
   }
 ): string {
   const chosenPrefixCode = customOptions?.prefixCode || settings.defaultJobPrefix || 'LND';
@@ -438,7 +439,9 @@ export function generateLandJobRef(
   const fileVersion = customOptions?.fileVersion || prefixObj?.fileVersion || settings.fileVersion || 'V1';
 
   const digits = settings.seqDigits || 4;
-  const seq = prefixObj?.nextSeq !== undefined ? prefixObj.nextSeq : (settings.nextSeq || 1);
+  const seq = (customOptions?.customSeq !== undefined && customOptions?.customSeq !== null)
+    ? customOptions.customSeq
+    : (prefixObj?.nextSeq !== undefined ? prefixObj.nextSeq : (settings.nextSeq || 1));
   const seqNum = String(seq).padStart(digits, '0');
   const year = new Date().getFullYear();
 

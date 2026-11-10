@@ -146,12 +146,42 @@ export class LandService {
     // Retrieve current settings from reactive cache / subject
     const settings = this.settingsSubject.getValue() || DEFAULT_LAND_SETTINGS;
     const chosenPrefix = jobData.prefixCode || settings.defaultJobPrefix || 'LND';
-    const jobRef = jobData.jobRef || generateLandJobRef(settings, {
-      prefixCode: chosenPrefix,
-      subjectCode: jobData.subjectCode,
-      fileNumber: jobData.fileNumber,
-      fileVersion: jobData.fileVersion
-    });
+
+    let jobRef = jobData.jobRef;
+    if (!jobRef) {
+      let customSeq: number | undefined;
+      const fn = jobData.fileNumber?.trim().toLowerCase();
+      if (fn) {
+        try {
+          const allJobs = await firstValueFrom(this.getLandJobs());
+          const fileJobs = allJobs.filter(j => (j.fileNumber || '').trim().toLowerCase() === fn);
+          if (fileJobs.length > 0) {
+            let maxFoundSeq = 0;
+            for (const j of fileJobs) {
+              if (j.jobRef) {
+                const parts = j.jobRef.split(/[\/\-]/);
+                const lastPart = parts[parts.length - 1];
+                const num = parseInt(lastPart, 10);
+                if (!isNaN(num) && num > maxFoundSeq) {
+                  maxFoundSeq = num;
+                }
+              }
+            }
+            customSeq = Math.max(fileJobs.length + 1, maxFoundSeq + 1);
+          }
+        } catch (e) {
+          console.warn('Could not query existing jobs for file sequence calculation:', e);
+        }
+      }
+
+      jobRef = generateLandJobRef(settings, {
+        prefixCode: chosenPrefix,
+        subjectCode: jobData.subjectCode,
+        fileNumber: jobData.fileNumber,
+        fileVersion: jobData.fileVersion,
+        customSeq
+      });
+    }
     const now = Date.now();
 
     const newJob: Omit<LandJob, 'id'> = {

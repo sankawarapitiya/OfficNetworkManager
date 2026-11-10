@@ -244,6 +244,36 @@ export class LandJobDialogComponent implements OnInit {
     return this.existingFileNumbers().find(f => f.fileNumber.toLowerCase() === target.toLowerCase()) || null;
   });
 
+  currentFileTaskSeq = computed<number>(() => {
+    const formFn = (this.initialForm?.get('fileNumber')?.value || '').trim();
+    const filterFn = (this.fileNumberFilterText() || '').trim();
+    const target = (formFn || filterFn).toLowerCase();
+    if (!target) return 1;
+
+    const existingJobsForFile = this.existingJobsList().filter(
+      j => (j.fileNumber || '').trim().toLowerCase() === target
+    );
+
+    if (existingJobsForFile.length === 0) {
+      return 1;
+    }
+
+    const nextSeqByCount = existingJobsForFile.length + 1;
+    let maxFoundSeq = 0;
+    for (const j of existingJobsForFile) {
+      if (j.jobRef) {
+        const parts = j.jobRef.split(/[\/\-]/);
+        const lastPart = parts[parts.length - 1];
+        const num = parseInt(lastPart, 10);
+        if (!isNaN(num) && num > maxFoundSeq) {
+          maxFoundSeq = num;
+        }
+      }
+    }
+
+    return Math.max(nextSeqByCount, maxFoundSeq + 1);
+  });
+
   currentStageName = computed(() => {
     switch (this.currentStepIndex()) {
       case 0: return 'Stage 1: Initial Setup';
@@ -400,6 +430,9 @@ export class LandJobDialogComponent implements OnInit {
     this.landService.getLandJobs().subscribe({
       next: (jobs) => {
         this.existingJobsList.set(jobs || []);
+        if (!this.existingJob) {
+          this.updateGeneratedJobRef();
+        }
       }
     });
 
@@ -494,12 +527,21 @@ export class LandJobDialogComponent implements OnInit {
   updateGeneratedJobRef() {
     if (this.isEditMode()) return;
     const s = this.settings();
-    const val = this.initialForm.value;
+    const val = this.initialForm?.value;
+    if (!val) return;
+
+    const fn = (val.fileNumber || this.fileNumberFilterText() || '').trim().toLowerCase();
+    const hasExistingFile = !!fn && this.existingJobsList().some(
+      j => (j.fileNumber || '').trim().toLowerCase() === fn
+    );
+    const customSeq = hasExistingFile ? this.currentFileTaskSeq() : undefined;
+
     const generated = generateLandJobRef(s, {
       prefixCode: val.prefixCode,
       subjectCode: val.subjectCode,
       fileNumber: val.fileNumber,
-      fileVersion: val.fileVersion
+      fileVersion: val.fileVersion,
+      customSeq
     });
     this.initialForm.patchValue({ customJobRef: generated });
   }
@@ -509,12 +551,19 @@ export class LandJobDialogComponent implements OnInit {
       return this.existingJob.jobRef;
     }
     const val = this.initialForm?.value;
+    const fn = (val?.fileNumber || this.fileNumberFilterText() || '').trim().toLowerCase();
+    const hasExistingFile = !!fn && this.existingJobsList().some(
+      j => (j.fileNumber || '').trim().toLowerCase() === fn
+    );
+    const customSeq = hasExistingFile ? this.currentFileTaskSeq() : undefined;
+
     if (val?.customJobRef) return val.customJobRef;
     return generateLandJobRef(this.settings(), {
       prefixCode: val?.prefixCode,
       subjectCode: val?.subjectCode,
       fileNumber: val?.fileNumber,
-      fileVersion: val?.fileVersion
+      fileVersion: val?.fileVersion,
+      customSeq
     });
   }
 
